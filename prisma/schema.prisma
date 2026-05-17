@@ -47,23 +47,40 @@ model User {
   clerkId String  @unique
   email   String? @unique
 
+  //////////////////////////////////////////////////
+  // BILLING
+  //////////////////////////////////////////////////
+
   plan    PlanType @default(FREE)
   credits Int      @default(10)
 
   lemonCustomerId     String?
   lemonSubscriptionId String?
 
+  //////////////////////////////////////////////////
+  // TIMESTAMPS
+  //////////////////////////////////////////////////
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // relations
-  videoJobs          VideoJob[]
-  images             Image[]
-  voices             Voice[]
-  usages             Usage[]
-  payments           Payment[]
-  subscriptions      Subscription[]
-  notifications      Notification[]
+  //////////////////////////////////////////////////
+  // RELATIONS
+  //////////////////////////////////////////////////
+
+  videoJobs VideoJob[]
+  imageJobs ImageJob[]
+  voiceJobs VoiceJob[]
+
+  images Image[]
+  voices Voice[]
+
+  usages        Usage[]
+  payments      Payment[]
+  subscriptions Subscription[]
+
+  notifications Notification[]
+
   manualPayments     ManualPayment[]
   abandonedCheckouts AbandonedCheckout[]
 
@@ -79,7 +96,7 @@ model Subscription {
   id String @id @default(cuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   lemonSubscriptionId String? @unique
   lemonCustomerId     String?
@@ -97,19 +114,20 @@ model Subscription {
 }
 
 //////////////////////////////////////////////////
-// 💰 PAYMENT (AUTOMATIC)
+// 💰 PAYMENT
 //////////////////////////////////////////////////
 
 model Payment {
   id String @id @default(cuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   amount   Float
   currency String
 
   lemonOrderId String? @unique
+
   status PaymentStatus @default(COMPLETED)
 
   createdAt DateTime @default(now())
@@ -118,14 +136,14 @@ model Payment {
 }
 
 //////////////////////////////////////////////////
-// 📊 USAGE (BILLING CORE)
+// 📊 USAGE
 //////////////////////////////////////////////////
 
 model Usage {
   id String @id @default(cuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   type String
   cost Int
@@ -137,6 +155,10 @@ model Usage {
 
   createdAt DateTime @default(now())
 
+  //////////////////////////////////////////////////
+  // RELATIONS
+  //////////////////////////////////////////////////
+
   videoJobs VideoJob[]
 
   @@index([userId])
@@ -145,19 +167,20 @@ model Usage {
 }
 
 //////////////////////////////////////////////////
-// 🎬 VIDEO JOB (CORE ENGINE)
+// 🎬 VIDEO JOB
 //////////////////////////////////////////////////
 
 model VideoJob {
   id String @id @default(cuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   prompt String
 
-  status   JobStatus @default(PENDING)
-  priority Int       @default(0)
+  status JobStatus @default(PENDING)
+
+  priority Int @default(0)
 
   resultUrl String?
   error     String?
@@ -168,7 +191,77 @@ model VideoJob {
   progress Int @default(0)
 
   usageId String?
-  usage   Usage? @relation(fields: [usageId], references: [id], onDelete: SetNull)
+  usage   Usage?  @relation(fields: [usageId], references: [id], onDelete: SetNull)
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([userId])
+  @@index([priority, createdAt])
+}
+
+//////////////////////////////////////////////////
+// 🖼 IMAGE JOB
+//////////////////////////////////////////////////
+
+model ImageJob {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  prompt String
+
+  status JobStatus @default(PENDING)
+
+  priority Int @default(0)
+
+  resultUrl String?
+  error     String?
+
+  attempts    Int @default(0)
+  maxAttempts Int @default(3)
+
+  progress Int @default(0)
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([userId])
+  @@index([priority, createdAt])
+}
+
+//////////////////////////////////////////////////
+// 🎙 VOICE JOB
+//////////////////////////////////////////////////
+
+model VoiceJob {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  text String
+
+  status JobStatus @default(PENDING)
+
+  priority Int @default(0)
+
+  resultUrl String?
+  error     String?
+
+  attempts    Int @default(0)
+  maxAttempts Int @default(3)
+
+  progress Int @default(0)
 
   startedAt  DateTime?
   finishedAt DateTime?
@@ -192,7 +285,7 @@ model Image {
   prompt String
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -210,7 +303,7 @@ model Voice {
   text String
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -225,11 +318,12 @@ model Notification {
   id String @id @default(cuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   title   String
   message String
-  read    Boolean @default(false)
+
+  read Boolean @default(false)
 
   createdAt DateTime @default(now())
 
@@ -237,14 +331,14 @@ model Notification {
 }
 
 //////////////////////////////////////////////////
-// 💳 MANUAL PAYMENT (🔥 PRO FRAUD SYSTEM)
+// 💳 MANUAL PAYMENT
 //////////////////////////////////////////////////
 
 model ManualPayment {
   id String @id @default(cuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   plan     String
   method   String
@@ -254,32 +348,15 @@ model ManualPayment {
   screenshotUrl String?
   transactionId String?
 
-  //////////////////////////////////////////////////
-  // 🧠 AI FRAUD SYSTEM
-  //////////////////////////////////////////////////
-
-  aiScore   Float?   // 0 → 1
+  aiScore   Float?
   aiRawText String?
-
-  riskLevel String? // LOW / MEDIUM / HIGH
-
-  //////////////////////////////////////////////////
-  // 📊 STATUS
-  //////////////////////////////////////////////////
+  riskLevel String?
 
   status   String  @default("PENDING")
   verified Boolean @default(false)
 
-  //////////////////////////////////////////////////
-  // ❌ ADMIN ACTIONS (🔥 FIX YOUR ERROR HERE)
-  //////////////////////////////////////////////////
-
-  rejectedBy   String?   // ✅ FIXED
+  rejectedBy   String?
   rejectReason String?
-
-  //////////////////////////////////////////////////
-  // 🌐 TRACKING
-  //////////////////////////////////////////////////
 
   ipAddress String?
   device    String?
@@ -299,16 +376,17 @@ model AbandonedCheckout {
   id String @id @default(cuid())
 
   userId String?
-  user   User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   email String?
   plan  String
 
   checkoutUrl String
-  orderId String? @unique
+  orderId     String? @unique
 
   recovered Boolean @default(false)
-  step      String @default("checkout_started")
+
+  step String @default("checkout_started")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -321,8 +399,9 @@ model AbandonedCheckout {
 //////////////////////////////////////////////////
 
 model WebhookEvent {
-  id      String   @id @default(cuid())
-  eventId String   @unique
+  id String @id @default(cuid())
+
+  eventId String @unique
 
   createdAt DateTime @default(now())
 

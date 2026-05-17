@@ -4,7 +4,7 @@ export async function refundCredits(reference: string) {
   return await db.$transaction(async (tx) => {
     // 🔎 نجيب usage
     const usage = await tx.usage.findFirst({
-      where: { reference },
+      where: { referenceId: reference },
     });
 
     if (!usage) {
@@ -31,7 +31,7 @@ export async function refundCredits(reference: string) {
       where: { id: usage.id },
       data: {
         refunded: true,
-        status: "failed",
+        status: "FAILED",
       },
     });
 
