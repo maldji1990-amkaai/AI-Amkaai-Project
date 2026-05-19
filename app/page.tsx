@@ -13,180 +13,143 @@ import {
   Zap,
   Stars,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function HomePage() {
   const [visitors, setVisitors] = useState(1284);
   const [online, setOnline] = useState(18);
 
-  const [loadingPlan, setLoadingPlan] =
-    useState<"pro" | "premium" | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<
+    "pro" | "premium" | null
+  >(null);
 
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState("");
   const [typingIndex, setTypingIndex] = useState(0);
   const [loadingAI, setLoadingAI] = useState(false);
 
-  const [cursor, setCursor] = useState({ x: 0, y: 0 });
-  const [scene, setScene] = useState(0);
-
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const scenes = ["/demo1.mp4", "/demo2.mp4", "/demo3.mp4"];
-
   const fullText =
     "✨ Cinematic drone shot over Tokyo at night, ultra realistic, neon reflections, volumetric lighting, cinematic camera movement.";
 
   //////////////////////////////////////////////////
-  // 📊 LIVE STATS SYSTEM
+  // 📊 LIVE STATS
   //////////////////////////////////////////////////
+
   useEffect(() => {
     const interval = setInterval(() => {
-      setVisitors((v) => v + Math.floor(Math.random() * 3));
-      setOnline(10 + Math.floor(Math.random() * 40));
-    }, 3500);
+      setVisitors(
+        (v) => v + Math.floor(Math.random() * 3)
+      );
+
+      setOnline(
+        10 + Math.floor(Math.random() * 40)
+      );
+    }, 4000);
 
     return () => clearInterval(interval);
   }, []);
 
   //////////////////////////////////////////////////
-  // 🌌 CURSOR + PARALLAX ENGINE
+  // ✨ AI TYPING EFFECT
   //////////////////////////////////////////////////
-  useEffect(() => {
-    const move = (e: MouseEvent) => {
-      setCursor({
-        x: (e.clientX / window.innerWidth - 0.5) * 30,
-        y: (e.clientY / window.innerHeight - 0.5) * 30,
-      });
-    };
 
-    window.addEventListener("mousemove", move);
-    return () => window.removeEventListener("mousemove", move);
-  }, []);
-
-  //////////////////////////////////////////////////
-  // ✨ AI TYPE STREAM ENGINE
-  //////////////////////////////////////////////////
   useEffect(() => {
     if (!loadingAI) return;
 
     if (typingIndex < fullText.length) {
-      const t = setTimeout(() => {
-        setResult((p) => p + fullText[typingIndex]);
-        setTypingIndex((i) => i + 1);
-      }, 12);
+      const timeout = setTimeout(() => {
+        setResult(
+          (prev) => prev + fullText[typingIndex]
+        );
 
-      return () => clearTimeout(t);
+        setTypingIndex((i) => i + 1);
+      }, 18);
+
+      return () => clearTimeout(timeout);
     } else {
       setLoadingAI(false);
     }
   }, [typingIndex, loadingAI]);
 
   //////////////////////////////////////////////////
-  // 🎬 SCENE ROTATOR (Kling style)
+  // 🌈 CURSOR GLOW
   //////////////////////////////////////////////////
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setScene((s) => (s + 1) % scenes.length);
-    }, 12000);
 
-    return () => clearInterval(interval);
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      const glow = document.getElementById(
+        "cursor-glow"
+      );
+
+      if (glow) {
+        glow.style.left = `${e.clientX}px`;
+        glow.style.top = `${e.clientY}px`;
+      }
+    };
+
+    window.addEventListener("mousemove", move);
+
+    return () =>
+      window.removeEventListener(
+        "mousemove",
+        move
+      );
   }, []);
 
   //////////////////////////////////////////////////
-  // 💳 CHECKOUT FLOW
+  // 💳 CHECKOUT
   //////////////////////////////////////////////////
-  const goToCheckout = async (plan: "pro" | "premium") => {
+
+  const goToCheckout = async (
+    plan: "pro" | "premium"
+  ) => {
     try {
       setLoadingPlan(plan);
 
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
         body: JSON.stringify({ plan }),
       });
 
       const data = await res.json();
 
-      if (!data?.url) return alert("Checkout failed");
+      if (!data?.url) {
+        alert("Checkout failed");
+        return;
+      }
 
       window.location.href = data.url;
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong");
     } finally {
       setLoadingPlan(null);
     }
   };
 
   //////////////////////////////////////////////////
-  // ⚡ AI GENERATION (RUNWAY STYLE)
+  // ⚡ DEMO AI
   //////////////////////////////////////////////////
+
   const generateAI = () => {
     if (!prompt.trim()) return;
 
     setResult("");
     setTypingIndex(0);
     setLoadingAI(true);
-
-    setTimeout(() => setResult("Analyzing prompt..."), 200);
-    setTimeout(() => setResult("Simulating cinematic physics..."), 800);
-    setTimeout(() => setResult("Rendering volumetric lighting..."), 1400);
-    setTimeout(() => setResult("Finalizing output..."), 2000);
   };
-
-  //////////////////////////////////////////////////
-  // 🌈 BACKGROUND ANIMATION LOOP
-  //////////////////////////////////////////////////
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let frame = 0;
-
-    const draw = () => {
-      frame++;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      for (let i = 0; i < 60; i++) {
-        const x = Math.sin(frame * 0.01 + i) * 200 + canvas.width / 2;
-        const y = Math.cos(frame * 0.01 + i) * 200 + canvas.height / 2;
-
-        ctx.fillStyle = "rgba(0,255,255,0.05)";
-        ctx.beginPath();
-        ctx.arc(x, y, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      requestAnimationFrame(draw);
-    };
-
-    draw();
-  }, []);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-white">
 
-      {/* 🌌 CANVAS BACKGROUND (NEW) */}
-      <canvas
-        ref={canvasRef}
-        className="fixed inset-0 opacity-40"
-      />
+      {/* 🌌 BACKGROUND */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,255,255,0.15),transparent_35%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.15),transparent_35%)]" />
 
-      {/* 🌌 GRADIENT DEPTH */}
-      <div
-        className="absolute inset-0 transition-transform duration-300"
-        style={{
-          transform: `translate(${cursor.x}px, ${cursor.y}px)`,
-          background:
-            "radial-gradient(circle at top, rgba(0,255,255,0.2), transparent 40%), radial-gradient(circle at bottom, rgba(168,85,247,0.2), transparent 45%)",
-        }}
-      />
-
-      {/* 🎥 VIDEO BACKDROP */}
+      {/* 🎥 VIDEO */}
       <video
         autoPlay
         muted
@@ -194,108 +157,452 @@ export default function HomePage() {
         playsInline
         className="fixed inset-0 h-full w-full object-cover opacity-20"
       >
-        <source src="/demo.mp4" />
+        <source
+          src="/demo.mp4"
+          type="video/mp4"
+        />
       </video>
 
+      {/* 🌈 CURSOR GLOW */}
+      <div
+        id="cursor-glow"
+        className="pointer-events-none fixed z-0 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/20 blur-3xl"
+      />
+
+      {/* DARK OVERLAY */}
       <div className="fixed inset-0 bg-black/70 backdrop-blur-md" />
 
-      {/* NAV */}
+      {/* NAVBAR */}
       <header className="relative z-50 border-b border-white/10 bg-black/30 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl justify-between px-6 py-5">
-          <h1 className="text-2xl font-black bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+          <motion.h1
+            initial={{
+              opacity: 0,
+              y: -20,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-2xl font-black tracking-wider text-transparent"
+          >
             AMKAAI
-          </h1>
+          </motion.h1>
+
+          <nav className="hidden gap-8 text-sm text-gray-300 md:flex">
+            <Link
+              href="#features"
+              className="transition hover:text-white"
+            >
+              Features
+            </Link>
+
+            <Link
+              href="#pricing"
+              className="transition hover:text-white"
+            >
+              Pricing
+            </Link>
+
+            <Link
+              href="/dashboard"
+              className="transition hover:text-white"
+            >
+              Dashboard
+            </Link>
+          </nav>
         </div>
       </header>
 
       {/* HERO */}
-      <section className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-6 pt-28 text-center">
+      <section className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-6 pb-24 pt-28 text-center">
 
+        {/* BADGE */}
         <motion.div
-          animate={{ y: [0, -8, 0] }}
-          transition={{ repeat: Infinity, duration: 4 }}
-          className="mb-6 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-5 py-2 text-cyan-300"
+          initial={{
+            opacity: 0,
+            y: 20,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          className="mb-8 flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-5 py-2 text-sm text-cyan-300 backdrop-blur-xl"
         >
-          ✦ AI Cinematic Engine
+          <Stars size={16} />
+          AI Powered Creative Platform
         </motion.div>
 
-        <h1 className="text-6xl font-black">
-          Cinematic AI Video Studio
-        </h1>
+        {/* TITLE */}
+        <motion.h1
+          initial={{
+            opacity: 0,
+            y: 40,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          transition={{
+            duration: 0.7,
+          }}
+          className="max-w-5xl text-5xl font-black leading-tight md:text-7xl"
+        >
+          Create
+          <span className="bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            {" "}
+            Cinematic AI{" "}
+          </span>
+          Videos In Seconds
+        </motion.h1>
 
-        <p className="mt-5 text-gray-400 max-w-xl">
-          Generate Hollywood-level AI videos instantly
-        </p>
+        {/* SUBTITLE */}
+        <motion.p
+          initial={{
+            opacity: 0,
+          }}
+          animate={{
+            opacity: 1,
+          }}
+          transition={{
+            delay: 0.2,
+          }}
+          className="mt-8 max-w-2xl text-lg leading-relaxed text-gray-400"
+        >
+          Generate ultra realistic AI videos,
+          voices and images with next-gen
+          artificial intelligence tools.
+        </motion.p>
 
-        <div className="mt-10 flex gap-4">
-          <button className="rounded-2xl bg-white px-8 py-4 text-black font-bold">
+        {/* STATS */}
+        <div className="mt-12 flex flex-wrap justify-center gap-5">
+          <Stat
+            value={`${visitors}+`}
+            label="Creators"
+          />
+
+          <Stat
+            value={`${online}`}
+            label="Online Now"
+          />
+
+          <Stat
+            value="99.9%"
+            label="Uptime"
+          />
+        </div>
+
+        {/* CTA */}
+        <div className="mt-12 flex flex-wrap justify-center gap-5">
+          <Link
+            href="/dashboard"
+            className="group flex items-center gap-2 rounded-2xl bg-white px-8 py-4 font-bold text-black transition hover:scale-105"
+          >
             Start Free
-          </button>
+            <ArrowRight
+              size={18}
+              className="transition group-hover:translate-x-1"
+            />
+          </Link>
 
           <button
-            onClick={() => goToCheckout("pro")}
-            className="rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-500 px-8 py-4 font-bold"
+            onClick={() =>
+              goToCheckout("pro")
+            }
+            className="rounded-2xl border border-cyan-400/20 bg-gradient-to-r from-cyan-500 to-purple-500 px-8 py-4 font-bold shadow-[0_0_40px_rgba(34,211,238,0.35)] transition hover:scale-105"
           >
-            Upgrade Pro
+            {loadingPlan === "pro"
+              ? "Redirecting..."
+              : "Upgrade Pro"}
           </button>
+        </div>
+
+        {/* TRUST */}
+        <div className="mt-8 flex items-center gap-2 text-sm text-gray-500">
+          <ShieldCheck
+            size={16}
+            className="text-cyan-400"
+          />
+          Secure payments powered by Lemon
+          Squeezy
         </div>
       </section>
 
-      {/* 🎬 CINEMATIC STAGE */}
-      <section className="relative z-10 mx-auto mt-24 max-w-6xl px-6">
+      {/* DEMO */}
+      <section className="relative z-10 mx-auto max-w-5xl px-6 pb-32">
+
         <motion.div
-          animate={{ rotateX: cursor.y, rotateY: cursor.x }}
-          className="relative overflow-hidden rounded-[2rem] border border-white/10"
+          initial={{
+            opacity: 0,
+            y: 40,
+          }}
+          whileInView={{
+            opacity: 1,
+            y: 0,
+          }}
+          viewport={{ once: true }}
+          className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-2xl"
         >
-          <video
-            src={scenes[scene]}
-            autoPlay
-            muted
-            loop
-            className="h-[420px] w-full object-cover opacity-80"
-          />
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent" />
-
-          <div className="absolute bottom-5 left-5 text-cyan-300">
-            Live AI Render Engine
+          <div className="mb-6 flex items-center gap-3">
+            <Play className="text-cyan-400" />
+            <h2 className="text-2xl font-bold">
+              AI Prompt Studio
+            </h2>
           </div>
-
-          <button
-            onClick={() => setScene((s) => (s + 1) % scenes.length)}
-            className="absolute bottom-5 right-5 bg-cyan-500 text-black px-4 py-2 rounded-xl"
-          >
-            Next Scene
-          </button>
-        </motion.div>
-      </section>
-
-      {/* ⚡ AI STUDIO */}
-      <section className="relative z-10 mx-auto mt-32 max-w-4xl px-6">
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-
-          <h2 className="text-xl font-bold mb-4">
-            AI Prompt Studio
-          </h2>
 
           <textarea
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            className="h-32 w-full rounded-xl bg-black/40 p-4"
+            onChange={(e) =>
+              setPrompt(e.target.value)
+            }
+            placeholder="Describe your cinematic scene..."
+            className="h-40 w-full rounded-2xl border border-white/10 bg-black/40 p-5 text-white outline-none transition focus:border-cyan-400"
           />
 
           <button
             onClick={generateAI}
-            className="mt-4 bg-cyan-500 text-black px-6 py-3 rounded-xl"
+            className="mt-5 rounded-2xl bg-cyan-500 px-6 py-3 font-bold text-black transition hover:scale-105"
           >
-            Generate
+            {loadingAI
+              ? "Generating..."
+              : "Generate AI Prompt"}
           </button>
 
-          <div className="mt-6 min-h-[120px] text-gray-300">
-            {loadingAI ? "Processing cinematic pipeline..." : result}
+          <div className="mt-8 min-h-[140px] rounded-2xl border border-white/10 bg-black/40 p-5 text-gray-300">
+            {result ||
+              "AI generated cinematic output appears here..."}
           </div>
+        </motion.div>
+      </section>
+
+      {/* FEATURES */}
+      <section
+        id="features"
+        className="relative z-10 mx-auto grid max-w-7xl gap-6 px-6 pb-32 md:grid-cols-4"
+      >
+        <Feature
+          icon={<Sparkles />}
+          title="AI Images"
+          text="Generate stunning visuals instantly."
+        />
+
+        <Feature
+          icon={<Mic />}
+          title="AI Voices"
+          text="Realistic human voice generation."
+        />
+
+        <Feature
+          icon={<Video />}
+          title="AI Videos"
+          text="Cinematic video creation with AI."
+        />
+
+        <Feature
+          icon={<BarChart3 />}
+          title="Analytics"
+          text="Track your AI generation usage."
+        />
+      </section>
+
+      {/* PRICING */}
+      <section
+        id="pricing"
+        className="relative z-10 mx-auto max-w-6xl px-6 pb-32"
+      >
+
+        <div className="mb-16 text-center">
+          <h2 className="text-5xl font-black">
+            Pricing
+          </h2>
+
+          <p className="mt-4 text-gray-400">
+            Scale your creativity with premium
+            AI power.
+          </p>
+        </div>
+
+        <div className="grid gap-8 md:grid-cols-2">
+
+          <PricingCard
+            title="PRO"
+            price="$15"
+            description="Perfect for creators."
+            features={[
+              "AI Video Generation",
+              "AI Voice Studio",
+              "Priority Queue",
+              "HD Rendering",
+            ]}
+            buttonText={
+              loadingPlan === "pro"
+                ? "Redirecting..."
+                : "Choose Pro"
+            }
+            onClick={() =>
+              goToCheckout("pro")
+            }
+          />
+
+          <PricingCard
+            title="PREMIUM"
+            price="$25"
+            description="For power users & agencies."
+            highlighted
+            features={[
+              "Everything in Pro",
+              "4K Rendering",
+              "Fastest Queue",
+              "Premium AI Models",
+            ]}
+            buttonText={
+              loadingPlan === "premium"
+                ? "Redirecting..."
+                : "Choose Premium"
+            }
+            onClick={() =>
+              goToCheckout("premium")
+            }
+          />
         </div>
       </section>
     </main>
+  );
+}
+
+//////////////////////////////////////////////////
+// 📊 STAT
+//////////////////////////////////////////////////
+
+function Stat({
+  value,
+  label,
+}: {
+  value: string;
+  label: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-7 py-5 backdrop-blur-xl">
+      <p className="text-center text-3xl font-black text-cyan-400">
+        {value}
+      </p>
+
+      <p className="mt-1 text-center text-sm text-gray-400">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+//////////////////////////////////////////////////
+// ⚡ FEATURE
+//////////////////////////////////////////////////
+
+function Feature({
+  icon,
+  title,
+  text,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  text: string;
+}) {
+  return (
+    <motion.div
+      whileHover={{
+        y: -5,
+      }}
+      className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl"
+    >
+      <div className="mb-5 text-cyan-400">
+        {icon}
+      </div>
+
+      <h3 className="text-2xl font-bold">
+        {title}
+      </h3>
+
+      <p className="mt-3 text-gray-400">
+        {text}
+      </p>
+    </motion.div>
+  );
+}
+
+//////////////////////////////////////////////////
+// 💰 PRICING CARD
+//////////////////////////////////////////////////
+
+function PricingCard({
+  title,
+  price,
+  description,
+  features,
+  buttonText,
+  highlighted,
+  onClick,
+}: any) {
+  return (
+    <motion.div
+      whileHover={{
+        scale: 1.02,
+      }}
+      className={`relative overflow-hidden rounded-3xl border p-10 backdrop-blur-2xl ${
+        highlighted
+          ? "border-cyan-400/40 bg-cyan-400/10 shadow-[0_0_60px_rgba(34,211,238,0.2)]"
+          : "border-white/10 bg-white/5"
+      }`}
+    >
+      {highlighted && (
+        <div className="absolute right-4 top-4 rounded-full bg-cyan-400 px-3 py-1 text-xs font-bold text-black">
+          MOST POPULAR
+        </div>
+      )}
+
+      <h3 className="text-3xl font-black">
+        {title}
+      </h3>
+
+      <p className="mt-4 text-6xl font-black">
+        {price}
+      </p>
+
+      <p className="mt-4 text-gray-400">
+        {description}
+      </p>
+
+      <div className="mt-8 space-y-4">
+        {features.map(
+          (
+            feature: string,
+            index: number
+          ) => (
+            <div
+              key={index}
+              className="flex items-center gap-3 text-gray-300"
+            >
+              <Zap
+                size={16}
+                className="text-cyan-400"
+              />
+
+              {feature}
+            </div>
+          )
+        )}
+      </div>
+
+      <button
+        onClick={onClick}
+        className={`mt-10 w-full rounded-2xl py-4 font-bold transition hover:scale-[1.02] ${
+          highlighted
+            ? "bg-cyan-400 text-black"
+            : "bg-white text-black"
+        }`}
+      >
+        {buttonText}
+      </button>
+    </motion.div>
   );
 }
