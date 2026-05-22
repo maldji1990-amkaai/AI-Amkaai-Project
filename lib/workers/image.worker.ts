@@ -1,22 +1,49 @@
 import { db } from "@/lib/db";
 
+//////////////////////////////////////////////////
+// 🖼 IMAGE WORKER (CLEAN + SAFE + DYNAMIC)
+//////////////////////////////////////////////////
+
 export async function processImageJob(jobId: string) {
-  const job = await db.imageJob.findUnique({
-    where: { id: jobId },
-  });
+  try {
+    //////////////////////////////////////////////////
+    // 🔎 FETCH IMAGE FROM DB
+    //////////////////////////////////////////////////
+    const job = await db.image.findUnique({
+      where: { id: jobId },
+    });
 
-  if (!job) return;
+    if (!job) {
+      console.log("❌ Image job not found:", jobId);
+      return;
+    }
 
-  // simulate AI
-  await new Promise((r) => setTimeout(r, 3000));
+    console.log("🧠 Processing image:", job.prompt);
 
-  await db.imageJob.update({
-    where: { id: jobId },
-    data: {
-      status: "COMPLETED",
-      resultUrl: `https://cdn.yoursaas.com/images/${Date.now()}.png`,
-    },
-  });
+    //////////////////////////////////////////////////
+    // ⏳ SIMULATE AI PROCESSING (TEMP)
+    //////////////////////////////////////////////////
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
-  console.log("🖼 Image done:", jobId);
+    //////////////////////////////////////////////////
+    // 🎯 GENERATE DYNAMIC RESULT (BASED ON PROMPT)
+    //////////////////////////////////////////////////
+    const resultUrl = `https://dummyimage.com/800x600/000/fff&text=${encodeURIComponent(
+      job.prompt
+    )}`;
+
+    //////////////////////////////////////////////////
+    // 💾 UPDATE DATABASE
+    //////////////////////////////////////////////////
+    await db.image.update({
+      where: { id: jobId },
+      data: {
+        url: resultUrl,
+      },
+    });
+
+    console.log("✅ Image generated:", resultUrl);
+  } catch (error) {
+    console.error("🔥 IMAGE WORKER ERROR:", error);
+  }
 }

@@ -23,7 +23,7 @@ export async function processVideoJob(
     });
 
     //////////////////////////////////////////////////
-    // 🔒 STRONG ATOMIC LOCK
+    // 🔒 ATOMIC LOCK
     //////////////////////////////////////////////////
 
     const locked = await db.videoJob.updateMany({
@@ -41,7 +41,7 @@ export async function processVideoJob(
     });
 
     if (locked.count === 0) {
-      console.log("⛔ Already locked or processed:", jobId);
+      console.log("⛔ Already locked:", jobId);
       return null;
     }
 
@@ -50,27 +50,21 @@ export async function processVideoJob(
     //////////////////////////////////////////////////
 
     const job = await db.videoJob.findUnique({
-      where: {
-        id: jobId,
-      },
+      where: { id: jobId },
     });
 
-    if (!job) {
-      throw new Error("Job not found");
-    }
+    if (!job) throw new Error("Job not found");
 
     //////////////////////////////////////////////////
-    // 🔄 UPDATE PROGRESS
+    // 📊 PROGRESS
     //////////////////////////////////////////////////
 
     await db.videoJob.update({
       where: { id: jobId },
-      data: {
-        progress: 10,
-      },
+      data: { progress: 10 },
     });
 
-    console.log(`🚀 START VIDEO GENERATION: ${jobId}`);
+    console.log("🚀 START:", job.prompt);
 
     //////////////////////////////////////////////////
     // 🤖 GENERATE VIDEO
@@ -82,14 +76,12 @@ export async function processVideoJob(
     );
 
     //////////////////////////////////////////////////
-    // 💾 SUCCESS TRANSACTION
+    // 💾 SUCCESS
     //////////////////////////////////////////////////
 
     await db.$transaction(async (tx) => {
       await tx.videoJob.update({
-        where: {
-          id: jobId,
-        },
+        where: { id: jobId },
         data: {
           status: "COMPLETED",
           resultUrl,
@@ -99,15 +91,9 @@ export async function processVideoJob(
         },
       });
 
-      //////////////////////////////////////////////////
-      // 💳 COMPLETE USAGE
-      //////////////////////////////////////////////////
-
       if (job.usageId) {
         await tx.usage.update({
-          where: {
-            id: job.usageId,
-          },
+          where: { id: job.usageId },
           data: {
             status: "COMPLETED",
           },
@@ -115,14 +101,15 @@ export async function processVideoJob(
       }
     });
 
-    console.log(`✅ VIDEO COMPLETED: ${jobId}`);
+    console.log("✅ DONE:", resultUrl);
 
     return {
       success: true,
       resultUrl,
     };
+
   } catch (error) {
-    console.error("🔥 VIDEO WORKER ERROR:", error);
+    console.error("🔥 VIDEO ERROR:", error);
 
     await handleFailure(jobId, error);
 
@@ -134,39 +121,28 @@ export async function processVideoJob(
 }
 
 //////////////////////////////////////////////////
-// 🤖 AI GENERATION LAYER
+// 🤖 AI GENERATION (🔥 FIX HERE)
 //////////////////////////////////////////////////
 
 async function generateVideo(prompt: string): Promise<string> {
-  console.log("🤖 Generating AI Video:", prompt);
-
-  //////////////////////////////////////////////////
-  // 🔥 FUTURE PROVIDERS
-  //////////////////////////////////////////////////
-
-  // - RunwayML
-  // - Kling AI
-  // - Pika Labs
-  // - Replicate
-  // - Stability AI
+  console.log("🤖 AI PROMPT:", prompt);
 
   //////////////////////////////////////////////////
   // ⏳ SIMULATION
   //////////////////////////////////////////////////
-
-  await new Promise((resolve) =>
-    setTimeout(resolve, 4000)
-  );
+  await new Promise((r) => setTimeout(r, 4000));
 
   //////////////////////////////////////////////////
-  // 📦 RESULT
+  // 🎯 DYNAMIC RESULT (IMPORTANT FIX)
   //////////////////////////////////////////////////
 
-  return `https://cdn.yoursaas.com/videos/${Date.now()}.mp4`;
+  const safePrompt = encodeURIComponent(prompt);
+
+  return `https://dummyvideo.com/1280x720.mp4?prompt=${safePrompt}&id=${Date.now()}`;
 }
 
 //////////////////////////////////////////////////
-// ⏱ SAFE TIMEOUT WRAPPER
+// ⏱ TIMEOUT
 //////////////////////////////////////////////////
 
 function withTimeout<T>(
@@ -175,10 +151,9 @@ function withTimeout<T>(
 ): Promise<T> {
   return Promise.race([
     promise,
-
     new Promise<T>((_, reject) =>
       setTimeout(() => {
-        reject(new Error("AI generation timeout"));
+        reject(new Error("AI timeout"));
       }, ms)
     ),
   ]);
@@ -194,45 +169,28 @@ async function handleFailure(
 ) {
   try {
     const job = await db.videoJob.findUnique({
-      where: {
-        id: jobId,
-      },
+      where: { id: jobId },
     });
 
-    if (!job) {
-      return;
-    }
+    if (!job) return;
 
-    const currentAttempts = job.attempts ?? 0;
-
-    const canRetry =
-      currentAttempts < MAX_RETRIES;
+    const attempts = job.attempts ?? 0;
+    const canRetry = attempts < MAX_RETRIES;
 
     //////////////////////////////////////////////////
     // 🔁 RETRY
     //////////////////////////////////////////////////
 
     if (canRetry) {
-      const nextAttempt =
-        currentAttempts + 1;
-
       const delay = Math.min(
-        BASE_DELAY * 2 ** currentAttempts,
+        BASE_DELAY * 2 ** attempts,
         15000
       );
 
-      console.log(
-        `🔁 RETRY ${jobId} (${nextAttempt}/${MAX_RETRIES}) in ${delay}ms`
-      );
-
-      //////////////////////////////////////////////////
-      // RESET TO PENDING
-      //////////////////////////////////////////////////
+      console.log(`🔁 RETRY in ${delay}ms`);
 
       await db.videoJob.update({
-        where: {
-          id: jobId,
-        },
+        where: { id: jobId },
         data: {
           status: "PENDING",
           error: String(error),
@@ -240,21 +198,10 @@ async function handleFailure(
         },
       });
 
-      //////////////////////////////////////////////////
-      // SAFE DELAY RETRY
-      //////////////////////////////////////////////////
-
-      setTimeout(async () => {
-        try {
-          await processVideoJob(jobId, {
-            attemptsMade: nextAttempt,
-          });
-        } catch (retryError) {
-          console.error(
-            "Retry process failed:",
-            retryError
-          );
-        }
+      setTimeout(() => {
+        processVideoJob(jobId, {
+          attemptsMade: attempts + 1,
+        });
       }, delay);
 
       return;
@@ -265,9 +212,7 @@ async function handleFailure(
     //////////////////////////////////////////////////
 
     await db.videoJob.update({
-      where: {
-        id: jobId,
-      },
+      where: { id: jobId },
       data: {
         status: "FAILED",
         error: String(error),
@@ -276,15 +221,9 @@ async function handleFailure(
       },
     });
 
-    //////////////////////////////////////////////////
-    // 💳 REFUND USAGE
-    //////////////////////////////////////////////////
-
     if (job.usageId) {
       await db.usage.update({
-        where: {
-          id: job.usageId,
-        },
+        where: { id: job.usageId },
         data: {
           status: "FAILED",
           refunded: true,
@@ -292,13 +231,9 @@ async function handleFailure(
       });
     }
 
-    console.error(
-      `❌ FINAL FAILURE: ${jobId}`
-    );
+    console.error("❌ FINAL FAILURE:", jobId);
+
   } catch (fatalError) {
-    console.error(
-      "💀 FATAL FAILURE HANDLER ERROR:",
-      fatalError
-    );
+    console.error("💀 FATAL:", fatalError);
   }
 }
