@@ -173,46 +173,84 @@ export default function HomePage() {
       <div className="fixed inset-0 bg-black/70 backdrop-blur-md" />
 
       {/* NAVBAR */}
-      <header className="relative z-50 border-b border-white/10 bg-black/30 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <motion.h1
-            initial={{
-              opacity: 0,
-              y: -20,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-2xl font-black tracking-wider text-transparent"
-          >
-            AMKAAI
-          </motion.h1>
+     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/30 backdrop-blur-2xl">
+  <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
 
-          <nav className="hidden gap-8 text-sm text-gray-300 md:flex">
-            <Link
-              href="#features"
-              className="transition hover:text-white"
-            >
-              Features
-            </Link>
+    {/* LOGO */}
+    <motion.div
+      initial={{
+        opacity: 0,
+        y: -20,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+    >
+      <Link
+        href="/"
+        className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-2xl font-black tracking-wider text-transparent"
+      >
+        AMKAAI
+      </Link>
+    </motion.div>
 
-            <Link
-              href="#pricing"
-              className="transition hover:text-white"
-            >
-              Pricing
-            </Link>
+    {/* NAV LINKS */}
+    <nav className="hidden items-center gap-8 text-sm text-gray-300 md:flex">
 
-            <Link
-              href="/dashboard"
-              className="transition hover:text-white"
-            >
-              Dashboard
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <Link
+        href="#features"
+        className="transition hover:text-white"
+      >
+        Features
+      </Link>
+
+      <Link
+        href="#pricing"
+        className="transition hover:text-white"
+      >
+        Pricing
+      </Link>
+
+      <Link
+        href="/dashboard"
+        className="transition hover:text-white"
+      >
+        Dashboard
+      </Link>
+
+      <Link
+        href="#"
+        className="transition hover:text-white"
+      >
+        AI Studio
+      </Link>
+    </nav>
+
+    {/* ACTIONS */}
+    <div className="flex items-center gap-3">
+
+      <Link
+        href="/sign-in"
+        className="hidden rounded-2xl border border-white/10 bg-white/5 px-5 py-2 text-sm text-gray-300 transition hover:bg-white/10 md:flex"
+      >
+        Login
+      </Link>
+
+      <Link
+        href="/dashboard"
+        className="group flex items-center gap-2 rounded-2xl bg-white px-5 py-2.5 font-bold text-black transition hover:scale-105"
+      >
+        Get Started
+
+        <ArrowRight
+          size={16}
+          className="transition group-hover:translate-x-1"
+        />
+      </Link>
+    </div>
+  </div>
+</header>
 
       {/* HERO */}
       <section className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-6 pb-24 pt-28 text-center">
