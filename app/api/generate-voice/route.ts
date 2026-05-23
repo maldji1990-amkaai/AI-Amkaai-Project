@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
+import { addJob } from "@/lib/queue";
 import { useCredits } from "@/lib/credits";
+
+const VOICE_COST = 5;
 
 export async function POST(req: Request) {
   try {
+    console.log("🚀 VOICE API HIT");
+
     // 🔐 AUTH
     const { userId } = await auth();
 
@@ -29,6 +34,7 @@ export async function POST(req: Request) {
 
     // 📦 PARSE BODY
     let body: any;
+
     try {
       body = await req.json();
     } catch {
@@ -47,46 +53,69 @@ export async function POST(req: Request) {
       );
     }
 
-    // 💸 USE CREDITS (centralized)
-    let creditResult;
+    console.log("📝 Voice text:", text);
+
+    // 💸 USE CREDITS
     try {
-      creditResult = await useCredits(user.id, "voice");
+      await useCredits(user.id, "voice");
     } catch (err: any) {
       return NextResponse.json(
-        { error: err.message || "Not enough credits" },
+        {
+          error: err.message || "Not enough credits",
+        },
         { status: 403 }
       );
     }
 
-    // 🎯 AI VOICE (placeholder)
-    // 👉 اربطه مع ElevenLabs / PlayHT / OpenAI TTS
-    const voiceUrl = "https://example.com/voice.mp3";
+    // 📦 CREATE VOICE JOB
+    let job;
 
-    // 💾 SAVE VOICE
-    await db.voice.create({
-      data: {
-        url: voiceUrl,
-        text,
-        userId: user.id,
-      },
-    }).catch(() => {});
+    try {
+      job = await db.voiceJob.create({
+        data: {
+          userId: user.id,
+          text,
+          status: "PENDING",
+        },
+      });
 
-    // 🚀 RESPONSE
+      console.log("🎤 VOICE JOB CREATED:", job.id);
+    } catch (err) {
+      console.error("🔥 VOICE JOB CREATE FAILED:", err);
+
+      return NextResponse.json(
+        { error: "Failed to create voice job" },
+        { status: 500 }
+      );
+    }
+
+    // 🧠 QUEUE
+    try {
+      addJob({
+        id: job.id,
+        type: "voice",
+      });
+
+      console.log("📤 VOICE JOB SENT TO QUEUE");
+    } catch (err) {
+      console.log("⚠️ Queue error:", err);
+    }
+
+    // 🚀 RESPONSE (same system as video/image)
     return NextResponse.json({
       success: true,
-      url: voiceUrl,
-      creditsUsed: creditResult.cost,
-      remainingCredits: creditResult.remainingCredits,
+      jobId: job.id,
+      status: "PENDING",
+      message: "Voice is being generated",
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("🔥 VOICE API FATAL ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          error?.message ||
-          "Internal server error during voice generation",
+        error: "Server error",
+        details: String(error),
       },
       { status: 500 }
     );

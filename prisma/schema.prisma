@@ -178,6 +178,8 @@ model VideoJob {
 
   prompt String
 
+  imageUrl String?
+
   status JobStatus @default(PENDING)
 
   priority Int @default(0)
@@ -191,7 +193,7 @@ model VideoJob {
   progress Int @default(0)
 
   usageId String?
-  usage   Usage?  @relation(fields: [usageId], references: [id], onDelete: SetNull)
+  usage   Usage? @relation(fields: [usageId], references: [id], onDelete: SetNull)
 
   startedAt  DateTime?
   finishedAt DateTime?

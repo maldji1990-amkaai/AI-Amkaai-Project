@@ -42,7 +42,7 @@ export default function AIImagePage() {
     setImage("");
 
     try {
-      const res = await fetch("/api/ai-image", {
+      const res = await fetch("/api/generate-image", {
         method: "POST",
         body: JSON.stringify({ prompt }),
       });
@@ -72,7 +72,7 @@ export default function AIImagePage() {
     setError("");
 
     try {
-      const res = await fetch("/api/ai-image", {
+      const res = await fetch("/api/generate-image", {
         method: "POST",
         body: JSON.stringify({
           prompt:

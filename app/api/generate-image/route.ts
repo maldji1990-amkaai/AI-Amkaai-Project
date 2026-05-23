@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
+import { addJob } from "@/lib/queue";
 import { useCredits } from "@/lib/credits";
+
+const IMAGE_COST = 10;
 
 export async function POST(req: Request) {
   try {
+    console.log("🚀 IMAGE API HIT");
+
     // 🔐 AUTH
     const { userId } = await auth();
 
@@ -29,6 +34,7 @@ export async function POST(req: Request) {
 
     // 📦 PARSE BODY
     let body: any;
+
     try {
       body = await req.json();
     } catch {
@@ -47,46 +53,70 @@ export async function POST(req: Request) {
       );
     }
 
-    // 💸 USE CREDITS (centralized system)
-    let creditResult;
+    console.log("📝 Prompt:", prompt);
+
+    // 💸 USE CREDITS (safe)
     try {
-      creditResult = await useCredits(user.id, "image");
+      await useCredits(user.id, "image");
     } catch (err: any) {
       return NextResponse.json(
-        { error: err.message || "Not enough credits" },
+        {
+          error:
+            err.message || "Not enough credits",
+        },
         { status: 403 }
       );
     }
 
-    // 🎯 AI IMAGE GENERATION (placeholder)
-    // 👉 هنا تربط OpenAI / Stability / Replicate
-    const imageUrl = "https://example.com/image.png";
+    // 📦 CREATE IMAGE JOB
+    let job;
 
-    // 💾 OPTIONAL: SAVE IMAGE
-    await db.image.create({
-      data: {
-        url: imageUrl,
-        prompt,
-        userId: user.id,
-      },
-    }).catch(() => {});
+    try {
+      job = await db.imageJob.create({
+        data: {
+          userId: user.id,
+          prompt,
+          status: "PENDING",
+        },
+      });
 
-    // 🚀 RESPONSE
+      console.log("🎨 IMAGE JOB CREATED:", job.id);
+    } catch (err) {
+      console.error("🔥 IMAGE JOB CREATE FAILED:", err);
+
+      return NextResponse.json(
+        { error: "Failed to create image job" },
+        { status: 500 }
+      );
+    }
+
+    // 🧠 ADD TO QUEUE
+    try {
+      addJob({
+        id: job.id,
+        type: "image",
+      });
+
+      console.log("📤 IMAGE JOB SENT TO QUEUE");
+    } catch (err) {
+      console.log("⚠️ Queue error:", err);
+    }
+
+    // 🚀 RESPONSE (same as video system)
     return NextResponse.json({
       success: true,
-      url: imageUrl,
-      creditsUsed: creditResult.cost,
-      remainingCredits: creditResult.remainingCredits,
+      jobId: job.id,
+      status: "PENDING",
+      message: "Image is being generated",
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("🔥 IMAGE API FATAL ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          error?.message ||
-          "Internal server error during image generation",
+        error: "Server error",
+        details: String(error),
       },
       { status: 500 }
     );

@@ -14,7 +14,6 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-
     const plan = body?.plan;
 
     if (
@@ -35,21 +34,18 @@ export async function POST(req: Request) {
     if (!checkoutUrl) {
       return NextResponse.json(
         {
-          error:
-            "Missing Lemon checkout URL",
+          error: "Missing Lemon Squeezy checkout URL",
         },
         { status: 500 }
       );
     }
 
-    // لا توقف الدفع إذا فشلت قاعدة البيانات
     try {
-      const user =
-        await db.user.findUnique({
-          where: {
-            clerkId: userId,
-          },
-        });
+      const user = await db.user.findUnique({
+        where: {
+          clerkId: userId,
+        },
+      });
 
       if (user) {
         await db.abandonedCheckout.create({
@@ -71,7 +67,6 @@ export async function POST(req: Request) {
     return NextResponse.json({
       url: checkoutUrl,
     });
-
   } catch (error: any) {
     console.error(
       "CHECKOUT ERROR:",

@@ -13,7 +13,7 @@ export default function AIVoicePage() {
 
     setLoading(true);
 
-    const res = await fetch("/api/voice", {
+    const res = await fetch("/api/generate-voice", {
       method: "POST",
       body: JSON.stringify({ text }),
     });
