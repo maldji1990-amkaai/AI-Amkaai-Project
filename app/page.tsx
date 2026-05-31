@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import type { ReactNode } from "react";
 import {
   Sparkles,
   Video,
@@ -25,11 +26,8 @@ export default function HomePage() {
 
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState("");
-  const [typingIndex, setTypingIndex] = useState(0);
   const [loadingAI, setLoadingAI] = useState(false);
-
-  const fullText =
-    "✨ Cinematic drone shot over Tokyo at night, ultra realistic, neon reflections, volumetric lighting, cinematic camera movement.";
+  const [type, setType] = useState<"image" | "video" | "voice">("image");
 
   //////////////////////////////////////////////////
   // 📊 LIVE STATS
@@ -52,24 +50,6 @@ export default function HomePage() {
   //////////////////////////////////////////////////
   // ✨ AI TYPING EFFECT
   //////////////////////////////////////////////////
-
-  useEffect(() => {
-    if (!loadingAI) return;
-
-    if (typingIndex < fullText.length) {
-      const timeout = setTimeout(() => {
-        setResult(
-          (prev) => prev + fullText[typingIndex]
-        );
-
-        setTypingIndex((i) => i + 1);
-      }, 18);
-
-      return () => clearTimeout(timeout);
-    } else {
-      setLoadingAI(false);
-    }
-  }, [typingIndex, loadingAI]);
 
   //////////////////////////////////////////////////
   // 🌈 CURSOR GLOW
@@ -134,14 +114,35 @@ export default function HomePage() {
   //////////////////////////////////////////////////
   // ⚡ DEMO AI
   //////////////////////////////////////////////////
+const generateAI = async () => {
+  if (!prompt.trim()) return;
 
-  const generateAI = () => {
-    if (!prompt.trim()) return;
-
-    setResult("");
-    setTypingIndex(0);
+  try {
     setLoadingAI(true);
-  };
+    setResult("");
+
+    const res = await fetch("/api/ai", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt,
+        type, // ✅ هنا التصحيح
+        demo: true,
+      }),
+    });
+
+    const data = await res.json();
+
+    setResult(data.output || "");
+
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoadingAI(false);
+  }
+};
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-white">
@@ -367,52 +368,78 @@ export default function HomePage() {
       </section>
 
       {/* DEMO */}
-      <section className="relative z-10 mx-auto max-w-5xl px-6 pb-32">
+{/* DEMO */}
+<section className="relative z-10 mx-auto max-w-5xl px-6 pb-32">
+  <motion.div
+    initial={{ opacity: 0, y: 40 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true }}
+    className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-2xl"
+  >
+    <div className="mb-6 flex items-center gap-3">
+      <Play className="text-cyan-400" />
+      <h2 className="text-2xl font-bold">AI Prompt Studio</h2>
+    </div>
 
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 40,
-          }}
-          whileInView={{
-            opacity: 1,
-            y: 0,
-          }}
-          viewport={{ once: true }}
-          className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-2xl"
-        >
+    <textarea
+      value={prompt}
+      onChange={(e) => setPrompt(e.target.value)}
+      placeholder="Describe your cinematic scene..."
+      className="h-40 w-full rounded-2xl border border-white/10 bg-black/40 p-5 text-white outline-none transition focus:border-cyan-400"
+    />
 
-          <div className="mb-6 flex items-center gap-3">
-            <Play className="text-cyan-400" />
-            <h2 className="text-2xl font-bold">
-              AI Prompt Studio
-            </h2>
-          </div>
+    <div className="flex gap-3 mt-4 justify-center">
+      <button onClick={() => setType("image")} className={`px-4 py-2 rounded-xl ${type === "image" ? "bg-cyan-500 text-black" : "bg-white/10"}`}>
+        🖼 Image
+      </button>
 
-          <textarea
-            value={prompt}
-            onChange={(e) =>
-              setPrompt(e.target.value)
-            }
-            placeholder="Describe your cinematic scene..."
-            className="h-40 w-full rounded-2xl border border-white/10 bg-black/40 p-5 text-white outline-none transition focus:border-cyan-400"
-          />
+      <button onClick={() => setType("video")} className={`px-4 py-2 rounded-xl ${type === "video" ? "bg-cyan-500 text-black" : "bg-white/10"}`}>
+        🎬 Video
+      </button>
 
-          <button
-            onClick={generateAI}
-            className="mt-5 rounded-2xl bg-cyan-500 px-6 py-3 font-bold text-black transition hover:scale-105"
-          >
-            {loadingAI
-              ? "Generating..."
-              : "Generate AI Prompt"}
-          </button>
+      <button onClick={() => setType("voice")} className={`px-4 py-2 rounded-xl ${type === "voice" ? "bg-cyan-500 text-black" : "bg-white/10"}`}>
+        🎤 Voice
+      </button>
+    </div>
 
-          <div className="mt-8 min-h-[140px] rounded-2xl border border-white/10 bg-black/40 p-5 text-gray-300">
-            {result ||
-              "AI generated cinematic output appears here..."}
-          </div>
-        </motion.div>
-      </section>
+    <button
+      onClick={generateAI}
+      className="mt-5 rounded-2xl bg-cyan-500 px-6 py-3 font-bold text-black transition hover:scale-105"
+    >
+      {loadingAI ? "Generating..." : "Generate AI Prompt"}
+    </button>
+
+    {/* RESULT */}
+    <div className="mt-8 min-h-[200px] rounded-2xl border border-white/10 bg-black/40 p-5 flex flex-col items-center justify-center gap-4">
+
+      {!result && (
+        <p className="text-gray-400">
+          AI generated output will appear here...
+        </p>
+      )}
+
+      {result &&
+        result.startsWith("http") &&
+        /\.(jpg|jpeg|png|webp)$/i.test(result) && (
+          <img src={result} className="rounded-xl max-h-[300px]" />
+      )}
+
+      {result &&
+        result.startsWith("http") &&
+        /\.(mp4)$/i.test(result) && (
+          <video src={result} controls className="rounded-xl max-h-[300px]" />
+      )}
+
+      {result &&
+        result.startsWith("http") &&
+        /\.(mp3)$/i.test(result) && (
+          <audio src={result} controls />
+      )}
+
+    </div>
+
+  </motion.div>
+</section>
 
       {/* FEATURES */}
       <section

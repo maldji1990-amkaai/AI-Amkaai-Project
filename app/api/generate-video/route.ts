@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { addJob } from "@/lib/queue";
+import { demoVideos } from "@/lib/demo";
 
 const VIDEO_COST = 30;
 
@@ -69,6 +70,25 @@ export async function POST(req: Request) {
     }
 
     console.log("📝 Prompt:", prompt);
+//////////////////////////////////////////////////
+// 🧠 DEMO MODE (CRITICAL - NO COST)
+//////////////////////////////////////////////////
+
+if (user.plan === "FREE") {
+  const randomVideo =
+    demoVideos[
+      Math.floor(Math.random() * demoVideos.length)
+    ];
+
+  console.log("🧪 DEMO VIDEO:", randomVideo);
+
+  return NextResponse.json({
+    success: true,
+    demo: true,
+    video: randomVideo,
+    message: "Demo preview — Upgrade to Pro for real AI video",
+  });
+}
 
     // ⚡ IMPORTANT: Skip usage temporarily (to avoid crash)
     let usage = null;

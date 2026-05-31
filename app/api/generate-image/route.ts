@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { addJob } from "@/lib/queue";
 import { useCredits } from "@/lib/credits";
+import { demoImages } from "@/lib/demo";
 
 const IMAGE_COST = 10;
 
@@ -53,20 +54,36 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("📝 Prompt:", prompt);
+   console.log("📝 Prompt:", prompt);
 
-    // 💸 USE CREDITS (safe)
-    try {
-      await useCredits(user.id, "image");
-    } catch (err: any) {
-      return NextResponse.json(
-        {
-          error:
-            err.message || "Not enough credits",
-        },
-        { status: 403 }
-      );
-    }
+//////////////////////////////////////////////////
+// 🧠 DEMO MODE
+//////////////////////////////////////////////////
+
+if (user.plan === "FREE") {
+  const randomImage =
+    demoImages[
+      Math.floor(Math.random() * demoImages.length)
+    ];
+
+  return NextResponse.json({
+    success: true,
+    demo: true,
+    image: randomImage,
+  });
+}
+
+// 💸 USE CREDITS (safe)
+try {
+  await useCredits(user.id, "image");
+} catch (err: any) {
+  return NextResponse.json(
+    {
+      error: err.message || "Not enough credits",
+    },
+    { status: 403 }
+  );
+}
 
     // 📦 CREATE IMAGE JOB
     let job;

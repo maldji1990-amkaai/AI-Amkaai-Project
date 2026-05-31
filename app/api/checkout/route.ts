@@ -25,20 +25,17 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+const checkoutUrl =
+  plan === "premium"
+    ? process.env.LEMON_SQUEEZY_PREMIUM_URL
+    : process.env.LEMON_SQUEEZY_PRO_URL;
 
-    const checkoutUrl =
-      plan === "premium"
-        ? process.env.LEMON_SQUEEZY_PREMIUM_URL
-        : process.env.LEMON_SQUEEZY_PRO_URL;
-
-    if (!checkoutUrl) {
-      return NextResponse.json(
-        {
-          error: "Missing Lemon Squeezy checkout URL",
-        },
-        { status: 500 }
-      );
-    }
+if (!checkoutUrl) {
+  return NextResponse.json(
+    { error: "Missing checkout URL" },
+    { status: 500 }
+  );
+}
 
     try {
       const user = await db.user.findUnique({

@@ -125,27 +125,88 @@ export async function processVideoJob(
 // 🤖 AI GENERATION
 //////////////////////////////////////////////////
 
+const REPLICATE_API = "https://api.replicate.com/v1/predictions";
+
 async function generateVideo(prompt: string): Promise<string> {
   console.log("🤖 AI PROMPT:", prompt);
 
-  await new Promise((r) => setTimeout(r, 4000));
+  //////////////////////////////////////////////////
+  // 🚀 CREATE VIDEO
+  //////////////////////////////////////////////////
 
-  const safePrompt = encodeURIComponent(prompt);
+  const createRes = await fetch(REPLICATE_API, {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${process.env.REPLICATE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: "83b6a56...", // ضع موديل فيديو هنا
+      input: {
+        prompt,
+      },
+    }),
+  });
 
-  return `https://dummyvideo.com/1280x720.mp4?prompt=${safePrompt}&id=${Date.now()}`;
+  const prediction = await createRes.json();
+
+  if (!prediction?.id) {
+    throw new Error("Failed to start video generation");
+  }
+
+  console.log("🧠 Prediction ID:", prediction.id);
+
+  //////////////////////////////////////////////////
+  // ⏳ WAIT UNTIL DONE
+  //////////////////////////////////////////////////
+
+  let result;
+
+  while (true) {
+    await new Promise((r) => setTimeout(r, 4000));
+
+    const checkRes = await fetch(
+      `${REPLICATE_API}/${prediction.id}`,
+      {
+        headers: {
+          Authorization: `Token ${process.env.REPLICATE_API_KEY}`,
+        },
+      }
+    );
+
+    result = await checkRes.json();
+
+    console.log("⏳ Status:", result.status);
+
+    if (result.status === "succeeded") break;
+
+    if (result.status === "failed") {
+      throw new Error("Video generation failed");
+  }
+
+  //////////////////////////////////////////////////
+  // 🎬 RESULT
+  //////////////////////////////////////////////////
+
+  const videoUrl = result.output?.[0];
+
+  if (!videoUrl) {
+    throw new Error("No video returned");
+  }
+
+  console.log("🎥 FINAL VIDEO:", videoUrl);
+
+  return videoUrl;
 }
 
-//////////////////////////////////////////////////
-// ⏱ TIMEOUT
-//////////////////////////////////////////////////
+  // 🎲 اختيار عشوائي
+  const randomIndex = Math.floor(Math.random() * videos.length);
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error("AI timeout")), ms)
-    ),
-  ]);
+  const selectedVideo = videos[randomIndex];
+
+  console.log("🎬 GENERATED VIDEO:", selectedVideo);
+
+  return selectedVideo;
 }
 
 //////////////////////////////////////////////////

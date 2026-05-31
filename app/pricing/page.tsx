@@ -4,12 +4,14 @@ import { useState, useEffect } from "react";
 
 const PLANS = {
   pro: {
+    id: "pro",
     usd: 15,
     usdt: 15,
     dzd: 4500,
     credits: 150,
   },
   premium: {
+    id: "premium",
     usd: 25,
     usdt: 25,
     dzd: 7500,
