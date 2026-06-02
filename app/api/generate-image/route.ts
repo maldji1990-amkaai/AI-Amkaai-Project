@@ -22,16 +22,22 @@ export async function POST(req: Request) {
     }
 
     // 👤 GET USER
-    const user = await db.user.findUnique({
-      where: { clerkId: userId },
-    });
+    let user = await db.user.findUnique({
+  where: { clerkId: userId },
+});
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
+// ✅ إنشاء المستخدم تلقائيا إذا غير موجود
+if (!user) {
+  user = await db.user.create({
+    data: {
+      clerkId: userId,
+      credits: 10,
+      plan: "FREE",
+    },
+  });
+
+  console.log("✅ New user created:", user.id);
+}
 
     // 📦 PARSE BODY
     let body: any;

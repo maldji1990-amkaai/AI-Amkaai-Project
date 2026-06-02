@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { addJob } from "@/lib/queue";
 import { useCredits } from "@/lib/credits";
 import { demoVoices } from "@/lib/demo";
+import { PlanType } from "@prisma/client";
 
 const VOICE_COST = 5;
 
@@ -22,16 +23,22 @@ export async function POST(req: Request) {
     }
 
     // 👤 GET USER
-    const user = await db.user.findUnique({
-      where: { clerkId: userId },
-    });
+    let user = await db.user.findUnique({
+  where: { clerkId: userId },
+});
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
+// ✅ AUTO CREATE USER (VERY IMPORTANT)
+if (!user) {
+  user = await db.user.create({
+    data: {
+      clerkId: userId,
+      credits: 10,
+      plan: PlanType.FREE,
+    },
+  });
+
+  console.log("✅ New user created:", user.id);
+}
 
     // 📦 PARSE BODY
     let body: any;
@@ -54,69 +61,68 @@ export async function POST(req: Request) {
       );
     }
 
-console.log("📝 Voice text:", text);
+    console.log("📝 Voice text:", text);
 
-//////////////////////////////////////////////////
-// 🧠 DEMO MODE (VOICE)
-//////////////////////////////////////////////////
+    //////////////////////////////////////////////////
+    // 🧠 DEMO MODE
+    //////////////////////////////////////////////////
 
-if (user.plan === "FREE") {
-  const randomVoice =
-    demoVoices[
-      Math.floor(Math.random() * demoVoices.length)
-    ];
+    if (user.plan === PlanType.FREE) {
+      if (user.credits < VOICE_COST) {
+        return NextResponse.json(
+          { error: "Free limit reached" },
+          { status: 403 }
+        );
+      }
 
-  return NextResponse.json({
-    success: true,
-    demo: true,
-    audio: randomVoice,
-    message: "Demo preview — Upgrade to Pro for real AI voice",
-  });
-}
+      const randomVoice =
+        demoVoices[
+          Math.floor(Math.random() * demoVoices.length)
+        ];
 
-// ✅ تحقق قبل الخصم
-if (user.plan !== "FREE" && user.credits < VOICE_COST) {
-  return NextResponse.json(
-    { error: "Not enough credits" },
-    { status: 403 }
-  );
-}
+      return NextResponse.json({
+        success: true,
+        demo: true,
+        audio: randomVoice,
+        message:
+          "Demo preview — Upgrade to Pro for real AI voice",
+      });
+    }
 
-// 💸 USE CREDITS
-try {
-  await useCredits(user.id, "voice");
-} catch (err: any) {
-  return NextResponse.json(
-    {
-      error: err.message || "Not enough credits",
-    },
-    { status: 403 }
-  );
-}
-
-    // 📦 CREATE VOICE JOB
-    let job;
+    //////////////////////////////////////////////////
+    // 💸 USE CREDITS (PRO / PREMIUM)
+    //////////////////////////////////////////////////
 
     try {
-      job = await db.voiceJob.create({
-        data: {
-          userId: user.id,
-          text,
-          status: "PENDING",
-        },
-      });
-
-      console.log("🎤 VOICE JOB CREATED:", job.id);
-    } catch (err) {
-      console.error("🔥 VOICE JOB CREATE FAILED:", err);
-
+      await useCredits(user.id, "voice");
+    } catch (err: any) {
       return NextResponse.json(
-        { error: "Failed to create voice job" },
-        { status: 500 }
+        {
+          error:
+            err.message || "Not enough credits",
+        },
+        { status: 403 }
       );
     }
 
+    //////////////////////////////////////////////////
+    // 📦 CREATE JOB
+    //////////////////////////////////////////////////
+
+    const job = await db.voiceJob.create({
+      data: {
+        userId: user.id,
+        text,
+        status: "PENDING",
+      },
+    });
+
+    console.log("🎤 VOICE JOB CREATED:", job.id);
+
+    //////////////////////////////////////////////////
     // 🧠 QUEUE
+    //////////////////////////////////////////////////
+
     try {
       addJob({
         id: job.id,
@@ -128,7 +134,10 @@ try {
       console.log("⚠️ Queue error:", err);
     }
 
-    // 🚀 RESPONSE (same system as video/image)
+    //////////////////////////////////////////////////
+    // 🚀 RESPONSE
+    //////////////////////////////////////////////////
+
     return NextResponse.json({
       success: true,
       jobId: job.id,
@@ -137,7 +146,10 @@ try {
     });
 
   } catch (error) {
-    console.error("🔥 VOICE API FATAL ERROR:", error);
+    console.error(
+      "🔥 VOICE API FATAL ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {

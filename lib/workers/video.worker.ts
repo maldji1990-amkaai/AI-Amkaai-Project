@@ -7,7 +7,32 @@ const BASE_DELAY = 2000;
 const PROCESS_TIMEOUT = 10 * 60 * 1000;
 
 //////////////////////////////////////////////////
-// 🚀 MAIN PROCESSOR (PRODUCTION SAFE)
+// ⏱ TIMEOUT HELPER
+//////////////////////////////////////////////////
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timeout exceeded"));
+    }, ms);
+
+    promise
+      .then((res) => {
+        clearTimeout(timeout);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+  });
+}
+
+//////////////////////////////////////////////////
+// 🚀 MAIN PROCESSOR
 //////////////////////////////////////////////////
 
 export async function processVideoJob(
@@ -25,7 +50,7 @@ export async function processVideoJob(
     });
 
     //////////////////////////////////////////////////
-    // 🔒 ATOMIC LOCK
+    // 🔒 LOCK
     //////////////////////////////////////////////////
 
     const locked = await db.videoJob.updateMany({
@@ -131,7 +156,7 @@ async function generateVideo(prompt: string): Promise<string> {
   console.log("🤖 AI PROMPT:", prompt);
 
   //////////////////////////////////////////////////
-  // 🚀 CREATE VIDEO
+  // 🚀 CREATE
   //////////////////////////////////////////////////
 
   const createRes = await fetch(REPLICATE_API, {
@@ -141,10 +166,8 @@ async function generateVideo(prompt: string): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      version: "83b6a56...", // ضع موديل فيديو هنا
-      input: {
-        prompt,
-      },
+      version: "83b6a56...", // 🔥 ضع موديل صحيح هنا
+      input: { prompt },
     }),
   });
 
@@ -157,7 +180,7 @@ async function generateVideo(prompt: string): Promise<string> {
   console.log("🧠 Prediction ID:", prediction.id);
 
   //////////////////////////////////////////////////
-  // ⏳ WAIT UNTIL DONE
+  // ⏳ WAIT
   //////////////////////////////////////////////////
 
   let result;
@@ -182,6 +205,7 @@ async function generateVideo(prompt: string): Promise<string> {
 
     if (result.status === "failed") {
       throw new Error("Video generation failed");
+    }
   }
 
   //////////////////////////////////////////////////
@@ -197,16 +221,6 @@ async function generateVideo(prompt: string): Promise<string> {
   console.log("🎥 FINAL VIDEO:", videoUrl);
 
   return videoUrl;
-}
-
-  // 🎲 اختيار عشوائي
-  const randomIndex = Math.floor(Math.random() * videos.length);
-
-  const selectedVideo = videos[randomIndex];
-
-  console.log("🎬 GENERATED VIDEO:", selectedVideo);
-
-  return selectedVideo;
 }
 
 //////////////////////////////////////////////////
@@ -277,7 +291,7 @@ async function handleFailure(jobId: string, error: unknown) {
 }
 
 //////////////////////////////////////////////////
-// 🎯 WORKER LISTENER
+// 🎯 WORKER
 //////////////////////////////////////////////////
 
 const worker = new Worker(
@@ -290,7 +304,7 @@ const worker = new Worker(
     return await processVideoJob(jobId);
   },
   {
-    connection, // ✅ FIXED HERE
+    connection,
     concurrency: 3,
   }
 );

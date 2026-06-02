@@ -24,17 +24,22 @@ export async function POST(req: Request) {
     console.log("👤 Clerk userId:", userId);
 
     // 👤 Get user
-    const user = await db.user.findUnique({
-      where: { clerkId: userId },
-    });
+    let user = await db.user.findUnique({
+  where: { clerkId: userId },
+});
 
-    if (!user) {
-      console.log("❌ User not found in DB");
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
+// ✅ AUTO CREATE USER
+if (!user) {
+  user = await db.user.create({
+    data: {
+      clerkId: userId,
+      credits: 10,
+      plan: "FREE",
+    },
+  });
+
+  console.log("✅ New user created:", user.id);
+}
 
     console.log("✅ User found:", user.id);
 
