@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image"; // ✨ تم تفعيل مكون الـ Image الذكي من Next.js لسرعة تحميل خارقة
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
@@ -29,7 +30,7 @@ const PRESET_SUGGESTIONS = [
   { label: "🧸 Pixar 3D", text: "3d cute character animation, pixar style, vibrant lighting, highly detailed" },
 ];
 
-// 🌐 تحديث مسارات المعرض بروابط سحابية حية، مستقرة ودائمة تعمل بنسبة 100%
+// 🌐 تحديث المعرض ليعرض صور الـ AI الخاصة بك مباشرة من مجلد public/gallery
 const AI_GALLERY = [
   {
     id: 1,
@@ -41,7 +42,7 @@ const AI_GALLERY = [
   {
     id: 2,
     type: "image",
-    url: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=800",
+    url: "/gallery/ai-image1.jpg", // 👈 صورتك الـ AI الأولى المرفوعة محلياً داخل مجلد public/gallery
     prompt: "Ancient desert city with floating neon structures at sunset, futuristic architecture, hyper-detailed render.",
     label: "Future Relics"
   },
@@ -55,7 +56,7 @@ const AI_GALLERY = [
   {
     id: 4,
     type: "image",
-    url: "https://images.unsplash.com/photo-1614728263952-84ea256f9679?q=80&w=800",
+    url: "/gallery/ai-image2.jpg", // 👈 صورتك الـ AI الثانية المرفوعة محلياً داخل مجلد public/gallery
     prompt: "Astronaut walking through a forest of bioluminescent plants on a remote planet, cinematic depth of field.",
     label: "Xeno Flora Matrix"
   }
@@ -107,7 +108,7 @@ export default function HomePage() {
 
   const goToCheckout = async (plan: PlanType) => {
     try {
-      setLoadingPlan(plan); // ✨ تم إصلاح الخطأ هنا بإضافة set
+      setLoadingPlan(plan);
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -349,7 +350,9 @@ export default function HomePage() {
                   {result.includes("mp4") ? (
                     <video src={result} controls autoPlay loop className="rounded-xl max-h-[230px] w-full object-contain" />
                   ) : (
-                    <img src={result} alt="AI Output Core" className="rounded-xl max-h-[230px] w-full object-contain" />
+                    <div className="relative w-full h-[230px]">
+                      <Image src={result} alt="AI Output Core" fill className="rounded-xl object-contain" />
+                    </div>
                   )}
                 </div>
               )}
@@ -392,7 +395,7 @@ export default function HomePage() {
               onMouseLeave={() => setHoveredGalleryId(null)}
               className="relative group rounded-2xl overflow-hidden border border-white/5 bg-zinc-950 aspect-[3/4] cursor-pointer shadow-2xl"
             >
-              {/* Media Dispatcher */}
+              {/* Media Dispatcher - تم تعديل الصور هنا لتعمل بمكون Image لسرعة فائقة وثبات في البناء */}
               {item.type === "video" ? (
                 <video 
                   src={item.url} 
@@ -403,9 +406,11 @@ export default function HomePage() {
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-60 group-hover:opacity-100"
                 />
               ) : (
-                <img 
+                <Image 
                   src={item.url} 
                   alt={item.label}
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-60 group-hover:opacity-100"
                 />
               )}
