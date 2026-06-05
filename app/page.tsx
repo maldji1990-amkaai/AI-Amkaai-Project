@@ -107,7 +107,7 @@ export default function HomePage() {
 
   const goToCheckout = async (plan: PlanType) => {
     try {
-      setLoadingPlan(plan);
+      loadingPlan(plan);
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,7 +126,7 @@ export default function HomePage() {
   const generateAI = async () => {
     if (!prompt.trim()) return;
     try {
-      loadingAI(true);
+      setLoadingAI(true); // ✨ تم إصلاح الخطأ البرمي هنا بنجاح
       setResult("");
       const res = await fetch("/api/ai", {
         method: "POST",
