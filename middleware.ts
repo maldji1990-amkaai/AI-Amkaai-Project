@@ -1,6 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// 👇 المسارات العامة
+// 👇 routes لي ما تحتاج auth
 const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
@@ -10,16 +10,17 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhook(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, req) => {
-
+export default clerkMiddleware((auth, req) => {
+  // 👇 حماية كل شيء ما عدا public routes
   if (!isPublicRoute(req)) {
-    await auth.protect(); // ✅ هذا هو الحل
+    auth().protect();
   }
-
 });
 
 export const config = {
   matcher: [
+    // مهم جداً: يشمل API routes
     "/((?!_next|.*\\..*).*)",
+    "/(api|trpc)(.*)",
   ],
 };
