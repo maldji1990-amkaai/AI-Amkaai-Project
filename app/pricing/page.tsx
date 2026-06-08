@@ -75,9 +75,9 @@ export default function PricingPage() {
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "Checkout failed");
-    } finaly {
-      setLoadingCheckout(false);
-    }
+    } finally {
+  setLoadingCheckout(false);
+}
   };
 
   const plan = selectedPlan ? PLANS[selectedPlan] : null;
