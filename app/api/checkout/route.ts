@@ -1,16 +1,39 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, getAuth } from "@clerk/nextjs/server"; // 👈 استيراد getAuth كحل بديل قوي جداً
 import { db } from "@/lib/db";
+
+// ⚡ إجبار Vercel على معاملة هذا المسار كـ Dynamic لمنع الـ Cache
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    // 1. 🔑 جلب الـ userId فقط (خفيف وسريع جداً ولا ينكسر أبداً)
-    const { userId } = await auth();
+    let userId: string | null = null;
 
+    // 🔄 المحاولة الأولى: جلب الـ auth بالطريقة القياسية
+    try {
+      const authObj = await auth();
+      userId = authObj?.userId;
+    } catch (e) {
+      console.warn("Standard auth() failed, trying fallback getAuth(req)...", e);
+    }
+
+    // 🔄 المحاولة الثانية: الحل البديل الحاسم أونلاين (يقرأ التوكن مباشرة من ترويسة الطلب الحي)
+    if (!userId) {
+      try {
+        const authObjFallback = getAuth(req as any);
+        userId = authObjFallback?.userId;
+      } catch (fallbackError) {
+        console.error("Both auth methods failed:", fallbackError);
+      }
+    }
+
+    // 🛑 إذا لم يتم العثور على مستخدم مسجل الدخول، نوقف العملية فوراً
     if (!userId) {
       return NextResponse.json(
-        { error: "Unauthorized", message: "No userId found in session" },
+        { 
+          error: "Unauthorized", 
+          message: "Clerk can't detect your session. Please clear cookies/cache and try again." 
+        },
         { status: 401 }
       );
     }
