@@ -1,11 +1,6 @@
 {
   "version": 2,
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    }
-  ],
+  "cleanUrls": true,
   "functions": {
     "app/api/**": {
       "maxDuration": 300
