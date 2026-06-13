@@ -133,7 +133,6 @@ export default function HomePage() {
     }
   };
 
-  // تبويبات مخصصة ومصقولة فقط للفيديو والأفاتار بدون تشتيت
   const studioTabs = [
     { id: "video" as MediaType, title: "AI Video", subtitle: "توليد فيديو ذكي", icon: Video, color: "text-blue-400", bgGlow: "from-blue-500/20", placeholder: "صف موضوع أو مشهد الفيديو السينمائي الذي ترغب في توليده بالتفصيل بواسطة الذكاء الاصطناعي..." },
     { id: "avatar" as MediaType, title: "AI Avatar", subtitle: "شخصية رقمية متحدثة", icon: UserSquare2, color: "text-amber-400", bgGlow: "from-amber-500/20", placeholder: "اكتب النص أو السيناريو الكامل الذي ترغب من الشخصية الرقمية (الأفاتار) التحدث به ومحاكاته أمام الكاميرا..." },
@@ -204,7 +203,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 🎛️ STUDIO CONTROL TOWER (ONLY VIDEO & AVATAR Dashboard style) */}
+      {/* 🎛️ STUDIO CONTROL TOWER */}
       <section id="studio" className="relative z-10 mx-auto max-w-7xl px-6 pb-32">
         <div className="w-full rounded-3xl border border-white/10 bg-[#09090d] shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[580px]">
           
@@ -216,7 +215,6 @@ export default function HomePage() {
                 <span className="text-[11px] font-black uppercase tracking-widest text-gray-400">Creation Studio</span>
               </div>
               
-              {/* التبديل الاحترافي ثنائي الاتجاه */}
               <div className="space-y-1">
                 {studioTabs.map((tab) => {
                   const TabIcon = tab.icon;
@@ -250,7 +248,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* صندوق معلومات الاستهلاك الخطي الذكي */}
             <div className="mt-6 md:mt-0 bg-white/[0.02] border border-white/5 rounded-2xl p-3.5 space-y-2">
               <div className="flex justify-between text-[10px] text-gray-400 font-mono">
                 <span>Generation Power</span>
@@ -279,7 +276,6 @@ export default function HomePage() {
                 </span>
               </div>
 
-              {/* حقل السيناريو والوصف */}
               <div className="space-y-2">
                 <div className="relative">
                   <textarea
@@ -313,7 +309,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* أدوات التحكم المتقدمة الموزعة حسب نوع الأداة */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
                 
                 <div className="bg-zinc-900/60 border border-white/5 p-3.5 rounded-xl space-y-2">
@@ -333,8 +328,8 @@ export default function HomePage() {
                       </>
                     ) : (
                       <>
-                        <option>🎙️ Ultra-Precise Arabic/English Sync</option>
-                        <option>🎭 Dynamic Facial Expression Match</option>
+                        <option value="zoom-in">🎙️ Ultra-Precise Arabic/English Sync</option>
+                        <option value="pan-left">🎭 Dynamic Facial Expression Match</option>
                       </>
                     )}
                   </select>
@@ -365,7 +360,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* شاشة مراقبة المخرجات ومعالج الفيديو النهائي */}
             <div className="relative min-h-[250px] rounded-2xl border border-white/5 bg-[#030305] flex flex-col items-center justify-center p-4 overflow-hidden shadow-inner">
               <div className="absolute top-3 left-3 flex items-center gap-1.5 text-[9px] uppercase font-mono tracking-widest text-gray-500 bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
                 <Tv size={11} className="text-cyan-400" /> Video Frame Buffer
@@ -481,4 +475,107 @@ export default function HomePage() {
       <section id="features" className="relative z-10 mx-auto grid max-w-7xl gap-6 px-6 pb-32 md:grid-cols-4">
         <Feature icon={<Sparkles size={16} />} title="Spatial 3D Tracking" text="Synthesis framework configured to build immaculate depths and highly clean avatar surfaces." />
         <Feature icon={<Video size={16} />} title="Fluid Video Mechanics" text="Enforces spatial real-world consistency rules across every single generated frame block." />
-        <Feature icon={<UserSquare2 size={16}
+        <Feature icon={<UserSquare2 size={16} />} title="AI Digital Humans" text="Bespoke hyper-realistic avatars with absolute accurate lip-synchronization engines." />
+        <Feature icon={<BarChart3 size={16} />} title="Telemetry Console" text="Tracks compute units, active nodes, history chains, and model iteration sequences live." />
+      </section>
+
+      {/* PRICING PLANS */}
+      <section id="pricing" className="relative z-10 mx-auto max-w-5xl px-6 pb-32">
+        <div className="mb-14 text-center">
+          <h2 className="text-xs font-black tracking-[0.2em] text-cyan-400 uppercase mb-2">Computational Costing</h2>
+          <p className="text-3xl font-black tracking-tight">Flexible Studio Scaler Plans</p>
+        </div>
+
+        <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
+          <PricingCard
+            title="PRO CREATOR STUDIO"
+            price="$15"
+            description="Engineered for independent design practitioners."
+            features={["Kling High-Speed Spatial Pass", "1500 Compute Node Credits /mo", "Priority Node Allocation", "Raw HD File Download Access"]}
+            buttonText={loadingPlan === "pro" ? "Routing Gateway..." : "Deploy Pro Engine"}
+            onClick={() => goToCheckout("pro")}
+          />
+          <PricingCard
+            title="PREMIUM AGENT ARCHITECTURE"
+            price="$25"
+            description="Tailored specifically for production agencies."
+            highlighted
+            features={["Everything inside Pro Studio Matrix", "4K Neural Network Upscaling", "Uncapped Continuous Rendering Lines", "Commercial Use Verification Contract"]}
+            buttonText={loadingPlan === "premium" ? "Routing Gateway..." : "Deploy Premium Architecture"}
+            onClick={() => goToCheckout("premium")}
+          />
+        </div>
+      </section>
+
+      {/* INTERACTIVE FAQ */}
+      <section className="relative z-10 mx-auto max-w-3xl px-6 pb-32">
+        <div className="mb-12 text-center">
+          <HelpCircle size={22} className="mx-auto text-cyan-400 mb-2" />
+          <p className="text-xl font-extrabold tracking-tight">System FAQ Knowledge Base</p>
+        </div>
+        <div className="space-y-3">
+          {[
+            { q: "How do compute node credits calculate allocations?", a: "Every second of generated video consumes roughly 5 node units. Avatar lip-sync layers consume 3 units per generation pass." },
+            { q: "Can I cancel my commercial use license contract anytime?", a: "Yes. All licenses are managed dynamically. Once cancelled, your assets remain safe under your folder directory." },
+            { q: "What underlying models operate AMKAAI core pipelines?", a: "We run a bespoke proprietary optimization layer constructed directly above Kling-v2 and specialized custom weights." }
+          ].map((faq, i) => (
+            <div key={i} className="border border-white/5 bg-[#09090b]/60 rounded-xl overflow-hidden transition-all">
+              <button onClick={() => setActiveFaq(activeFaq === i ? null : i)} className="w-full p-4 flex items-center justify-between text-left text-xs font-bold font-mono text-gray-300 hover:text-white">
+                <span>{faq.q}</span>
+                <ChevronDown size={14} className={`transform transition-transform text-gray-500 ${activeFaq === i ? "rotate-180 text-cyan-400" : ""}`} />
+              </button>
+              <AnimatePresence>
+                {activeFaq === i && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-white/5 bg-black/30">
+                    <p className="p-4 text-xs text-gray-400 font-light leading-relaxed">{faq.a}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+/* ================= HELPERS / MINI COMPONENTS ================= */
+function Feature({ icon, title, text }: FeatureProps) {
+  return (
+    <motion.div whileHover={{ y: -3 }} className="rounded-2xl border border-white/5 bg-[#070709]/50 p-5 backdrop-blur-xl transition-all">
+      <div className="mb-4 text-cyan-400 bg-cyan-500/10 w-9 h-9 rounded-xl flex items-center justify-center border border-cyan-500/10">{icon}</div>
+      <h3 className="text-sm font-bold tracking-wide text-gray-200">{title}</h3>
+      <p className="mt-2 text-[11px] text-gray-500 leading-relaxed font-light">{text}</p>
+    </motion.div>
+  );
+}
+
+function PricingCard({ title, price, description, features, buttonText, highlighted = false, onClick }: PricingCardProps) {
+  return (
+    <motion.div whileHover={{ y: -2 }} className={`relative overflow-hidden rounded-2xl border p-7 backdrop-blur-2xl transition-all flex flex-col justify-between ${highlighted ? "border-cyan-500/20 bg-gradient-to-b from-cyan-950/10 via-black to-black shadow-2xl" : "border-white/5 bg-[#070709]"}`}>
+      {highlighted && (
+        <div className="absolute right-4 top-4 rounded-full bg-cyan-400 px-2.5 py-0.5 text-[8px] font-black text-black tracking-widest uppercase">
+          CLUSTER OPTIMAL
+        </div>
+      )}
+      <div>
+        <h3 className="text-[10px] font-black tracking-[0.15em] text-cyan-400 uppercase font-mono">{title}</h3>
+        <p className="mt-3 text-4xl font-black tracking-tight">{price}<span className="text-xs text-gray-600 font-normal font-mono"> /cycle</span></p>
+        <p className="mt-2 text-[11px] text-gray-400 font-light leading-relaxed">{description}</p>
+
+        <div className="mt-6 space-y-2.5 border-t border-white/5 pt-6">
+          {features.map((feature, index) => (
+            <div key={index} className="flex items-center gap-2 text-[11px] text-gray-300 font-light">
+              <CheckCircle2 size={12} className="text-cyan-400 shrink-0" />
+              {feature}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={onClick} className={`mt-8 w-full rounded-xl py-3 text-[11px] font-black uppercase tracking-wider transition ${highlighted ? "bg-cyan-500 text-black hover:opacity-90 shadow-lg shadow-cyan-500/10" : "bg-white/5 text-white border border-white/10 hover:bg-white/10"}`}>
+        {buttonText}
+      </button>
+    </motion.div>
+  );
+}
