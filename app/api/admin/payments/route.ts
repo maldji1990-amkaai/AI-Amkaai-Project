@@ -2,10 +2,14 @@ import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
-    // 🔐 حماية
-    const { userId } = await await auth(); // ✅ FIX
+    //////////////////////////////////////////////////
+    // 🔐 حماية المسار والتأكد من هوية المشرف
+    //////////////////////////////////////////////////
+    const { userId } = await auth(); // ✅ إصلاح: إزالة الـ await المزدوجة المسببة للأخطاء
     const user = await currentUser();
 
     if (!userId || !user) {
@@ -15,12 +19,17 @@ export async function GET() {
     const adminEmail = process.env.ADMIN_EMAIL;
     const userEmail = user.emailAddresses[0]?.emailAddress;
 
-    if (userEmail !== adminEmail) {
+    if (!adminEmail || userEmail !== adminEmail) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // 📊 جلب البيانات
+    //////////////////////////////////////////////////
+    // 📊 جلب طلبات الدفع المعلقة (PENDING) فقط
+    //////////////////////////////////////////////////
     const payments = await db.manualPayment.findMany({
+      where: {
+        status: "PENDING", // 👈 ميزة إضافية: جلب الطلبات المعلقة فقط لتسريع وتحسين أداء اللوحة الحية
+      },
       orderBy: { createdAt: "desc" },
       include: {
         user: {
@@ -31,7 +40,9 @@ export async function GET() {
       },
     });
 
-    // 🧹 تنظيف البيانات
+    //////////////////////////////////////////////////
+    // 🧹 تنظيف وتجهيز البيانات لواجهة الـ Admin Dashboard
+    //////////////////////////////////////////////////
     const formatted = payments.map((p) => ({
       id: p.id,
       userId: p.userId,
@@ -39,7 +50,7 @@ export async function GET() {
       plan: p.plan,
       amount: p.amount,
       status: p.status,
-      screenshotUrl: p.screenshotUrl,
+      method: p.method, // 👈 تمرير طريقة الدفع (baridimob أو crypto) لتعرضها البطاقة أونلاين
       createdAt: p.createdAt,
     }));
 

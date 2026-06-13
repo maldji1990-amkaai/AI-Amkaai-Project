@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { PlanType } from "@prisma/client";
 
-//////////////////////////////////////////////////
-// 🚀 APPROVE MANUAL PAYMENT (PRODUCTION SAFE)
-//////////////////////////////////////////////////
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
@@ -14,19 +13,13 @@ export async function POST(req: Request) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json(
-        { error: "Invalid JSON body" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
     const paymentId = body?.paymentId;
 
     if (!paymentId) {
-      return NextResponse.json(
-        { error: "paymentId required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "paymentId required" }, { status: 400 });
     }
 
     //////////////////////////////////////////////////
@@ -40,15 +33,11 @@ export async function POST(req: Request) {
         plan: true,
         status: true,
         verified: true,
-        aiScore: true, // ✅ مهم
       },
     });
 
     if (!payment) {
-      return NextResponse.json(
-        { error: "Payment not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
     //////////////////////////////////////////////////
@@ -62,20 +51,6 @@ export async function POST(req: Request) {
     }
 
     //////////////////////////////////////////////////
-    // 🧠 AI FRAUD CHECK (SAFE)
-    //////////////////////////////////////////////////
-    if (
-      payment.verified === false &&
-      payment.aiScore !== null &&
-      payment.aiScore < 0.5 // threshold قابل للتعديل
-    ) {
-      return NextResponse.json(
-        { error: "Payment flagged as risky by AI" },
-        { status: 400 }
-      );
-    }
-
-    //////////////////////////////////////////////////
     // 👤 GET USER
     //////////////////////////////////////////////////
     const user = await db.user.findUnique({
@@ -84,28 +59,28 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     //////////////////////////////////////////////////
-    // 💰 CREDIT CALCULATION (SCALABLE)
+    // 💰 CREDIT & PLAN CALCULATION
     //////////////////////////////////////////////////
     const PLAN_CREDITS: Record<string, number> = {
-      FREE: 50,
+      FREE: 10,
       PRO: 100,
       PREMIUM: 300,
     };
 
-    const creditsToAdd = PLAN_CREDITS[payment.plan] ?? 50;
+    const creditsToAdd = PLAN_CREDITS[payment.plan.toUpperCase()] ?? 10;
+
+    let targetPlan: PlanType = PlanType.FREE;
+    if (payment.plan.toUpperCase() === "PRO") targetPlan = PlanType.PRO;
+    if (payment.plan.toUpperCase() === "PREMIUM") targetPlan = PlanType.PREMIUM;
 
     //////////////////////////////////////////////////
     // 💾 TRANSACTION (ATOMIC + SAFE)
     //////////////////////////////////////////////////
     await db.$transaction(async (tx) => {
-      // 🔒 double-check داخل transaction
       const freshPayment = await tx.manualPayment.findUnique({
         where: { id: payment.id },
         select: { status: true },
@@ -115,6 +90,7 @@ export async function POST(req: Request) {
         return;
       }
 
+      // 1. تحديث حالة الفاتورة اليدوية إلى COMPLETED
       await tx.manualPayment.update({
         where: { id: payment.id },
         data: {
@@ -123,28 +99,34 @@ export async function POST(req: Request) {
         },
       });
 
+      // 2. تحديث خطة العميل الحالية + زيادة نقاط الإنتاج له
       await tx.user.update({
         where: { id: user.id },
         data: {
+          plan: targetPlan,
           credits: { increment: creditsToAdd },
+        },
+      });
+
+      // 3. إنشاء سجل اشتراك نشط لمدة 30 يوماً
+      await tx.subscription.create({
+        data: {
+          userId: user.id,
+          plan: targetPlan,
+          status: "ACTIVE",
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },
       });
     });
 
-    //////////////////////////////////////////////////
-    // 📤 RESPONSE
-    //////////////////////////////////////////////////
     return NextResponse.json({
       success: true,
       creditsAdded: creditsToAdd,
+      activatedPlan: targetPlan,
     });
 
   } catch (error) {
     console.error("APPROVE PAYMENT ERROR:", error);
-
-    return NextResponse.json(
-      { error: "internal_server_error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "internal_server_error" }, { status: 500 });
   }
 }

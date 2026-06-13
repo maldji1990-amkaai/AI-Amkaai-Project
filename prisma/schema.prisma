@@ -148,7 +148,7 @@ model Usage {
   type String
   cost Int
 
-  status   UsageStatus @default(PENDING)
+  status  UsageStatus @default(PENDING)
   refunded Boolean     @default(false)
 
   referenceId String?
@@ -342,17 +342,17 @@ model ManualPayment {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  plan     String
-  method   String
-  amount   Float
-  currency String @default("USD")
+  plan          String
+  method        String
+  amount        Float
+  currency      String @default("USD")
 
   screenshotUrl String?
   transactionId String?
 
-  aiScore   Float?
-  aiRawText String?
-  riskLevel String?
+  aiScore    Float?
+  aiRawText  String?
+  riskLevel  String?
 
   status   String  @default("PENDING")
   verified Boolean @default(false)

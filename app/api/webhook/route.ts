@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { PlanType } from "@prisma/client";
-import { PLANS, getPlanFromVariant } from "@/lib/config"; // 📦 استيراد مصدر الحقيقة الموحد
+import { PLANS, getPlanFromVariant } from "@/lib/config"; 
 import crypto from "crypto";
 
-// ⚠️ الأحداث المدعومة والمنظمة بناءً على وظيفتها وحمايتها
 const ALLOWED_EVENTS = new Set([
   "subscription_created",
   "subscription_updated",
@@ -14,8 +13,8 @@ const ALLOWED_EVENTS = new Set([
 
 export async function POST(req: Request) {
   try {
-    // 🔒 1. التحقق من توقيع Lemon Squeezy لمنع أي اختراق أو طلبات وهمية
-    const rawBody = await req.text(); // قراءة النص الخام ضرورية للتحقق من التوقيع
+    // 🔒 1. التحقق من توقيع Lemon Squeezy لمنع الطلبات الوهمية
+    const rawBody = await req.text(); 
     const hmac = crypto.createHmac("sha256", process.env.LEMON_SQUEEZY_WEBHOOK_SECRET || "");
     const digest = Buffer.from(hmac.update(rawBody).digest("hex"), "utf8");
     const signature = Buffer.from(req.headers.get("X-Signature") || "", "utf8");
@@ -35,12 +34,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
     }
 
-    // ❌ تجاهل الأحداث غير المهمة لتقليل استهلاك السيرفر
     if (!ALLOWED_EVENTS.has(eventName)) {
       return NextResponse.json({ ignored: true }, { status: 200 });
     }
 
-    // 🔒 2. فحص التكرار (Idempotency Check) لمنع تكرار شحن النقاط لنفس الطلب
+    // 🔒 2. فحص التكرار (Idempotency Check)
     const existingEvent = await db.webhookEvent.findUnique({
       where: { eventId },
     });
@@ -57,7 +55,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing user email" }, { status: 400 });
     }
 
-    // 👤 البحث عن المستخدم في قاعدة البيانات
     const user = await db.user.findUnique({
       where: { email },
     });
@@ -66,25 +63,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // 🎯 تحويل الـ Variant ID القادم إلى نوع الخطة المقابلة من ملف الـ Config
     const variantId = attributes?.variant_id;
-    const planName = getPlanFromVariant(variantId); // يعيد "pro" أو "premium" أو null
+    const planName = getPlanFromVariant(variantId); 
 
     if (!planName) {
       console.log("⚠️ Unknown variant ID:", variantId);
       return NextResponse.json({ error: "Unknown variant" }, { status: 400 });
     }
 
-    // تحويل صيغة النص لتتوافق تماماً مع الـ Enum في قاعدة البيانات (PRO, PREMIUM)
     const dbPlan = planName.toUpperCase() as PlanType;
     const creditsToGrant = PLANS[planName].credits;
 
     const lemonCustomerId = attributes?.customer_id?.toString() || null;
-    const lemonSubscriptionId = body?.data?.id?.toString() || null; // معرّف الاشتراك الفريد من ليمون
-    const subscriptionStatus = attributes?.status; // الحالات: active, cancelled, expired, past_due
+    const lemonSubscriptionId = body?.data?.id?.toString() || null; 
+    const subscriptionStatus = attributes?.status; // active, cancelled, expired, past_due
     const endsAt = attributes?.ends_at ? new Date(attributes?.ends_at) : null;
 
-    // 🔍 جلب معرّف الاشتراك الفريد من قاعدة البيانات إن وجد مسبقًا لتجنب أخطاء قيود الحقول
     const existingSubscription = await db.subscription.findFirst({
       where: { userId: user.id }
     });
@@ -93,14 +87,14 @@ export async function POST(req: Request) {
     // 🧠 هندسة أحداث الاشتراكات (Subscription Logic Handler)
     ////////////////////////////////////////////////////////////////
 
-    // الحالة الأولى: إنشاء اشتراك جديد لأول مرة (شحن أولي)
+    // الحالة الأولى: إنشاء اشتراك جديد لأول مرة
     if (eventName === "subscription_created") {
       await db.$transaction([
         db.user.update({
           where: { id: user.id },
           data: {
             plan: dbPlan,
-            credits: { increment: creditsToGrant }, // شحن النقاط الافتتاحية
+            credits: { increment: creditsToGrant }, 
             lemonCustomerId,
             lemonSubscriptionId,
           },
@@ -116,20 +110,12 @@ export async function POST(req: Request) {
           create: { 
             userId: user.id, 
             status: subscriptionStatus, 
-            
-            // 🛠️ حل المشكلة الحالي: تزويد الحقل المطلوب "plan" بشكل آمن ومرن لتغطية الـ Enum أو الـ String
             plan: dbPlan, 
-            
-            // احتياطياً في حال كان مسمى الحقل في جدول الاشتراك هو planType
             ...(dbPlan ? { planType: dbPlan } : {}),
-
-            // حشر الـ Variant ID ديناميكياً لتغطية المسميين المحتملين
             ...(variantId ? {
               variantId: String(variantId),
               variant_id: String(variantId)
             } : {}),
-            
-            // تمرير آمن لمعرف اشتراك ليمون
             ...(lemonSubscriptionId ? {
               lemonSubscriptionId: lemonSubscriptionId,
               lemonSqueezyId: lemonSubscriptionId,
@@ -142,20 +128,21 @@ export async function POST(req: Request) {
       console.log(`✅ ${email} Subscribed to ${dbPlan} (+${creditsToGrant} credits)`);
     }
 
-    // الحالة الثانية: نجاح التجديد الشهري التلقائي (شحن الدورة الشهرية الجديدة)
+    // الحالة الثانية: نجاح التجديد الشهري التلقائي
     else if (eventName === "subscription_payment_success") {
       await db.$transaction([
         db.user.update({
           where: { id: user.id },
           data: {
-            credits: { increment: creditsToGrant }, // إضافة النقاط للشهر الجديد فور نجاح الدفع
+            plan: dbPlan, // إعادة تأكيد الباقة لتفادي أي انقطاع
+            credits: { increment: creditsToGrant }, // شحن رصيد الشهر الجديد
           },
         }),
         db.subscription.updateMany({
           where: { userId: user.id },
           data: { 
             status: "active",
-            ...(endsAt ? { endsAt: null } : {})
+            ...(endsAt ? { endsAt: endsAt } : {}) // 🎯 تصحيح: حفظ تاريخ انتهاء الشهر الجديد القادم
           }, 
         }),
         db.webhookEvent.create({ data: { eventId } }),
@@ -163,7 +150,7 @@ export async function POST(req: Request) {
       console.log(`🔄 ${email} Subscription renewed for ${dbPlan} (+${creditsToGrant} credits)`);
     }
 
-    // الحالة الثالثة: تحديث حالة الاشتراك أو انتهاء صلاحيته بالكامل (إيقاف وحظر)
+    // الحالة الثالثة: تحديث حالة الاشتراك أو انتهاء صلاحيته بالكامل (إيقاف وحظر وتصفير)
     else if (eventName === "subscription_updated" || eventName === "subscription_expired") {
       const isEnded = ["expired", "unpaid", "past_due"].includes(subscriptionStatus);
 
@@ -178,12 +165,15 @@ export async function POST(req: Request) {
         ...(isEnded ? [
           db.user.update({
             where: { id: user.id },
-            data: { plan: PlanType.FREE }
+            data: { 
+              plan: PlanType.FREE,
+              credits: 0 // 🎯 حماية صلبة: تصفير النقاط فوراً لمنع التوليد المجاني بعد انتهاء الاشتراك
+            }
           })
         ] : []),
         db.webhookEvent.create({ data: { eventId } }),
       ]);
-      console.log(`ℹ️ ${email} Subscription updated status to: ${subscriptionStatus}`);
+      console.log(`ℹ️ ${email} Subscription updated status to: ${subscriptionStatus}. Is Ended: ${isEnded}`);
     }
 
     return NextResponse.json({ success: true });
