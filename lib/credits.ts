@@ -23,10 +23,10 @@ export async function useCredits(
   const cost = AI_COSTS[type];
 
   if (!cost) {
-    throw new Error("Invalid AI type");
+    throw new Error("Invalid AI type"); //
   }
 
-  const reference = options?.reference ?? null;
+  const reference = options?.reference ?? null; //
 
   // تشغيل المعاملة الآمنة لضمان تنفيذ كل الخطوات أو إلغائها معاً (Atomicity)
   const result = await db.$transaction(async (tx) => {
@@ -34,31 +34,31 @@ export async function useCredits(
     //////////////////////////////////////////////////
     // 🛡️ LEMON SQUEEZY SUBSCRIPTION CHECK
     //////////////////////////////////////////////////
-    // 🛠️ تم الحل: نطلب فقط حقل status من الـ select لتجنب تعارض تسمية الـ endsAt
+    // فحص آمن لحالة اشتراك المستخدم الحالية في المنصة
     const subscription = await tx.subscription.findFirst({
       where: { userId },
-      select: { status: true },
-    }) as any; // استخدام any هنا كصمام أمان مؤقت لـ TypeScript لقراءة أي حقول ديناميكية دون اعتراض الـ Linter
+      select: { status: true, endsAt: true }, // جلب الحقول المطلوبة لـ Prisma Linter بشكل منضبط
+    }) as any;
 
     if (subscription) {
       // الحالات المسموح لها بالتوليد فقط في Lemon Squeezy
       const allowedStatuses = ["active", "on_trial"];
       
       if (!allowedStatuses.includes(subscription.status)) {
-        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
+        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE"); //
       }
 
-      // 🛠️ فحص إضافي آمن: محاولة قراءة تاريخ الانتهاء بكافة مسمياته المحتملة (endsAt أو ends_at) دون إجبار الـ linter عليها
-      const subscriptionEndsAt = subscription.endsAt || subscription.ends_at;
+      // فحص إضافي آمن لتاريخ انتهاء صلاحية الباقة
+      const subscriptionEndsAt = subscription.endsAt;
       if (subscriptionEndsAt && new Date() > new Date(subscriptionEndsAt)) {
-        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
+        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE"); //
       }
     }
 
     //////////////////////////////////////////////////
     // 💸 DEDUCT CREDITS SAFELY (ANTI-RACE CONDITION)
     //////////////////////////////////////////////////
-    // الخصم يتم فقط وحصراً إذا كان رصيد المستخدم الحالي أكبر من أو يساوي التكلفة
+    // الخصم الحصين يتم فقط إذا كان رصيد المستخدم الحالي أكبر من أو يساوي تكلفة العملية
     const update = await tx.user.updateMany({
       where: {
         id: userId,
@@ -73,15 +73,15 @@ export async function useCredits(
       },
     });
 
-    // إذا كانت النتيجة 0، فهذا يعني أن نقاط المستخدم أقل من المطلوب (تم حظره برمجياً)
+    // إذا كانت النتيجة 0، فهذا يعني أن نقاط المستخدم لا تكفي
     if (update.count === 0) {
-      throw new Error("NOT_ENOUGH_CREDITS");
+      throw new Error("NOT_ENOUGH_CREDITS"); //
     }
 
     //////////////////////////////////////////////////
     // 📊 USAGE LOG (RECORD INITIALIZATION)
     //////////////////////////////////////////////////
-    // إنشاء سجل العملية وتثبيت حالتها كـ PENDING لحين نجاح سيرفر الذكاء الاصطناعي
+    // إنشاء سجل الاستهلاك وتثبيت حالتها كـ PENDING لحين معالجة السيرفرات
     const usage = await tx.usage.create({
       data: {
         userId,
@@ -96,7 +96,7 @@ export async function useCredits(
     //////////////////////////////////////////////////
     // 🔍 UTILITY: GET EXACT BALANCE
     //////////////////////////////////////////////////
-    // جلب الرصيد الحقيقي المتبقي بعد التحديث الآمن
+    // جلب الرصيد الدقيق المتبقي لحساب المستخدم
     const user = await tx.user.findUnique({
       where: { id: userId },
       select: { credits: true },
@@ -122,7 +122,7 @@ export async function useCredits(
 //////////////////////////////////////////////////
 
 export async function markUsageSuccess(reference: string) {
-  if (!reference) return;
+  if (!reference) return; //
 
   await db.usage.updateMany({
     where: {
@@ -141,7 +141,7 @@ export async function markUsageSuccess(reference: string) {
 
 export async function refundCredits(reference: string) {
   if (!reference) {
-    throw new Error("Missing reference for refund");
+    throw new Error("Missing reference for refund"); //
   }
 
   return await db.$transaction(async (tx) => {
@@ -151,18 +151,18 @@ export async function refundCredits(reference: string) {
     });
 
     if (!usage) {
-      throw new Error("Usage not found");
+      throw new Error("Usage not found"); //
     }
 
-    // صمام أمان لمنع عملية الـ Refund المتكررة لنفس الطلب في نفس الوقت
+    // صمام أمان لمنع عمليات استرجاع النقاط المتكررة لنفس الـ API Call
     if (usage.refunded || usage.status === UsageStatus.FAILED) {
-      return { skipped: true, message: "Credits already refunded or usage failed" };
+      return { skipped: true, message: "Credits already refunded or usage failed" }; //
     }
 
     //////////////////////////////////////////////////
     // 🔒 LOCK USAGE STATE FIRST
     //////////////////////////////////////////////////
-    // نقوم بتغيير حالة السجل إلى مسترجع وفاشل أولاً لقطع الطريق على أي عملية موازية
+    // نقوم بتغيير حالة السجل إلى فاشل ومسترجع أولاً لقطع الطريق على أي عملية تداخل برمجية
     await tx.usage.update({
       where: { id: usage.id },
       data: {
@@ -174,7 +174,7 @@ export async function refundCredits(reference: string) {
     //////////////////////////////////////////////////
     // 💸 INCREMENT USER CREDITS
     //////////////////////////////////////////////////
-    // إعادة النقاط المحجوزة بالكامل إلى حساب المستخدم
+    // إعادة النقاط بأمان وبشكل كامل إلى الحساب الرئيسي للمستخدم
     await tx.user.update({
       where: { id: usage.userId },
       data: {
@@ -199,11 +199,11 @@ export async function getUserCredits(userId: string) {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { credits: true },
-  });
+  }); //
 
-  if (!user) throw new Error("User not found");
+  if (!user) throw new Error("User not found"); //
 
-  return user.credits;
+  return user.credits; //
 }
 
 export async function addCredits(userId: string, amount: number) {
@@ -214,5 +214,5 @@ export async function addCredits(userId: string, amount: number) {
         increment: amount,
       },
     },
-  });
+  }); //
 }

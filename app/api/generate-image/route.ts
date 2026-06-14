@@ -1,88 +1,53 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { addJob } from "@/lib/queue";
 import { useCredits, refundCredits, markUsageSuccess } from "@/lib/credits";
-import { demoImages } from "@/lib/demo";
-import { LIMITS } from "@/lib/config";
+import { demoVideos } from "@/lib/demo"; // يفضل استخدام روابط فيديو ديمو هنا للمشترك المجاني
+import { PlanType } from "@prisma/client";
+import Replicate from "replicate";
 
-export async function POST(req: Request) {
-  // 🎯 إنشاء معرّف فريد للعملية لربط حجز النقاط وإرجاعها
-  const referenceId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+});
+
+export async function POST(request: Request) {
+  const referenceId = `img2vid_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
   try {
-    console.log("🚀 IMAGE API HIT");
+    console.log("🚀 HEYGEN-STYLE IMAGE-TO-VIDEO API HIT");
 
-    // 🔐 AUTH (التحقق من Clerk)
+    // 1️⃣ التحقق من الهوية عبر Clerk
     const { userId } = await auth();
-
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 👤 GET USER
+    // استقبال البيانات (الوصف النصي للحركة + الصورة المراد تحريكها)
+    const { prompt, uploadedImage, aspectRatio } = await request.json();
+
+    if (!uploadedImage) {
+      return NextResponse.json({ error: "الرجاء رفع صورة أولاً لتحويلها إلى فيديو (Image to Video)" }, { status: 400 });
+    }
+
+    // 2️⃣ جلب بيانات المستخدم من قاعدة البيانات
     let user = await db.user.findUnique({
       where: { clerkId: userId },
     });
 
-    // ✅ إنشاء المستخدم تلقائياً في قاعدة البيانات إذا لم يكن موجوداً
     if (!user) {
       user = await db.user.create({
         data: {
           clerkId: userId,
           credits: 10,
-          plan: "FREE",
+          plan: PlanType.FREE,
         },
       });
-      console.log("✅ New user created on the fly:", user.id);
     }
 
-    // 📦 PARSE BODY
-    let body: any;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-
-    const { prompt } = body;
-
-    // 🔐 التحقق من قيود الـ Prompt الأمنية من ملف الـ Config
-    if (!prompt || prompt.trim().length < LIMITS.minPromptLength) {
-      return NextResponse.json(
-        { error: `Valid prompt is required (Minimum ${LIMITS.minPromptLength} characters)` },
-        { status: 400 }
-      );
-    }
-    if (prompt.length > LIMITS.maxPromptLength) {
-      return NextResponse.json(
-        { error: `Prompt too long. Maximum ${LIMITS.maxPromptLength} characters.` },
-        { status: 400 }
-      );
-    }
-
-    console.log("📝 Prompt:", prompt);
-
-    //////////////////////////////////////////////////
-    // 🧠 DEMO MODE (المستخدمين المجانيين)
-    //////////////////////////////////////////////////
-    if (user.plan === "FREE") {
-      const randomImage = demoImages[Math.floor(Math.random() * demoImages.length)];
-
-      return NextResponse.json({
-        success: true,
-        demo: true,
-        image: randomImage,
-      });
-    }
-
-    //////////////////////////////////////////////////
-    // 💸 USE CREDITS (حجز النقاط وفحص اشتراك ليمون سكويزي)
-    //////////////////////////////////////////////////
+    // 3️⃣ سحب وخصم النقاط بشكل آمن وصارم
     let creditResult;
     try {
-      // 🛡️ تم تمرير الـ referenceId لربطه بجدول الـ Usage بنجاح
-      creditResult = await useCredits(user.id, "image", { reference: referenceId });
+      creditResult = await useCredits(user.id, "video", { reference: referenceId }); // استخدام كلفة الفيديو
     } catch (err: any) {
       if (err.message === "SUBSCRIPTION_EXPIRED_OR_INACTIVE") {
         return NextResponse.json({ error: "Your subscription has expired. Please check your billing dashboard." }, { status: 403 });
@@ -90,57 +55,73 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: err.message || "Not enough credits" }, { status: 402 });
     }
 
-    // فتح بلوك try/catch داخلي لحماية العملية وتفعيل الـ Refund فوراً في حال سقوط خادم الطابور أو الـ DB
+    // 4️⃣ وضع المحاكاة للمستخدمين المجانيين (FREE DEMO MODE)
+    if (user.plan === PlanType.FREE) {
+      // إرجاع فيديو ديمو عشوائي جاهز لعدم استهلاك سيرفرات الـ GPU الحقيقية مجاناً
+      const fallbackVideo = demoVideos ? demoVideos[Math.floor(Math.random() * demoVideos.length)] : "https://replicate.delivery/pbxt/IJ9ZJ6cOsnwUuH1F6gA8G...";
+      
+      await markUsageSuccess(referenceId);
+
+      return NextResponse.json({
+        success: true,
+        videoUrl: fallbackVideo,
+        demo: true,
+        remainingCredits: creditResult.remainingCredits,
+      });
+    }
+
+    // 5️⃣ تشغيل الـ Real AI الفعلي للمشتركين المدفوعين (PRO / PREMIUM)
     try {
-      // 📦 CREATE IMAGE JOB IN DATABASE
-      const job = await db.imageJob.create({
-        data: {
-          userId: user.id,
-          prompt,
-          status: "PENDING",
-          // يمكنك حفظ الـ referenceId هنا أيضاً في قاعدة بياناتك إذا أردت تتبعاً أدق
+      /*
+        توليد HeyGen-Style حقيقي: نرسل الصورة كـ Seed Image ومعه الـ Prompt لتوجيه الحركة
+        باستخدام موديل Luma Dream Machine المتطور على Replicate القادر على تحويل الصور الثابتة لفيديوهات حية.
+      */
+      const prediction = await replicate.predictions.create({
+        version: "maxwell-in-the-cloud/luma-dream-machine", 
+        input: {
+          image: uploadedImage, // الصورة المرفوعة من الواجهة (رابط أو Base64)
+          prompt: prompt || "Bring this image to life, natural cinematic movement, high quality",
+          aspect_ratio: aspectRatio || "16:9",
         },
       });
 
-      console.log("🎨 IMAGE JOB CREATED IN DB:", job.id);
+      // الانتظار الذكي (Polling) داخل السيرفر حتى انتهاء معالجة الفيديو بالكامل
+      let result = await replicate.predictions.get(prediction.id);
+      while (result.status !== "succeeded" && result.status !== "failed") {
+        await new Promise((resolve) => setTimeout(resolve, 3000)); // الانتظار 3 ثوانٍ بين كل فحص
+        result = await replicate.predictions.get(prediction.id);
+      }
 
-      // 🧠 ADD TO BACKGROUND QUEUE (إرسال المهمة للـ Worker)
-      addJob({
-        id: job.id,
-        type: "image",
-      });
+      if (result.status === "failed") {
+        throw new Error("LUMA_RENDER_NODE_FAILED");
+      }
 
-      console.log("📤 IMAGE JOB SENT TO QUEUE");
+      // استخراج رابط الفيديو النهائي المولّد بنجاح
+      const finalVideoUrl = Array.isArray(result.output) ? result.output[0] : result.output;
 
-      // 🎯 بما أن المهمة أرسلت للطابور الخلفي بنجاح، نعلّم الاستهلاك كـ COMPLETED
-      // ملاحظة: الـ Worker في الخلفية هو من سيقوم بتحديث حقل الـ job status إلى SUCCESS لاحقاً عند انتهاء التوليد.
+      // تثبيت عملية الخصم بنجاح
       await markUsageSuccess(referenceId);
 
-      // 🚀 RESPONSE
       return NextResponse.json({
         success: true,
-        jobId: job.id,
-        status: "PENDING",
-        message: "Image is being generated in the background",
+        videoUrl: finalVideoUrl,
+        demo: false,
         remainingCredits: creditResult.remainingCredits,
       });
 
-    } catch (queueOrDbError) {
-      // 💸 [صمام أمان الطوارئ] إذا فشل حفظ الـ Job أو فشل الـ Queue، يتم استرداد النقاط فوراً تلقائياً!
-      console.error("🔥 Job creation or Queue injection failed! Triggering automatic refund...", queueOrDbError);
+    } catch (aiError: any) {
+      // صمام الأمان: رد النقاط فوراً للعميل في حال حدوث أي خطأ برمي في خوادم المعالجة
+      console.error("🔥 Image-to-Video pipeline failed, rolling back credits:", aiError);
       await refundCredits(referenceId);
 
       return NextResponse.json(
-        { error: "Generation pipeline failed. Your credits have been securely refunded." },
+        { error: "فشلت عملية تحويل الصورة إلى فيديو في خوادم الـ GPU. تم إعادة نقاطك إلى حسابك بأمان." },
         { status: 500 }
       );
     }
 
   } catch (error) {
-    console.error("🔥 IMAGE API FATAL ERROR:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error", details: String(error) },
-      { status: 500 }
-    );
+    console.error("🔥 FATAL ERROR IN IMAGE-TO-VIDEO API:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

@@ -1,32 +1,41 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { addJob } from "@/lib/queue";
 import { useCredits, refundCredits, markUsageSuccess } from "@/lib/credits";
-import { demoVoices } from "@/lib/demo";
 import { PlanType } from "@prisma/client";
-import { LIMITS } from "@/lib/config";
+import Replicate from "replicate";
 
-export async function POST(req: Request) {
-  // 🎯 إنشاء معرّف فريد للعملية لربط العمليات الحسابية بنظام الـ Refund
+// تهيئة محرك اتصال Replicate للذكاء الاصطناعي
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+});
+
+export async function POST(request: Request) {
+  // 🎯 إنشاء معرف فريد للعملية لمتابعة حجز النقاط وإرجاعها تلقائياً في حال الفشل
   const referenceId = `voc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
   try {
-    console.log("🚀 VOICE API HIT");
+    console.log("🚀 HEYGEN-STYLE VOICE CLONE & LIP-SYNC API HIT");
 
-    // 🔐 AUTH (التحقق من Clerk)
+    // 🔒 التحقق من هوية المستخدم عبر Clerk
     const { userId } = await auth();
-
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 👤 GET USER
+    // 📦 استقبال المعطيات من واجهة المستخدم الفخمة (Synthesis Hub)
+    const body = await request.json();
+    const { text, voiceSampleUrl, language, targetAvatarVideo } = body;
+
+    if (!text) {
+      return NextResponse.json({ error: "الرجاء كتابة النص المراد تحويله لنطق بشري حقيقي" }, { status: 400 });
+    }
+
+    // 👤 جلب بيانات المستخدم التحقق من وجوده في قاعدة البيانات
     let user = await db.user.findUnique({
       where: { clerkId: userId },
     });
 
-    // ✅ إنشاء المستخدم تلقائياً إذا لم يكن مسجلاً في قاعدة البيانات
     if (!user) {
       user = await db.user.create({
         data: {
@@ -35,41 +44,13 @@ export async function POST(req: Request) {
           plan: PlanType.FREE,
         },
       });
-      console.log("✅ New user created on the fly:", user.id);
     }
-
-    // 📦 PARSE BODY
-    let body: any;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-
-    const { text } = body;
-
-    // 🔐 التحقق من قيود النص المدخل بناءً على ملف الـ Config الموحد
-    if (!text || text.trim().length < LIMITS.minPromptLength) {
-      return NextResponse.json(
-        { error: `Valid text is required (Minimum ${LIMITS.minPromptLength} characters)` },
-        { status: 400 }
-      );
-    }
-    if (text.length > LIMITS.maxTextLength) {
-      return NextResponse.json(
-        { error: `Text too long. Maximum ${LIMITS.maxTextLength} characters.` },
-        { status: 400 }
-      );
-    }
-
-    console.log("📝 Voice text:", text);
 
     //////////////////////////////////////////////////
-    // 💸 USE CREDITS & SUBSCRIPTION CHECK (آمن للجميع)
+    // 💸 USE CREDITS & SUBSCRIPTION CHECK (آمن وصارم)
     //////////////////////////////////////////////////
     let creditResult;
     try {
-      // دالة useCredits ستقوم بالتحقق من اشتراك Lemon Squeezy وخصم النقاط بناءً على نوع الحساب
       creditResult = await useCredits(user.id, "voice", { reference: referenceId });
     } catch (err: any) {
       if (err.message === "SUBSCRIPTION_EXPIRED_OR_INACTIVE") {
@@ -79,72 +60,117 @@ export async function POST(req: Request) {
     }
 
     //////////////////////////////////////////////////
-    // 🧠 DEMO MODE (إرجاع النتيجة الفورية للمجاني بعد خصم نقاطه بنجاح)
+    // 🧠 DEMO MODE (FREE USERS)
     //////////////////////////////////////////////////
     if (user.plan === PlanType.FREE) {
-      const randomVoice = demoVoices[Math.floor(Math.random() * demoVoices.length)];
-
-      // بما أن العملية نجحت وحصل على ملف تجريبي، نعلّم الاستهلاك كـ COMPLETED فوراً
+      // إرسال ملف صوتي تجريبي سريع لتوفير موارد السيرفر الحقيقية
+      const demoAudio = "https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg";
+      
       await markUsageSuccess(referenceId);
 
       return NextResponse.json({
         success: true,
+        outputUrl: demoAudio,
         demo: true,
-        audio: randomVoice,
         remainingCredits: creditResult.remainingCredits,
-        message: "Demo preview — Upgrade to Pro for real AI voice",
       });
     }
 
-    // فتح بلوك try/catch داخلي لحماية عمليات الطابور الخلفي للمشتركين (Pro / Premium)
+    //////////////////////////////////////////////////
+    // 💎 PRO / PREMIUM (REAL HEYGEN-STYLE AI ACTIVE)
+    //////////////////////////////////////////////////
     try {
-      // 📦 CREATE VOICE JOB IN DATABASE
-      const job = await db.voiceJob.create({
-        data: {
-          userId: user.id,
-          text,
-          status: "PENDING",
-        },
-      });
+      let finalOutputUrl = "";
 
-      console.log("🎤 VOICE JOB CREATED IN DB:", job.id);
+      // 🎤 المسار الأول: إذا رفع المشترك عينة صوت حقيقية (Instant Voice Cloning)
+      if (voiceSampleUrl) {
+        // استدعاء موديل XTTS-v2 العالمي المتخصص في نسخ البصمة الصوتية والتحدث بها بكل لغات العالم
+        const prediction = await replicate.predictions.create({
+          version: "lucataco/xtts-v2:684bc385", 
+          input: {
+            text: text,
+            speaker: voiceSampleUrl, // رابط ملف بصمة صوت العميل المرفوع من الواجهة
+            language: language || "ar", // دعم اللغة العربية بطلاقة وبنفس النبرة المنسوخة
+          },
+        });
 
-      // 🧠 ADD TO BACKGROUND QUEUE
-      addJob({
-        id: job.id,
-        type: "voice",
-      });
+        // 🔄 حلقة الانتظار الذكي (Polling)
+        let result = await replicate.predictions.get(prediction.id);
+        while (result.status !== "succeeded" && result.status !== "failed") {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          result = await replicate.predictions.get(prediction.id);
+        }
 
-      console.log("📤 VOICE JOB SENT TO QUEUE");
+        if (result.status === "failed") throw new Error("VOICE_CLONING_PIPELINE_FAILED");
+        finalOutputUrl = result.output; // رابط ملف الـ WAV المستنسخ الحقيقي
+      } 
+      // 🗣️ المسار الثاني: توليد نطق بشري احترافي قياسي من نصوص (Text-to-Speech) في حال عدم رفع عينة
+      else {
+        const prediction = await replicate.predictions.create({
+          version: "aoisynth/elevenlabs-tts:standard", 
+          input: { 
+            text: text, 
+            voice_id: "21m00Tcm4TlvDq8ikWAM" // صوت احترافي افتراضي عالي الجودة
+          }, 
+        });
 
-      // علم العملية كـ COMPLETED لنجاح دخولها الطابور الخلفي بنجاح
+        let result = await replicate.predictions.get(prediction.id);
+        while (result.status !== "succeeded" && result.status !== "failed") {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          result = await replicate.predictions.get(prediction.id);
+        }
+
+        if (result.status === "failed") throw new Error("TTS_ENGINE_FAILED");
+        finalOutputUrl = result.output;
+      }
+
+      //////////////////////////////////////////////////////////////////
+      // 🔗 السحر الحقيقي (HeyGen Lip-Sync Integration)
+      // إذا قام المشترك بتفعيل دمج الصوت المولد مع ملامح شفايف الأفاتار
+      //////////////////////////////////////////////////////////////////
+      if (targetAvatarVideo && finalOutputUrl) {
+        console.log("🔄 Active Lip-Sync Layer: Merging cloned voice with target face...");
+        
+        // استدعاء موديل Wav2Lip المتطور لدمج الصوت المستنسخ مع فيديو الأفاتار الصامت بدقة تزامنية عالية
+        const lipSyncPrediction = await replicate.predictions.create({
+          version: "cjwbw/wav2lip:19c8d3d3", 
+          input: {
+            face: targetAvatarVideo, // رابط فيديو الأفاتار الصامت القادم من الفرونت إند
+            audio: finalOutputUrl,    // رابط البصمة الصوتية المولدة في الخطوة السابقة
+          },
+        });
+
+        let syncResult = await lipSyncPrediction.get(lipSyncPrediction.id);
+        while (syncResult.status !== "succeeded" && syncResult.status !== "failed") {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          syncResult = await lipSyncPrediction.get(lipSyncPrediction.id);
+        }
+
+        // إذا نجحت عملية المزامنة الحركية، يتحول المخرج النهائي ليكون فيديو ناطق فخم بدلاً من مجرد صوت
+        if (syncResult.status === "succeeded") {
+          finalOutputUrl = syncResult.output;
+        }
+      }
+
+      // 🎯 تأكيد نجاح العملية بالكامل وترسيخ خصم النقاط في قاعدة البيانات
       await markUsageSuccess(referenceId);
 
-      // 🚀 RESPONSE
       return NextResponse.json({
         success: true,
-        jobId: job.id,
-        status: "PENDING",
-        message: "Voice is being generated in the background",
+        outputUrl: finalOutputUrl, // سيعود برابط فيديو متكامل أو ملف صوتي فخم حسب الخيارات المفعلة
+        demo: false,
         remainingCredits: creditResult.remainingCredits,
       });
 
-    } catch (queueOrDbError) {
-      // 💸 [صمام أمان الطوارئ] إذا فشل السيرفر في إدخال العملية للطابور، يتم رد النقاط تلقائياً
-      console.error("🔥 Voice Job creation or Queue failed! Triggering automatic refund...", queueOrDbError);
+    } catch (aiError) {
+      // 💸 [صمام الأمان لـ سحب الرصيد] استرداد مالي فوري للنقاط في حال حدوث أي مشكلة في السيرفر الخارجي
+      console.error("🔥 Voice pipeline internal failure, triggering refund:", aiError);
       await refundCredits(referenceId);
-
-      return NextResponse.json(
-        { error: "Voice pipeline failed. Your credits have been securely refunded." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to process AI Voice synthesis nodes. Your credits have been securely refunded." }, { status: 502 });
     }
 
   } catch (error) {
-    console.error("🔥 VOICE API FATAL ERROR:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error", details: String(error) },
-      { status: 500 }
-    );
+    console.error("🔥 FATAL ERROR IN GENERATE VOICE API:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

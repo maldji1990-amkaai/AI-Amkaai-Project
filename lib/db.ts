@@ -1,16 +1,13 @@
 import { PrismaClient } from "@prisma/client";
 
 declare global {
-  // 🧠 نخلي Prisma global باش ما يتكرر في dev
   var prisma: PrismaClient | undefined;
 }
 
-export const db =
-  global.prisma ||
-  new PrismaClient({
-    log: ["query", "error", "warn"], // useful أثناء التطوير
-  });
+export const db = globalThis.prisma || new PrismaClient({
+  log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+});
 
 if (process.env.NODE_ENV !== "production") {
-  global.prisma = db;
+  globalThis.prisma = db;
 }

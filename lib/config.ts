@@ -1,5 +1,7 @@
 // lib/config.ts
 
+import { PlanType as PrismaPlanType } from "@prisma/client";
+
 //////////////////////////////////////////////////
 // 💳 PLANS CONFIG (المصدر الوحيد للحقيقة)
 //////////////////////////////////////////////////
@@ -27,16 +29,16 @@ export const PLANS = {
   },
 } as const;
 
-export type PlanType = keyof typeof PLANS;
+export type ConfigPlanType = keyof typeof PLANS;
 
 //////////////////////////////////////////////////
-// 🎯 AI COSTS (مكان واحد فقط)
+// 🎯 AI COSTS (مكان واحد فقط لتحديد أسعار العمليات)
 //////////////////////////////////////////////////
 
 export const AI_COSTS = {
   image: 1,
   voice: 3,
-  video: 30, // تكلفة الفيديو الواحد
+  video: 30, // تكلفة توليد الفيديو الواحد أو الأفاتار
 } as const;
 
 export type AIType = keyof typeof AI_COSTS;
@@ -51,49 +53,49 @@ export const LEMON_VARIANTS = {
 };
 
 //////////////////////////////////////////////////
-// 🔐 SECURITY / LIMITS
+// 🔐 SECURITY / LIMITS (المحددات الأمنية للمدخلات)
 //////////////////////////////////////////////////
 
 export const LIMITS = {
-  maxPromptLength: 1000,
-  minPromptLength: 3,
-  maxTextLength: 2000,
+  maxPromptLength: 1000, // الحد الأقصى لوصف الفيديو النصي
+  minPromptLength: 3,    // الحد الأدنى لحروف المدخلات لمنع الطلبات الفارغة
+  maxTextLength: 2000,   // الحد الأقصى لنصوص استنساخ وتحويل الصوت
 };
 
 //////////////////////////////////////////////////
-// ⚡ FEATURE FLAGS (مستقبلاً)
+// ⚡ FEATURE FLAGS (التحكم في تشغيل الميزات برميًا)
 //////////////////////////////////////////////////
 
 export const FEATURES = {
-  enableVideoQueue: true,
-  enableVoice: true,
-  enableImage: true,
+  enableVideoQueue: true,      // تفعيل/تعطيل طابور إنتاج الفيديو بالكامل
+  enableVoice: true,           // تشغيل ميزة استنساخ وهندسة الصوت AI
+  enableImage: true,           // تشغيل محرك تحسين وتوليد الصور
 };
 
 //////////////////////////////////////////////////
 // 🧠 HELPER FUNCTIONS
 //////////////////////////////////////////////////
 
-// ✅ جلب نقاط الخطة
-export function getPlanCredits(plan: PlanType) {
+// ✅ جلب نقاط الخطة بناءً على نوعها
+export function getPlanCredits(plan: ConfigPlanType) {
   return PLANS[plan]?.credits || 0;
 }
 
-// ✅ التحقق مما إذا كانت الخطة مدفوعة
-export function isProPlan(plan: PlanType) {
+// ✅ التحقق مما إذا كانت الخطة مدفوعة/احترافية
+export function isProPlan(plan: ConfigPlanType) {
   return PLANS[plan]?.isPro || false;
 }
 
-// ✅ جلب تكلفة عملية الـ AI
+// ✅ جلب تكلفة عملية الـ AI (خصم النقاط)
 export function getAICost(type: AIType) {
   return AI_COSTS[type];
 }
 
-// ✅ تحويل رقم الـ Variant القادم من الـ Webhook إلى الخطة المقابلة (مؤمنة بالكامل)
-export function getPlanFromVariant(variantId: string | number | null) {
+// ✅ تحويل رقم الـ Variant القادم من الـ Webhook الخاص بـ Lemon Squeezy إلى اسم الخطة المقابلة
+export function getPlanFromVariant(variantId: string | number | null): ConfigPlanType | null {
   if (!variantId) return null;
 
-  // تحويل القيمة القادمة إلى نص دائماً لضمان دقة المقارنة الصارمة ===
+  // تحويل القيمة القادمة إلى نص دائماً لضمان دقة المقارنة الصارمة
   const incomingVariantStr = String(variantId);
 
   if (incomingVariantStr === LEMON_VARIANTS.pro) return "pro";

@@ -10,22 +10,22 @@ export type Job = {
 };
 
 // =====================================
-// 🧠 QUEUE STORAGE
+// 🧠 QUEUE STORAGE (In-Memory Heap Matrix)
 // =====================================
 
 const queue: Job[] = [];
 
-// 🔒 execution safety locks
+// 🔒 صمامات الأمان والتحكم بالتوازي (Execution Safety Locks)
 let isProcessing = false;
 let activeJobs = 0;
 
-// ⚡ SaaS tuning
+// ⚡ إعدادات الجدولة والتحميل للإنتاجية (SaaS tuning)
 const MAX_RETRIES = 3;
 const CONCURRENCY = 2;
 const MAX_QUEUE_SIZE = 500;
 
 // =====================================
-// 🚀 ADD JOB (SAFE)
+// 🚀 ADD JOB (SAFE ENTRY POINT)
 // =====================================
 
 export function addJob(input: {
@@ -34,7 +34,7 @@ export function addJob(input: {
   priority?: number;
 }) {
   if (queue.length >= MAX_QUEUE_SIZE) {
-    console.warn("⚠️ Queue full, rejecting job:", input.id);
+    console.warn("⚠️ [QUEUE OVERFLOW] Cluster full, rejecting job placement for:", input.id);
     return;
   }
 
@@ -53,7 +53,7 @@ export function addJob(input: {
 }
 
 // =====================================
-// ⚡ TRIGGER PROCESSING
+// ⚡ TRIGGER PROCESSING ENGINE
 // =====================================
 
 function trigger() {
@@ -64,7 +64,7 @@ function trigger() {
 }
 
 // =====================================
-// 🔄 MAIN LOOP (SAFE CONCURRENCY)
+// 🔄 MAIN LOOP (SAFE CONCURRENCY STEERING)
 // =====================================
 
 async function processQueue() {
@@ -84,37 +84,39 @@ async function processQueue() {
         activeJobs--;
       });
     }
+  } throws (err) {
+    console.error("🔥 Critical failure inside cluster engine main-loop:", err);
   } finally {
     isProcessing = false;
   }
 }
 
 // =====================================
-// 🧠 EXECUTE JOB
+// 🧠 EXECUTE CORE JOB IN ISOLATION
 // =====================================
 
 async function executeJob(job: Job) {
   const start = Date.now();
 
   console.log(
-    `🚀 START job=${job.id} type=${job.type} retry=${job.retries}`
+    `🚀 [GPU MATRIX ENTRANCE] START job=${job.id} type=${job.type} retry=${job.retries}`
   );
 
   try {
     await handleJob(job);
 
     console.log(
-      `✅ DONE job=${job.id} in ${Date.now() - start}ms`
+      `✅ [GPU MATRIX SUCCESS] DONE job=${job.id} execution took ${Date.now() - start}ms`
     );
   } catch (err: any) {
-    console.error(`❌ FAIL job=${job.id}`, err?.message);
+    console.error(`❌ [GPU MATRIX FAILURE] FAIL job=${job.id}`, err?.message);
 
     await handleFailure(job, err);
   }
 }
 
 // =====================================
-// 🔧 JOB HANDLER
+// 🔧 JOB ROUTER & DISPATCHER
 // =====================================
 
 async function handleJob(job: Job) {
@@ -135,25 +137,25 @@ async function handleJob(job: Job) {
     }
 
     default:
-      throw new Error(`Unknown job type: ${job.type}`);
+      throw new Error(`Unknown pipeline assignment type: ${job.type}`);
   }
 }
 
 // =====================================
-// ❌ FAILURE HANDLER (PRODUCTION SAFE)
+// ❌ FAILURE HANDLER WITH BACKOFF STRATEGY
 // =====================================
 
 async function handleFailure(job: Job, err: any) {
   const nextRetry = job.retries + 1;
 
-  job.lastError = err?.message ?? "unknown error";
+  job.lastError = err?.message ?? "unknown cluster render failure";
 
-  // 🔁 retry allowed
+  // 🔁 التحقق من إمكانية إعادة المحاولة برمجياً
   if (nextRetry <= MAX_RETRIES) {
     const delayMs = backoff(nextRetry);
 
     console.log(
-      `🔁 RETRY job=${job.id} ${nextRetry}/${MAX_RETRIES} in ${delayMs}ms`
+      `🔁 [RETRY SCHEDULING] Re-injecting job=${job.id} sequence ${nextRetry}/${MAX_RETRIES} after delay ${delayMs}ms`
     );
 
     setTimeout(() => {
@@ -169,43 +171,53 @@ async function handleFailure(job: Job, err: any) {
     return;
   }
 
-  // 💀 final failure
-  console.error(`💀 FINAL FAIL job=${job.id}`);
+  // 💀 الفشل النهائي وإغلاق المعاملة
+  console.error(`💀 [FATAL RENDERING COLLAPSE] FINAL FAIL for job=${job.id}. Initiating safe fallback hooks.`);
 
   await markJobFailed(job);
 }
 
 // =====================================
-// 💀 FINAL FAILURE HOOK
+// 💀 FINAL FAILURE HOOK & AUTO-REFUND SHIELD
 // =====================================
 
 async function markJobFailed(job: Job) {
   try {
     const { db } = await import("@/lib/db");
+    const { refundCredits } = await import("@/lib/credits");
 
-    await db.videoJob.update({
-      where: { id: job.id },
-      data: {
-        status: "FAILED",
-        error: job.lastError ?? "unknown",
-        finishedAt: new Date(),
-      },
-    });
+    // 1. تحديث حالة الـ Job المخصصة في قاعدة البيانات بناءً على نوعها
+    if (job.type === "video") {
+      await db.videoJob.update({
+        where: { id: job.id },
+        data: {
+          status: "FAILED",
+          error: job.lastError ?? "Unknown API Failure",
+          finishedAt: new Date(),
+        },
+      });
+    } else if (job.type === "voice") {
+      await db.voiceJob.update({
+        where: { id: job.id },
+        data: {
+          status: "FAILED",
+          error: job.lastError ?? "Unknown Audio Failure",
+          finishedAt: new Date(),
+        },
+      });
+    }
 
-    await db.usage.updateMany({
-      where: { referenceId: job.id },
-      data: {
-        status: "FAILED",
-        refunded: true,
-      },
-    });
+    // 2. تفعيل صمام أمان استرجاع النقاط للمستخدم فوراً لحمايته
+    console.log(`💸 [AUTO-REFUND PROTOCOL ACTIVATED] Triggering refund sequence for referenceId/jobId: ${job.id}`);
+    await refundCredits(job.id);
+
   } catch (e) {
-    console.error("⚠️ DB failure handling job fail:", e);
+    console.error("⚠️ [CRITICAL EXTENSION ERROR] DB or Refund failure handling final job crash:", e);
   }
 }
 
 // =====================================
-// 📊 PRIORITY SORTING
+// 📊 PRIORITY SORTING ALGORITHM
 // =====================================
 
 function sortQueue() {
@@ -219,7 +231,7 @@ function sortQueue() {
 }
 
 // =====================================
-// ⏱ BACKOFF STRATEGY
+// ⏱ BACKOFF EXPONENTIAL STRATEGY
 // =====================================
 
 function backoff(retry: number) {
@@ -227,7 +239,7 @@ function backoff(retry: number) {
 }
 
 // =====================================
-// ⏱ UTIL
+// ⏱ UTIL HELPERS
 // =====================================
 
 function sleep(ms: number) {
@@ -235,13 +247,20 @@ function sleep(ms: number) {
 }
 
 // =====================================
-// 📡 DEBUG (DEV ONLY)
+// 📡 CLUSTER MONITORING TERMINAL LOGS
 // =====================================
 
 if (process.env.NODE_ENV !== "production") {
-  setInterval(() => {
-    console.log(
-      `📊 Queue size=${queue.length} active=${activeJobs}`
-    );
-  }, 5000);
+  if (typeof global !== "undefined") {
+    // منع تكرار الـ Intervals في وضع الـ Hot Reload الخاص بـ Next.js Dev Mode
+    const globalObj = global as any;
+    if (!globalObj.__queue_logger_attached__) {
+      globalObj.__queue_logger_attached__ = true;
+      setInterval(() => {
+        if (queue.length > 0 || activeJobs > 0) {
+          console.log(`📊 [CLUSTER ANALYTICS] Active render channels=${activeJobs} | Waiting in queue=${queue.length}`);
+        }
+      }, 7000);
+    }
+  }
 }

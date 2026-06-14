@@ -9,12 +9,12 @@ import { useAuth } from "@clerk/nextjs";
 import {
   Sparkles, Video, BarChart3, ArrowRight, Play, ShieldCheck,
   Flame, Users, HelpCircle, ChevronDown, CheckCircle2, 
-  Wand2, Move, AudioLines, Compass, Tv, RefreshCw, UserSquare2, LayoutDashboard, Settings
+  Wand2, Move, AudioLines, Compass, Tv, RefreshCw, UserSquare2, LayoutDashboard, Settings, Mic
 } from "lucide-react";
 
 /* ================= TYPES ================= */
 type PlanType = "pro" | "premium";
-type MediaType = "video" | "avatar"; 
+type MediaType = "video" | "avatar" | "voice"; 
 type AspectRatioType = "16:9" | "9:16" | "1:1";
 type CameraMoveType = "zoom-in" | "pan-left" | "orbit-360" | "tilt-up";
 
@@ -135,7 +135,8 @@ export default function HomePage() {
 
   const studioTabs = [
     { id: "video" as MediaType, title: "AI Video", subtitle: "توليد فيديو ذكي", icon: Video, color: "text-blue-400", bgGlow: "from-blue-500/20", placeholder: "صف موضوع أو مشهد الفيديو السينمائي الذي ترغب في توليده بالتفصيل بواسطة الذكاء الاصطناعي..." },
-    { id: "avatar" as MediaType, title: "AI Avatar", subtitle: "شخصية رقمية متحدثة", icon: UserSquare2, color: "text-amber-400", bgGlow: "from-amber-500/20", placeholder: "اكتب النص أو السيناريو الكامل الذي ترغب من الشخصية الرقمية (الأفاتار) التحدث به ومحاكاته أمام الكاميرا..." },
+    { id: "avatar" as MediaType, title: "AI Avatar", subtitle: "شخصية رقمية متحدثة", icon: UserSquare2, color: "text-cyan-400", bgGlow: "from-cyan-500/20", placeholder: "اكتب النص أو السيناريو الكامل الذي ترغب من الشخصية الرقمية (الأفاتار) التحدث به ومحاكاته أمام الكاميرا..." },
+    { id: "voice" as MediaType, title: "AI Voice Cloning & Lip-Sync", subtitle: "استنساخ ومزامنة الصوت حركياً", icon: Mic, color: "text-amber-400", bgGlow: "from-amber-500/20", placeholder: "اكتب هنا النص المراد تحويله لبصمتك الصوتية المستنسخة أو الصوت الجاهز مع ميزة تركيب وحركة الشفايف الاحترافية..." },
   ];
 
   const currentTabInfo = studioTabs.find(t => t.id === type)!;
@@ -208,7 +209,7 @@ export default function HomePage() {
         <div className="w-full rounded-3xl border border-white/10 bg-[#09090d] shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[580px]">
           
           {/* SIDEBAR NAVIGATION */}
-          <div className="w-full md:w-64 bg-[#0d0d14] border-b md:border-b-0 md:border-r border-white/5 p-4 flex flex-col justify-between shrink-0">
+          <div className="w-full md:w-72 bg-[#0d0d14] border-b md:border-b-0 md:border-r border-white/5 p-4 flex flex-col justify-between shrink-0">
             <div className="space-y-4">
               <div className="flex items-center gap-2 px-2 pb-3 border-b border-white/5">
                 <LayoutDashboard size={14} className="text-cyan-400" />
@@ -234,11 +235,11 @@ export default function HomePage() {
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${
                           isSelected ? `bg-gradient-to-tr ${tab.bgGlow} text-white` : "bg-zinc-900 text-gray-500 group-hover:text-gray-300"
                         }`}>
-                          <TabIcon size={15} className={isSelected ? tab.color : ""} />
+                          <TabIcon size={14} className={isSelected ? tab.color : ""} />
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold">{tab.title}</span>
-                          <span className="text-[10px] text-gray-500 font-medium">{tab.subtitle}</span>
+                        <div className="flex flex-col max-w-[150px]">
+                          <span className="text-xs font-bold truncate leading-tight">{tab.title}</span>
+                          <span className="text-[10px] text-gray-500 font-medium truncate mt-0.5">{tab.subtitle}</span>
                         </div>
                       </div>
                       {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
@@ -269,7 +270,7 @@ export default function HomePage() {
                     <span className="w-2 h-2 rounded-full bg-cyan-500 animate-ping" />
                     <span>Generate Creative {currentTabInfo.title}</span>
                   </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">أنشئ محتواك المرئي والأفاتار الرقمي فائق الواقعية مباشرة للإنتاج البصري.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">أنشئ محتواك المرئي، الأفاتار الرقمي فائق الواقعية، أو البصمات الصوتية مباشرة للإنتاج البصري والسمعي.</p>
                 </div>
                 <span className="self-start sm:self-center text-[10px] bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-2.5 py-1 rounded-md font-mono font-bold tracking-wide uppercase">
                   Studio Pipeline Active
@@ -289,7 +290,7 @@ export default function HomePage() {
                     disabled={loadingAI || !prompt.trim()}
                     className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-4 py-2 text-[10px] font-black text-black transition disabled:opacity-20 shadow-md uppercase tracking-wider"
                   >
-                    {loadingAI ? "Rendering Video..." : "Execute Studio Render ✨"}
+                    {loadingAI ? "Rendering Stream..." : "Execute Studio Render ✨"}
                   </button>
                 </div>
 
@@ -315,7 +316,7 @@ export default function HomePage() {
                   <div className="flex items-center gap-1.5">
                     {type === "video" ? <Compass size={12} className="text-indigo-400" /> : <Settings size={12} className="text-indigo-400" />}
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
-                      {type === "video" ? "Cinematic Camera Rig" : "Avatar Lip-Sync Pass"}
+                      {type === "video" ? "Cinematic Camera Rig" : type === "avatar" ? "Avatar Lip-Sync Pass" : "Voice Matrix Target"}
                     </label>
                   </div>
                   <select value={cameraMove} onChange={(e) => setCameraMove(e.target.value as CameraMoveType)} className="w-full bg-[#0d0d14] text-[11px] text-gray-300 border border-white/5 p-2 rounded-lg focus:outline-none focus:border-cyan-500/40">
@@ -326,10 +327,16 @@ export default function HomePage() {
                         <option value="orbit-360">🔄 Orbit 360°</option>
                         <option value="tilt-up">↕️ Tilt Cinematic</option>
                       </>
-                    ) : (
+                    ) : type === "avatar" ? (
                       <>
                         <option value="zoom-in">🎙️ Ultra-Precise Arabic/English Sync</option>
                         <option value="pan-left">🎭 Dynamic Facial Expression Match</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="zoom-in">🇸🇦 العربية الفصحى الفخمة</option>
+                        <option value="pan-left">🇺🇸 English US Standard</option>
+                        <option value="orbit-360">🇫🇷 French Global Core</option>
                       </>
                     )}
                   </select>
@@ -339,7 +346,9 @@ export default function HomePage() {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-1.5">
                       <span className="text-emerald-400 text-xs">👤</span>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Persistent Face Lock</label>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                        {type === "voice" ? "Cloning Engine Accuracy" : "Persistent Face Lock"}
+                      </label>
                     </div>
                     <span className="text-[10px] font-mono text-emerald-400 font-bold">{Math.round(faceLockStrength * 100)}%</span>
                   </div>
@@ -362,7 +371,7 @@ export default function HomePage() {
 
             <div className="relative min-h-[250px] rounded-2xl border border-white/5 bg-[#030305] flex flex-col items-center justify-center p-4 overflow-hidden shadow-inner">
               <div className="absolute top-3 left-3 flex items-center gap-1.5 text-[9px] uppercase font-mono tracking-widest text-gray-500 bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
-                <Tv size={11} className="text-cyan-400" /> Video Frame Buffer
+                <Tv size={11} className="text-cyan-400" /> Frame Node Buffer
               </div>
 
               <div className="absolute top-3 right-3 flex items-center gap-1.5">
@@ -381,13 +390,17 @@ export default function HomePage() {
               {loadingAI && (
                 <div className="text-center space-y-2">
                   <RefreshCw size={20} className="animate-spin text-cyan-400 mx-auto" />
-                  <p className="text-[10px] text-cyan-400 font-mono tracking-wider animate-pulse">Processing Neural Video Frame Sequences...</p>
+                  <p className="text-[10px] text-cyan-400 font-mono tracking-wider animate-pulse">Processing Neural Frame Sequences...</p>
                 </div>
               )}
 
               {result && !loadingAI && (
                 <div className="w-full h-full flex items-center justify-center max-h-[220px]">
-                  <video src={result} controls autoPlay loop className="rounded-xl max-h-[190px] w-full object-contain" />
+                  {type === "voice" ? (
+                    <audio src={result} controls className="w-[80%] accent-amber-400" />
+                  ) : (
+                    <video src={result} controls autoPlay loop className="rounded-xl max-h-[190px] w-full object-contain" />
+                  )}
                 </div>
               )}
 

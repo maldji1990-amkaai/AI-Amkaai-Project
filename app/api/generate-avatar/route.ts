@@ -4,13 +4,19 @@ import { db } from "@/lib/db";
 import { useCredits, refundCredits, markUsageSuccess } from "@/lib/credits";
 import { demoAvatars } from "@/lib/demo";
 import { PlanType } from "@prisma/client";
+import Replicate from "replicate";
 
-export async function POST() {
-  // 🎯 إنشاء معرّف فريد للعملية لربط حجز النقاط وإرجاعها في حال الفشل مستقبلاً
+// تهيئة حزمة Replicate باستخدام مفتاح البيئة السري
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+});
+
+export async function POST(request: Request) {
+  // 🎯 إنشاء معرّف فريد للعملية لربط حجز النقاط وإرجاعها في حال الفشل
   const referenceId = `avt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
   try {
-    console.log("🚀 AVATAR API HIT");
+    console.log("🚀 REAL AI AVATAR API HIT");
 
     // 🔐 AUTH (التحقق من Clerk)
     const { userId } = await auth();
@@ -18,6 +24,9 @@ export async function POST() {
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // القراءة الديناميكية للبيانات المرفوعة من واجهة المستخدم
+    const { prompt, uploadedImage } = await request.json();
 
     // 👤 GET USER
     let user = await db.user.findUnique({
@@ -41,7 +50,6 @@ export async function POST() {
     //////////////////////////////////////////////////
     let creditResult;
     try {
-      // 🛠️ تم التعديل هنا: تمرير "image" بدلًا من "avatar" للتوافق مع أنواع TypeScript المقبولة في دالة useCredits
       creditResult = await useCredits(user.id, "image", { reference: referenceId });
     } catch (err: any) {
       if (err.message === "SUBSCRIPTION_EXPIRED_OR_INACTIVE") {
@@ -61,44 +69,67 @@ export async function POST() {
 
       return NextResponse.json({
         success: true,
-        avatar,
+        avatar, // سيعيد الرابط المؤقت للمستخدم المجاني
         demo: true,
         remainingCredits: creditResult.remainingCredits,
       });
     }
 
     //////////////////////////////////////////////////
-    // 💎 PRO / PREMIUM (FUTURE REAL AI / CURRENT DEMO)
+    // 💎 PRO / PREMIUM (REAL AI ACTIVE)
     //////////////////////////////////////////////////
     try {
-      
-      /* 💡 مكان ربط الـ API الحقيقي مستقبلاً (مثل Leonardo AI أو Replicate):
-         const response = await fetch("https://api.replicate.com/v1/predictions", { ... });
-         if (!response.ok) throw new Error("AI_SERVER_FAILED");
-         const data = await response.json();
-         const avatarUrl = data.output;
+      if (!uploadedImage) {
+        throw new Error("MISSING_SOURCE_IMAGE");
+      }
+
+      /* 💡 الربط الفعلي بموديل ذكاء اصطناعي متطور:
+         سنستخدم هنا نموذج LivePortrait الشهير والخفيف القادر على بث الروح في الصور وتحريك الوجوه بدقة
       */
+      const prediction = await replicate.predictions.create({
+        version: "fofr/live-portrait:16ef6823", // معرف الموديل المستقر على Replicate
+        input: {
+          source_image: uploadedImage, // يقبل رابط مباشر أو صورة مشفرة Base64 قادمة من الفرونت إند
+          prompt: prompt || "expression driving pattern",
+        },
+      });
 
-      // المحاكاة المؤقتة للمشتركين (سيتم خصم النقاط منهم بشكل صحيح الآن)
-      const avatar = demoAvatars[Math.floor(Math.random() * demoAvatars.length)];
+      // 🔄 حلقة الانتظار الذكي (Polling Loop) لمتابعة ريندر الأفاتار في خوادم Replicate الخلفية
+      let result = await replicate.predictions.get(prediction.id);
+      while (result.status !== "succeeded" && result.status !== "failed") {
+        // الانتظار لمدة ثانيتين قبل التحقق مرة أخرى لتجنب حظر الـ Rate-limit
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        result = await replicate.predictions.get(prediction.id);
+      }
 
-      // علم العملية كـ COMPLETED لنجاح توليد الأفاتار للمشتركين
+      if (result.status === "failed") {
+        throw new Error("AI_SERVER_RENDER_FAILED");
+      }
+
+      // استخراج الرابط الحقيقي النهائي للفيديو التوليدي الناتج عن الذكاء الاصطناعي
+      const avatarUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+
+      // علم العملية كـ COMPLETED لنجاح توليد الأفاتار الحقيقي للمشتركين وترسيخ خصم النقاط
       await markUsageSuccess(referenceId);
 
       return NextResponse.json({
         success: true,
-        avatar,
+        avatar: avatarUrl, // إرسال رابط الفيديو الحقيقي للأفاتار الناطق
         demo: false,
         remainingCredits: creditResult.remainingCredits,
       });
 
-    } catch (aiError) {
-      // 💸 صمام الأمان: في حال قمت بربط الـ API الفعلي مستقبلاً وفشل السيرفر الخارجي، يتم رد النقاط فوراً
+    } catch (aiError: any) {
+      // 💸 صمام الأمان: في حال فشل السيرفر الخارجي أو لم يتم رفع صورة، يتم رد النقاط فوراً لحساب العميل
       console.error("🔥 Avatar AI pipeline failed, triggering refund...", aiError);
       await refundCredits(referenceId);
 
+      const errorMessage = aiError.message === "MISSING_SOURCE_IMAGE" 
+        ? "Avatar generation requires a base seed image to be uploaded."
+        : "Avatar generation failed on cloud GPUs. Your credits have been securely refunded.";
+
       return NextResponse.json(
-        { error: "Avatar generation failed. Your credits have been securely refunded." },
+        { error: errorMessage },
         { status: 500 }
       );
     }
