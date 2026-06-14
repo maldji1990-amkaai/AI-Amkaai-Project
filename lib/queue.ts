@@ -84,7 +84,7 @@ async function processQueue() {
         activeJobs--;
       });
     }
-  } throws (err) {
+  } catch (err) { // 🛠️ تم التصحيح هنا من throws إلى catch ليعمل الـ Build بنجاح
     console.error("🔥 Critical failure inside cluster engine main-loop:", err);
   } finally {
     isProcessing = false;

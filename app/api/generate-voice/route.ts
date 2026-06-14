@@ -140,10 +140,11 @@ export async function POST(request: Request) {
           },
         });
 
-        let syncResult = await lipSyncPrediction.get(lipSyncPrediction.id);
+        // 🛠️ تم حل المشكلة هنا: استخدام كائن replicate الرئيسي لجلب الـ Prediction بدقة وعزل تعارض الـ Types
+        let syncResult = await replicate.predictions.get(lipSyncPrediction.id);
         while (syncResult.status !== "succeeded" && syncResult.status !== "failed") {
           await new Promise((resolve) => setTimeout(resolve, 2000));
-          syncResult = await lipSyncPrediction.get(lipSyncPrediction.id);
+          syncResult = await replicate.predictions.get(lipSyncPrediction.id);
         }
 
         // إذا نجحت عملية المزامنة الحركية، يتحول المخرج النهائي ليكون فيديو ناطق فخم بدلاً من مجرد صوت

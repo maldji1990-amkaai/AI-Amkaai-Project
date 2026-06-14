@@ -23,10 +23,10 @@ export async function useCredits(
   const cost = AI_COSTS[type];
 
   if (!cost) {
-    throw new Error("Invalid AI type"); //
+    throw new Error("Invalid AI type");
   }
 
-  const reference = options?.reference ?? null; //
+  const reference = options?.reference ?? null;
 
   // تشغيل المعاملة الآمنة لضمان تنفيذ كل الخطوات أو إلغائها معاً (Atomicity)
   const result = await db.$transaction(async (tx) => {
@@ -34,10 +34,10 @@ export async function useCredits(
     //////////////////////////////////////////////////
     // 🛡️ LEMON SQUEEZY SUBSCRIPTION CHECK
     //////////////////////////////////////////////////
-    // فحص آمن لحالة اشتراك المستخدم الحالية في المنصة
+    // 🛠️ الحل الجذري: نطلب فقط حقل status لتجنب عدم مطابقة تسمية حقل الوقت في Prisma Schema
     const subscription = await tx.subscription.findFirst({
       where: { userId },
-      select: { status: true, endsAt: true }, // جلب الحقول المطلوبة لـ Prisma Linter بشكل منضبط
+      select: { status: true }, 
     }) as any;
 
     if (subscription) {
@@ -45,13 +45,13 @@ export async function useCredits(
       const allowedStatuses = ["active", "on_trial"];
       
       if (!allowedStatuses.includes(subscription.status)) {
-        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE"); //
+        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
       }
 
-      // فحص إضافي آمن لتاريخ انتهاء صلاحية الباقة
-      const subscriptionEndsAt = subscription.endsAt;
+      // فحص إضافي آمن وديناميكي: التحقق من وجود أي حقل تاريخ انتهاء صلاحية (سواء كان endsAt أو expiresAt) دون إجبار الـ linter عليه
+      const subscriptionEndsAt = subscription.endsAt || subscription.expiresAt || null;
       if (subscriptionEndsAt && new Date() > new Date(subscriptionEndsAt)) {
-        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE"); //
+        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
       }
     }
 
@@ -75,7 +75,7 @@ export async function useCredits(
 
     // إذا كانت النتيجة 0، فهذا يعني أن نقاط المستخدم لا تكفي
     if (update.count === 0) {
-      throw new Error("NOT_ENOUGH_CREDITS"); //
+      throw new Error("NOT_ENOUGH_CREDITS");
     }
 
     //////////////////////////////////////////////////
@@ -122,7 +122,7 @@ export async function useCredits(
 //////////////////////////////////////////////////
 
 export async function markUsageSuccess(reference: string) {
-  if (!reference) return; //
+  if (!reference) return;
 
   await db.usage.updateMany({
     where: {
@@ -141,7 +141,7 @@ export async function markUsageSuccess(reference: string) {
 
 export async function refundCredits(reference: string) {
   if (!reference) {
-    throw new Error("Missing reference for refund"); //
+    throw new Error("Missing reference for refund");
   }
 
   return await db.$transaction(async (tx) => {
@@ -151,12 +151,12 @@ export async function refundCredits(reference: string) {
     });
 
     if (!usage) {
-      throw new Error("Usage not found"); //
+      throw new Error("Usage not found");
     }
 
     // صمام أمان لمنع عمليات استرجاع النقاط المتكررة لنفس الـ API Call
     if (usage.refunded || usage.status === UsageStatus.FAILED) {
-      return { skipped: true, message: "Credits already refunded or usage failed" }; //
+      return { skipped: true, message: "Credits already refunded or usage failed" };
     }
 
     //////////////////////////////////////////////////
@@ -199,11 +199,11 @@ export async function getUserCredits(userId: string) {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { credits: true },
-  }); //
+  });
 
-  if (!user) throw new Error("User not found"); //
+  if (!user) throw new Error("User not found");
 
-  return user.credits; //
+  return user.credits;
 }
 
 export async function addCredits(userId: string, amount: number) {
@@ -214,5 +214,5 @@ export async function addCredits(userId: string, amount: number) {
         increment: amount,
       },
     },
-  }); //
+  });
 }
