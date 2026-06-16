@@ -4,18 +4,23 @@ import { useEffect } from "react";
 
 export default function LiveChat() {
   useEffect(() => {
-    // 1. تعريف مصفوفة كريسب في المتصفح
-    (window as any).$crisp = [];
-    
-    // 🚨 استبدل هذا المعرف بالمعرف الخاص بموقعك بعد التسجيل في كريسب
-    (window as any).CRISP_WEBSITE_ID = "ضع_هنا_الـ_WEBSITE_ID_الخاص_بك"; 
+    // إعداد كود Tawk.to ليعمل داخل React/Next.js
+    (window as any).Tawk_API = (window as any).Tawk_API || {};
+    (window as any).Tawk_LoadStart = new Date();
 
-    // 2. حقن السكريبت ديناميكياً لتسريع تحميل الموقع
-    const d = document;
-    const s = d.createElement("script");
-    s.src = "https://client.crisp.chat/l.js";
-    s.async = true;
-    d.getElementsByTagName("head")[0].appendChild(s);
+    const s1 = document.createElement("script");
+    const s0 = document.getElementsByTagName("script")[0];
+
+    s1.async = true;
+    s1.src = 'https://embed.tawk.to/6a31280d25dfec1d42f64729/1jr808tda';
+    s1.charset = 'UTF-8';
+    s1.setAttribute('crossorigin', '*');
+
+    if (s0 && s0.parentNode) {
+      s0.parentNode.insertBefore(s1, s0);
+    } else {
+      document.head.appendChild(s1);
+    }
   }, []);
 
   return null;
