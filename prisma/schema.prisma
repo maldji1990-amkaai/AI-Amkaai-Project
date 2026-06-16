@@ -7,9 +7,234 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//////////////////////////////////////////////////
-// 📌 ENUMS
-//////////////////////////////////////////////////
+model User {
+  id                  String              @id @default(cuid())
+  clerkId             String              @unique
+  email               String?             @unique
+  /// ///////////////////////////////////////////////
+  /// ///////////////////////////////////////////////
+  plan                PlanType            @default(FREE)
+  credits             Int                 @default(10)
+  lemonCustomerId     String?
+  lemonSubscriptionId String?
+  /// ///////////////////////////////////////////////
+  /// ///////////////////////////////////////////////
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  abandonedCheckouts  AbandonedCheckout[]
+  images              Image[]
+  imageJobs           ImageJob[]
+  manualPayments      ManualPayment[]
+  notifications       Notification[]
+  payments            Payment[]
+  subscriptions       Subscription[]
+  usages              Usage[]
+  videoJobs           VideoJob[]
+  voices              Voice[]
+  voiceJobs           VoiceJob[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+model Subscription {
+  id                  String    @id @default(cuid())
+  userId              String
+  lemonSubscriptionId String?   @unique
+  lemonCustomerId     String?
+  status              String
+  plan                PlanType
+  currentPeriodEnd    DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  userId       String
+  amount       Float
+  currency     String
+  lemonOrderId String?       @unique
+  status       PaymentStatus @default(COMPLETED)
+  createdAt    DateTime      @default(now())
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Usage {
+  id          String      @id @default(cuid())
+  userId      String
+  type        String
+  cost        Int
+  status      UsageStatus @default(PENDING)
+  refunded    Boolean     @default(false)
+  referenceId String?
+  createdAt   DateTime    @default(now())
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoJobs   VideoJob[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([referenceId])
+}
+
+model VideoJob {
+  id          String    @id @default(cuid())
+  userId      String
+  prompt      String
+  status      JobStatus @default(PENDING)
+  priority    Int       @default(0)
+  resultUrl   String?
+  error       String?
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  progress    Int       @default(0)
+  usageId     String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  imageUrl    String?
+  usage       Usage?    @relation(fields: [usageId], references: [id])
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+  @@index([priority, createdAt])
+}
+
+model ImageJob {
+  id          String    @id @default(cuid())
+  userId      String
+  prompt      String
+  status      JobStatus @default(PENDING)
+  priority    Int       @default(0)
+  resultUrl   String?
+  error       String?
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  progress    Int       @default(0)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+  @@index([priority, createdAt])
+}
+
+model VoiceJob {
+  id          String    @id @default(cuid())
+  userId      String
+  text        String
+  status      JobStatus @default(PENDING)
+  priority    Int       @default(0)
+  resultUrl   String?
+  error       String?
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  progress    Int       @default(0)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+  @@index([priority, createdAt])
+}
+
+model Image {
+  id        String   @id @default(cuid())
+  url       String
+  prompt    String
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Voice {
+  id        String   @id @default(cuid())
+  url       String
+  text      String
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ManualPayment {
+  id            String   @id @default(cuid())
+  userId        String
+  plan          String
+  method        String
+  amount        Float
+  currency      String   @default("USD")
+  screenshotUrl String?
+  transactionId String?
+  aiScore       Float?
+  aiRawText     String?
+  riskLevel     String?
+  status        String   @default("PENDING")
+  verified      Boolean  @default(false)
+  rejectedBy    String?
+  rejectReason  String?
+  ipAddress     String?
+  device        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model AbandonedCheckout {
+  id          String   @id @default(cuid())
+  userId      String?
+  email       String?
+  plan        String
+  checkoutUrl String
+  orderId     String?  @unique
+  recovered   Boolean  @default(false)
+  step        String   @default("checkout_started")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+}
 
 enum PlanType {
   FREE
@@ -36,376 +261,4 @@ enum PaymentStatus {
   PENDING
   COMPLETED
   FAILED
-}
-
-//////////////////////////////////////////////////
-// 👤 USER
-//////////////////////////////////////////////////
-
-model User {
-  id      String  @id @default(cuid())
-  clerkId String  @unique
-  email   String? @unique
-
-  //////////////////////////////////////////////////
-  // BILLING
-  //////////////////////////////////////////////////
-
-  plan    PlanType @default(FREE)
-  credits Int      @default(10)
-
-  lemonCustomerId     String?
-  lemonSubscriptionId String?
-
-  //////////////////////////////////////////////////
-  // TIMESTAMPS
-  //////////////////////////////////////////////////
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  //////////////////////////////////////////////////
-  // RELATIONS
-  //////////////////////////////////////////////////
-
-  videoJobs VideoJob[]
-  imageJobs ImageJob[]
-  voiceJobs VoiceJob[]
-
-  images Image[]
-  voices Voice[]
-
-  usages        Usage[]
-  payments      Payment[]
-  subscriptions Subscription[]
-
-  notifications Notification[]
-
-  manualPayments     ManualPayment[]
-  abandonedCheckouts AbandonedCheckout[]
-
-  @@index([clerkId])
-  @@index([email])
-}
-
-//////////////////////////////////////////////////
-// 💳 SUBSCRIPTION
-//////////////////////////////////////////////////
-
-model Subscription {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  lemonSubscriptionId String? @unique
-  lemonCustomerId     String?
-
-  status String
-  plan   PlanType
-
-  currentPeriodEnd DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
-}
-
-//////////////////////////////////////////////////
-// 💰 PAYMENT
-//////////////////////////////////////////////////
-
-model Payment {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  amount   Float
-  currency String
-
-  lemonOrderId String? @unique
-
-  status PaymentStatus @default(COMPLETED)
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-//////////////////////////////////////////////////
-// 📊 USAGE
-//////////////////////////////////////////////////
-
-model Usage {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  type String
-  cost Int
-
-  status  UsageStatus @default(PENDING)
-  refunded Boolean     @default(false)
-
-  referenceId String?
-
-  createdAt DateTime @default(now())
-
-  //////////////////////////////////////////////////
-  // RELATIONS
-  //////////////////////////////////////////////////
-
-  videoJobs VideoJob[]
-
-  @@index([userId])
-  @@index([status])
-  @@index([referenceId])
-}
-
-//////////////////////////////////////////////////
-// 🎬 VIDEO JOB
-//////////////////////////////////////////////////
-
-model VideoJob {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  prompt String
-
-  imageUrl String?
-
-  status JobStatus @default(PENDING)
-
-  priority Int @default(0)
-
-  resultUrl String?
-  error     String?
-
-  attempts    Int @default(0)
-  maxAttempts Int @default(3)
-
-  progress Int @default(0)
-
-  usageId String?
-  usage   Usage? @relation(fields: [usageId], references: [id], onDelete: SetNull)
-
-  startedAt  DateTime?
-  finishedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status])
-  @@index([userId])
-  @@index([priority, createdAt])
-}
-
-//////////////////////////////////////////////////
-// 🖼 IMAGE JOB
-//////////////////////////////////////////////////
-
-model ImageJob {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  prompt String
-
-  status JobStatus @default(PENDING)
-
-  priority Int @default(0)
-
-  resultUrl String?
-  error     String?
-
-  attempts    Int @default(0)
-  maxAttempts Int @default(3)
-
-  progress Int @default(0)
-
-  startedAt  DateTime?
-  finishedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status])
-  @@index([userId])
-  @@index([priority, createdAt])
-}
-
-//////////////////////////////////////////////////
-// 🎙 VOICE JOB
-//////////////////////////////////////////////////
-
-model VoiceJob {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  text String
-
-  status JobStatus @default(PENDING)
-
-  priority Int @default(0)
-
-  resultUrl String?
-  error     String?
-
-  attempts    Int @default(0)
-  maxAttempts Int @default(3)
-
-  progress Int @default(0)
-
-  startedAt  DateTime?
-  finishedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status])
-  @@index([userId])
-  @@index([priority, createdAt])
-}
-
-//////////////////////////////////////////////////
-// 🖼 IMAGE
-//////////////////////////////////////////////////
-
-model Image {
-  id String @id @default(cuid())
-
-  url    String
-  prompt String
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-//////////////////////////////////////////////////
-// 🎙 VOICE
-//////////////////////////////////////////////////
-
-model Voice {
-  id String @id @default(cuid())
-
-  url  String
-  text String
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-//////////////////////////////////////////////////
-// 🔔 NOTIFICATION
-//////////////////////////////////////////////////
-
-model Notification {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  title   String
-  message String
-
-  read Boolean @default(false)
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-//////////////////////////////////////////////////
-// 💳 MANUAL PAYMENT
-//////////////////////////////////////////////////
-
-model ManualPayment {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  plan          String
-  method        String
-  amount        Float
-  currency      String @default("USD")
-
-  screenshotUrl String?
-  transactionId String?
-
-  aiScore    Float?
-  aiRawText  String?
-  riskLevel  String?
-
-  status   String  @default("PENDING")
-  verified Boolean @default(false)
-
-  rejectedBy   String?
-  rejectReason String?
-
-  ipAddress String?
-  device    String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
-}
-
-//////////////////////////////////////////////////
-// ⚠️ ABANDONED CHECKOUT
-//////////////////////////////////////////////////
-
-model AbandonedCheckout {
-  id String @id @default(cuid())
-
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  email String?
-  plan  String
-
-  checkoutUrl String
-  orderId     String? @unique
-
-  recovered Boolean @default(false)
-
-  step String @default("checkout_started")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-}
-
-//////////////////////////////////////////////////
-// 🔐 WEBHOOK IDEMPOTENCY
-//////////////////////////////////////////////////
-
-model WebhookEvent {
-  id String @id @default(cuid())
-
-  eventId String @unique
-
-  createdAt DateTime @default(now())
-
-  @@index([eventId])
 }
