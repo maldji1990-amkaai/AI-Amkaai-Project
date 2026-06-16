@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AMKAAI</string>
+    <string name="title_activity_main">AMKAAI</string>
+    <string name="package_name">com.amkaai.app</string>
+    <string name="custom_url_scheme">com.amkaai.app</string>
+</resources>
