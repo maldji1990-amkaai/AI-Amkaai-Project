@@ -2,7 +2,7 @@ import "./globals.css";
 
 import type { Metadata } from "next";
 
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs"; 
 
 import { Geist } from "next/font/google";
 
@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import Providers from "./providers";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+import LiveChat from "@/components/LiveChat"; // 👈 1. استيراد مكون الشات الذكي
 
 //////////////////////////////////////////////////
 // 🔤 FONT
@@ -133,8 +135,6 @@ export const metadata: Metadata = {
     canonical:
       "https://www.amkaai.net",
   },
-
-  themeColor: "#000000",
 };
 
 //////////////////////////////////////////////////
@@ -192,6 +192,9 @@ export default function RootLayout({
               <div className="relative min-h-screen">
                 {children}
               </div>
+
+              {/* 💬 2. نافذة الشات تعمل هنا عالمياً في الخلفية */}
+              <LiveChat />
 
             </Providers>
 
