@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 /* ================= TYPES ================= */
-type PlanType = "pro" | "premium";
+type PlanType = "creator" | "pro" | "premium";
 type MediaType = "video" | "avatar" | "voice"; 
 type AspectRatioType = "16:9" | "9:16" | "1:1";
 type CameraMoveType = "zoom-in" | "pan-left" | "orbit-360" | "tilt-up";
@@ -21,7 +21,7 @@ type CameraMoveType = "zoom-in" | "pan-left" | "orbit-360" | "tilt-up";
 interface FeatureProps { icon: React.ReactNode; title: string; text: string; }
 interface PricingCardProps {
   title: string; price: string; description: string; features: string[];
-  buttonText: string; highlighted?: boolean; onClick: () => void;
+  buttonText: string; highlighted?: boolean; badgeText?: string; onClick: () => void;
 }
 
 /* ================= CONSTANTS & STATIC DATA ================= */
@@ -87,7 +87,7 @@ export default function HomePage() {
 
   const goToCheckout = async (plan: PlanType) => {
     if (!isSignedIn) {
-      router.push("/sign-in?redirect_url=/pricing");
+      router.push(`/sign-in?redirect_url=/pricing`);
       return;
     }
 
@@ -493,13 +493,26 @@ export default function HomePage() {
       </section>
 
       {/* PRICING PLANS */}
-      <section id="pricing" className="relative z-10 mx-auto max-w-5xl px-6 pb-32">
+      <section id="pricing" className="relative z-10 mx-auto max-w-6xl px-6 pb-32">
         <div className="mb-14 text-center">
           <h2 className="text-xs font-black tracking-[0.2em] text-cyan-400 uppercase mb-2">Computational Costing</h2>
           <p className="text-3xl font-black tracking-tight">Flexible Studio Scaler Plans</p>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
+        {/* 🌟 التحديث هنا: تم تعديل الـ Grid لتستوعب 3 خطط بدلاً من خطتين */}
+        <div className="grid gap-8 md:grid-cols-3 max-w-5xl mx-auto">
+          
+          {/* 1️⃣ باقة Creator Pass الجديدة */}
+          <PricingCard
+            title="CREATOR PASS"
+            price="$7"
+            description="Entry level tier for content creators and casual experimenters."
+            features={["Standard Spatial Engine Access", "600 Compute Node Credits /mo", "Standard Pipeline Priority", "HD File Downloads Ready"]}
+            buttonText={loadingPlan === "creator" ? "Routing Gateway..." : "Deploy Creator Engine"}
+            onClick={() => goToCheckout("creator")}
+          />
+
+          {/* 2️⃣ باقة Pro Studio */}
           <PricingCard
             title="PRO CREATOR STUDIO"
             price="$15"
@@ -508,11 +521,14 @@ export default function HomePage() {
             buttonText={loadingPlan === "pro" ? "Routing Gateway..." : "Deploy Pro Engine"}
             onClick={() => goToCheckout("pro")}
           />
+
+          {/* 3️⃣ باقة Premium Studio */}
           <PricingCard
             title="PREMIUM AGENT ARCHITECTURE"
             price="$25"
             description="Tailored specifically for production agencies."
             highlighted
+            badgeText="CLUSTER OPTIMAL"
             features={["Everything inside Pro Studio Matrix", "4K Neural Network Upscaling", "Uncapped Continuous Rendering Lines", "Commercial Use Verification Contract"]}
             buttonText={loadingPlan === "premium" ? "Routing Gateway..." : "Deploy Premium Architecture"}
             onClick={() => goToCheckout("premium")}
@@ -563,12 +579,12 @@ function Feature({ icon, title, text }: FeatureProps) {
   );
 }
 
-function PricingCard({ title, price, description, features, buttonText, highlighted = false, onClick }: PricingCardProps) {
+function PricingCard({ title, price, description, features, buttonText, highlighted = false, badgeText, onClick }: PricingCardProps) {
   return (
     <motion.div whileHover={{ y: -2 }} className={`relative overflow-hidden rounded-2xl border p-7 backdrop-blur-2xl transition-all flex flex-col justify-between ${highlighted ? "border-cyan-500/20 bg-gradient-to-b from-cyan-950/10 via-black to-black shadow-2xl" : "border-white/5 bg-[#070709]"}`}>
-      {highlighted && (
+      {badgeText && (
         <div className="absolute right-4 top-4 rounded-full bg-cyan-400 px-2.5 py-0.5 text-[8px] font-black text-black tracking-widest uppercase">
-          CLUSTER OPTIMAL
+          {badgeText}
         </div>
       )}
       <div>
