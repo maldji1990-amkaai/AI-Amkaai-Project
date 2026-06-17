@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { PlanType } from "@prisma/client";
 
 /**
- * فحص ما إذا كان المستخدم يمتلك باقة احترافية نشطة (PRO أو PREMIUM)
+ * فحص ما إذا كان المستخدم يمتلك باقة احترافية نشطة (CREATOR أو PRO أو PREMIUM)
  * @param userId - معرّف الـ Clerk الخاص بالمستخدم
  */
 export async function isProUser(userId: string) {
@@ -15,15 +15,19 @@ export async function isProUser(userId: string) {
   });
 
   // 2. التحقق من استحقاق المستخدم للميزات الاحترافية
-  // الخطة تعتبر PRO إذا كانت قيمتها PRO أو PREMIUM في الـ Enum الخاص بـ Prisma
-  return user?.plan === PlanType.PRO || user?.plan === PlanType.PREMIUM;
+  // 🌟 التحديث هنا: تم إضافة CREATOR إلى جانب PRO و PREMIUM ليعامل كـ Pro User تلقائياً
+  return (
+    user?.plan === PlanType.CREATOR ||
+    user?.plan === PlanType.PRO ||
+    user?.plan === PlanType.PREMIUM
+  );
 }
 
 /**
  * دالة مساعدة إضافية في حال احتجت لمعرفة نوع الباقة الحرفي للمستخدم في أي مكان بالتطبيق
  */
 export async function getUserPlan(userId: string): Promise<PlanType> {
-  if (!userId) return PlanType.FREE;
+  if (!userId) return PlanType.FREE; // أو القيمة الافتراضية غير المشتركة لديك في الـ Enum
 
   const user = await db.user.findUnique({
     where: { clerkId: userId },

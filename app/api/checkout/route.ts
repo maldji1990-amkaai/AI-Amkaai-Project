@@ -41,21 +41,28 @@ export async function POST(req: Request) {
     const body = await req.json();
     const plan = body?.plan;
 
-    if (plan !== "pro" && plan !== "premium") {
+    // 🌟 التحديث هنا: إضافة 'creator' إلى الخطط المقبولة في الخادم
+    if (plan !== "creator" && plan !== "pro" && plan !== "premium") {
       return NextResponse.json(
         { error: "Invalid plan", message: `Plan received: ${plan}` },
         { status: 400 }
       );
     }
 
+    // 🌟 التحديث هنا: توزيع الروابط الديناميكية لتشمل باقة الـ Creator Pass الجديدة بـ 7$
     const baseCheckoutUrl =
       plan === "premium"
         ? process.env.LEMON_SQUEEZY_PREMIUM_URL
-        : process.env.LEMON_SQUEEZY_PRO_URL;
+        : plan === "pro"
+        ? process.env.LEMON_SQUEEZY_PRO_URL
+        : process.env.LEMON_SQUEEZY_CREATOR_URL; // رابط باقة الـ 7 دولار في ملف الـ .env
 
     if (!baseCheckoutUrl) {
       return NextResponse.json(
-        { error: "Missing checkout URL", message: "Environment variables for Lemon Squeezy URLs are missing on the server" },
+        { 
+          error: "Missing checkout URL", 
+          message: `Environment variables for Lemon Squeezy URLs are missing on the server for plan: ${plan}` 
+        },
         { status: 500 }
       );
     }

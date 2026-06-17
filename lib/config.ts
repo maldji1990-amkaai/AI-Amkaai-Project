@@ -3,28 +3,28 @@
 import { PlanType as PrismaPlanType } from "@prisma/client";
 
 //////////////////////////////////////////////////
-// 💳 PLANS CONFIG (المصدر الوحيد للحقيقة)
+// 💳 PLANS CONFIG (المصدر الوحيد للحقيقة - 3 باقات فقط)
 //////////////////////////////////////////////////
 
 export const PLANS = {
-  free: {
-    name: "Free",
-    credits: 10,
-    price: 0,
-    isPro: false,
+  creator: {
+    name: "Creator Pass",
+    credits: 70, // 🌟 70 نقطة = 70 ثانية توليد فيديو مرن
+    price: 7,   // 7 USD
+    isPro: true,
   },
 
   pro: {
-    name: "Pro",
-    credits: 120, // 💡 يمكنك زيادتها مستقبلاً (مثلاً: 1200) لزيادة المبيعات
-    price: 15, // USD
+    name: "Pro Pack",
+    credits: 200, // 🌟 200 نقطة = 200 ثانية
+    price: 15,   // 15 USD
     isPro: true,
   },
 
   premium: {
-    name: "Premium",
-    credits: 320, // 💡 يمكنك زيادتها مستقبلاً (مثلاً: 3500)
-    price: 25, // USD
+    name: "Premium Studio",
+    credits: 400, // 🌟 400 نقطة = 400 ثانية
+    price: 25,   // 25 USD
     isPro: true,
   },
 } as const;
@@ -37,8 +37,8 @@ export type ConfigPlanType = keyof typeof PLANS;
 
 export const AI_COSTS = {
   image: 1,
-  voice: 3,
-  video: 30, // تكلفة توليد الفيديو الواحد أو الأفاتار
+  voice: 1,  
+  video: 1,  // نظام مرن: 1 نقطة لكل 1 ثانية توليد فيديو (Pay-Per-Second)
 } as const;
 
 export type AIType = keyof typeof AI_COSTS;
@@ -48,6 +48,7 @@ export type AIType = keyof typeof AI_COSTS;
 //////////////////////////////////////////////////
 
 export const LEMON_VARIANTS = {
+  creator: process.env.LEMON_SQUEEZY_CREATOR_VARIANT_ID || "", 
   pro: process.env.LEMON_SQUEEZY_PRO_VARIANT_ID || "",
   premium: process.env.LEMON_SQUEEZY_PREMIUM_VARIANT_ID || "",
 };
@@ -57,19 +58,19 @@ export const LEMON_VARIANTS = {
 //////////////////////////////////////////////////
 
 export const LIMITS = {
-  maxPromptLength: 1000, // الحد الأقصى لوصف الفيديو النصي
-  minPromptLength: 3,    // الحد الأدنى لحروف المدخلات لمنع الطلبات الفارغة
-  maxTextLength: 2000,   // الحد الأقصى لنصوص استنساخ وتحويل الصوت
+  maxPromptLength: 1000, 
+  minPromptLength: 3,    
+  maxTextLength: 2000,   
 };
 
 //////////////////////////////////////////////////
-// ⚡ FEATURE FLAGS (التحكم في تشغيل الميزات برميًا)
+// ⚡ FEATURE FLAGS (التحكم في تشغيل الميزات برمجيًا)
 //////////////////////////////////////////////////
 
 export const FEATURES = {
-  enableVideoQueue: true,      // تفعيل/تعطيل طابور إنتاج الفيديو بالكامل
-  enableVoice: true,           // تشغيل ميزة استنساخ وهندسة الصوت AI
-  enableImage: true,           // تشغيل محرك تحسين وتوليد الصور
+  enableVideoQueue: true,      
+  enableVoice: true,           
+  enableImage: true,           
 };
 
 //////////////////////////////////////////////////
@@ -95,9 +96,9 @@ export function getAICost(type: AIType) {
 export function getPlanFromVariant(variantId: string | number | null): ConfigPlanType | null {
   if (!variantId) return null;
 
-  // تحويل القيمة القادمة إلى نص دائماً لضمان دقة المقارنة الصارمة
   const incomingVariantStr = String(variantId);
 
+  if (incomingVariantStr === LEMON_VARIANTS.creator) return "creator"; 
   if (incomingVariantStr === LEMON_VARIANTS.pro) return "pro";
   if (incomingVariantStr === LEMON_VARIANTS.premium) return "premium";
 

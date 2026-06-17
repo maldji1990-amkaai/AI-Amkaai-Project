@@ -64,15 +64,19 @@ export async function POST(req: Request) {
     }
 
     const variantId = attributes?.variant_id;
-    const planName = getPlanFromVariant(variantId); 
+    const planName = getPlanFromVariant(variantId); // سيعيد: 'creator' أو 'pro' أو 'premium'
 
     if (!planName) {
       console.log("⚠️ Unknown variant ID:", variantId);
       return NextResponse.json({ error: "Unknown variant" }, { status: 400 });
     }
 
+    // تأمين جلب اسم الباقة وصيغتها لقاعدة البيانات وملف الـ Config
+    const cleanPlanKey = planName.toLowerCase() as "creator" | "pro" | "premium";
     const dbPlan = planName.toUpperCase() as PlanType;
-    const creditsToGrant = PLANS[planName].credits;
+    
+    // جلب عدد النقاط ديناميكياً بناءً على ما حددته في ملف الـ Config (70 أو 200 أو 400)
+    const creditsToGrant = PLANS[cleanPlanKey]?.credits || 0;
 
     const lemonCustomerId = attributes?.customer_id?.toString() || null;
     const lemonSubscriptionId = body?.data?.id?.toString() || null; 
@@ -87,7 +91,7 @@ export async function POST(req: Request) {
     // 🧠 هندسة أحداث الاشتراكات (Subscription Logic Handler)
     ////////////////////////////////////////////////////////////////
 
-    // الحالة الأولى: إنشاء اشتراك جديد لأول مرة
+    // الحالة الأولى: إنشاء اشتراك جديد لأول مرة (شحن رصيد الباقة المشتراة)
     if (eventName === "subscription_created") {
       await db.$transaction([
         db.user.update({
@@ -128,7 +132,7 @@ export async function POST(req: Request) {
       console.log(`✅ ${email} Subscribed to ${dbPlan} (+${creditsToGrant} credits)`);
     }
 
-    // الحالة الثانية: نجاح التجديد الشهري التلقائي
+    // الحالة الثانية: نجاح التجديد الشهري التلقائي (إعادة تزويد الحساب بالنقاط للشهر الجديد)
     else if (eventName === "subscription_payment_success") {
       await db.$transaction([
         db.user.update({
@@ -142,7 +146,7 @@ export async function POST(req: Request) {
           where: { userId: user.id },
           data: { 
             status: "active",
-            ...(endsAt ? { endsAt: endsAt } : {}) // 🎯 تصحيح: حفظ تاريخ انتهاء الشهر الجديد القادم
+            ...(endsAt ? { endsAt: endsAt } : {}) // 🎯 حفظ تاريخ انتهاء الشهر الجديد القادم
           }, 
         }),
         db.webhookEvent.create({ data: { eventId } }),
@@ -167,7 +171,7 @@ export async function POST(req: Request) {
             where: { id: user.id },
             data: { 
               plan: PlanType.FREE,
-              credits: 0 // 🎯 حماية صلبة: تصفير النقاط فوراً لمنع التوليد المجاني بعد انتهاء الاشتراك
+              credits: 0 // 🎯 حماية صلبة: تصفير النقاط فوراً لمنع التوليد غير المدفوع بعد انتهاء الباقة
             }
           })
         ] : []),

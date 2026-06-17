@@ -3,26 +3,36 @@
 import { useState, useEffect } from "react";
 
 const PLANS = {
+  creator: {
+    id: "creator",
+    usd: 7,
+    usdt: 7,
+    dzd: 2100,
+    credits: 70,
+    features: ["70 Monthly Credits", "Optimized 480p Quality", "1 Credit = 1 Second of Video", "No Watermark Downloads"],
+  },
   pro: {
     id: "pro",
     usd: 15,
     usdt: 15,
     dzd: 4500,
-    credits: 150,
-    features: ["150 Credits", "HD 1080p Generation", "Fast Rendering Process"],
+    credits: 200, // تمت زيادتها لـ 200 لتتناسب مع الـ 15$ ديناميكياً وتنافسياً
+    features: ["200 Monthly Credits", "Cinematic HD 720p Quality", "Turbo Rendering Process", "Commercial License"],
   },
   premium: {
     id: "premium",
     usd: 25,
     usdt: 25,
     dzd: 7500,
-    credits: 500,
-    features: ["500 Credits", "4K Ultra HD Generation", "Priority Queue (Instant)", "VIP Support 24/7"],
+    credits: 400, // تمت موازنتها لـ 400 نقطة لتتناسب مع قيمة الـ 25$ بدقة
+    features: ["400 Monthly Credits", "Studio Full HD 1080p Quality", "Priority Queue (Instant)", "VIP Support 24/7"],
   },
 };
 
+type PlanKey = "creator" | "pro" | "premium";
+
 export default function PricingPage() {
-  const [selectedPlan, setSelectedPlan] = useState<"pro" | "premium" | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PlanKey | null>(null);
   const [paymentInfo, setPaymentInfo] = useState({ rip: "", usdt: "" });
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +52,7 @@ export default function PricingPage() {
       });
   }, []);
 
-  const goToCheckout = async (plan: "pro" | "premium") => {
+  const goToCheckout = async (plan: PlanKey) => {
     try {
       setLoadingCheckout(true);
       setError(null);
@@ -76,8 +86,8 @@ export default function PricingPage() {
       console.error(err);
       setError(err?.message || "Checkout failed");
     } finally {
-  setLoadingCheckout(false);
-}
+      setLoadingCheckout(false);
+    }
   };
 
   const plan = selectedPlan ? PLANS[selectedPlan] : null;
@@ -86,81 +96,114 @@ export default function PricingPage() {
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-start px-6 py-16 font-sans">
       
       {/* 1. Header Section */}
-      <div className="text-center max-w-2xl mx-auto mb-10">
-        <h1 className="text-5xl font-extrabold mb-4 bg-gradient-to-r from-white via-gray-300 to-gray-500 bg-clip-text text-transparent">
-          AI Video SaaS 🚀
+      <div className="text-center max-w-2xl mx-auto mb-14">
+        <h1 className="text-5xl font-black mb-4 bg-gradient-to-r from-white via-neutral-300 to-neutral-500 bg-clip-text text-transparent tracking-tight">
+          Flexible Cinematic Plans 🎬
         </h1>
-        <p className="text-gray-400 text-lg mb-8">
-          Unlock premium AI generation tools and power up your content creation.
+        <p className="text-neutral-400 text-base max-w-lg mx-auto mb-8 leading-relaxed">
+          Unlock the true potential of AI generation. Choose a budget-friendly plan with a smart credit-based system.
         </p>
         <button
           onClick={() => (window.location.href = "/dashboard")}
-          className="bg-white text-black px-8 py-3.5 rounded-xl font-bold shadow-lg hover:bg-gray-200 transition-all"
+          className="bg-white text-black px-8 py-3.5 rounded-xl font-bold shadow-xl hover:bg-neutral-200 hover:scale-[1.01] active:scale-[0.99] transition-all"
         >
-          🎬 Try Free Dashboard
+          🚀 Try Free Dashboard
         </button>
       </div>
 
-      {/* 2. Pricing Cards Grid */}
-      <div className="grid md:grid-cols-2 gap-8 w-full max-w-4xl mb-16">
+      {/* 2. Pricing Cards Grid (Three Columns now) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mb-16 items-stretch">
         <PlanCard
-          title="Pro"
-          price={`$${PLANS.pro.usd}`}
-          credits={`${PLANS.pro.credits} credits`}
-          features={PLANS.pro.features}
-          onClick={() => setSelectedPlan("pro")}
+          title="Creator Pass"
+          price={`$${PLANS.creator.usd}`}
+          originalPrice="$14"
+          credits={`${PLANS.creator.credits} Credits`}
+          creditsDetail="1 point = 1 second of video generation"
+          features={PLANS.creator.features}
+          onClick={() => setSelectedPlan("creator")}
+          borderColor="border-cyan-500/20 bg-cyan-500/[0.02]"
         />
         <PlanCard
-          title="Premium"
-          price={`$${PLANS.premium.usd}`}
-          credits={`${PLANS.premium.credits} credits`}
-          features={PLANS.premium.features}
+          title="Pro Pack"
+          price={`$${PLANS.pro.usd}`}
+          originalPrice="$30"
+          credits={`${PLANS.pro.credits} Credits`}
+          creditsDetail="Flexible use for ultra cinematic content"
+          features={PLANS.pro.features}
           highlight
+          onClick={() => setSelectedPlan("pro")}
+          borderColor="border-purple-500 bg-purple-500/5 shadow-purple-500/5 shadow-2xl"
+        />
+        <PlanCard
+          title="Premium Studio"
+          price={`$${PLANS.premium.usd}`}
+          originalPrice="$50"
+          credits={`${PLANS.premium.credits} Credits`}
+          creditsDetail="Designed for pro agencies & top directors"
+          features={PLANS.premium.features}
           onClick={() => setSelectedPlan("premium")}
+          borderColor="border-amber-500/20 bg-amber-500/[0.02]"
         />
       </div>
 
       {/* 3. Trust & Security Badges */}
-      <div className="max-w-md mx-auto text-center border-t border-white/10 pt-8 mb-16 w-full">
-        <p className="text-sm text-gray-400 mb-3">🔒 Secured and encrypted transactions</p>
-        <div className="flex justify-center gap-6 text-xs text-gray-500 font-medium">
+      <div className="max-w-xl mx-auto text-center border-t border-white/10 pt-8 mb-16 w-full">
+        <p className="text-sm text-neutral-400 mb-3">🔒 Secured and encrypted automated checkouts</p>
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-neutral-500 font-medium">
           <span>• Card Processing via Lemon Squeezy</span>
           <span>• Supports Credit Card, USDT & BaridiMob</span>
         </div>
       </div>
 
       {/* 4. Features Comparison Table */}
-      <div className="w-full max-w-3xl mb-20 bg-white/5 border border-white/10 rounded-2xl p-6 shadow-xl">
+      <div className="w-full max-w-4xl mb-20 bg-white/[0.02] border border-white/10 rounded-2xl p-6 shadow-xl backdrop-blur-md">
         <h3 className="text-xl font-bold mb-6 text-center text-white">Full Feature Comparison</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-white/10 text-gray-400 text-sm">
+              <tr className="border-b border-white/10 text-neutral-400 text-sm">
                 <th className="pb-3 font-medium">Feature</th>
-                <th className="pb-3 font-medium">Pro</th>
-                <th className="pb-3 font-medium">Premium</th>
+                <th className="pb-3 font-medium">Creator Pass</th>
+                <th className="pb-3 font-medium text-purple-400">Pro Pack</th>
+                <th className="pb-3 font-medium text-amber-400">Premium Studio</th>
               </tr>
             </thead>
-            <tbody className="text-gray-300 divide-y divide-white/5">
+            <tbody className="text-neutral-300 divide-y divide-white/5 text-xs sm:text-sm">
               <tr>
-                <td className="py-3.5 font-medium">AI Generation Credits</td>
-                <td className="py-3.5">150 Credits</td>
-                <td className="py-3.5 text-cyan-400 font-bold">500 Credits</td>
+                <td className="py-4 font-medium text-white">AI Generation Credits</td>
+                <td className="py-4">70 Credits</td>
+                <td className="py-4 font-semibold text-purple-400">200 Credits</td>
+                <td className="py-4 font-bold text-amber-400">400 Credits</td>
               </tr>
               <tr>
-                <td className="py-3.5 font-medium">Maximum Video Quality</td>
-                <td className="py-3.5">HD 1080p</td>
-                <td className="py-3.5">4K Ultra HD</td>
+                <td className="py-4 font-medium text-white">Consumption Model</td>
+                <td className="py-4 text-neutral-400">1 credit = 1 second</td>
+                <td className="py-4 text-neutral-400">1 credit = 1 second</td>
+                <td className="py-4 text-neutral-400">1 credit = 1 second</td>
               </tr>
               <tr>
-                <td className="py-3.5 font-medium">Rendering Priority</td>
-                <td className="py-3.5">Standard Fast</td>
-                <td className="py-3.5">Instant (Priority Queue)</td>
+                <td className="py-4 font-medium text-white">Maximum Quality</td>
+                <td className="py-4 text-cyan-400">Optimized 480p</td>
+                <td className="py-4 text-purple-400 font-semibold">Cinematic HD 720p</td>
+                <td className="py-4 text-amber-400 font-bold">Studio Full HD 1080p</td>
               </tr>
               <tr>
-                <td className="py-3.5 font-medium">Customer Support</td>
-                <td className="py-3.5">Email Support</td>
-                <td className="py-3.5">VIP Direct 24/7</td>
+                <td className="py-4 font-medium text-white">Rendering Queue</td>
+                <td className="py-4">Standard Fast</td>
+                <td className="py-4">Turbo Queue</td>
+                <td className="py-4 font-bold text-amber-400">Instant VIP Priority</td>
+              </tr>
+              <tr>
+                <td className="py-4 font-medium text-white">Watermark Free</td>
+                <td className="py-4">✓ Yes</td>
+                <td className="py-4">✓ Yes</td>
+                <td className="py-4">✓ Yes</td>
+              </tr>
+              <tr>
+                <td className="py-4 font-medium text-white">Customer Support</td>
+                <td className="py-4">Standard</td>
+                <td className="py-4">Priority Email</td>
+                <td className="py-4 text-amber-400">VIP Direct 24/7</td>
               </tr>
             </tbody>
           </table>
@@ -172,9 +215,10 @@ export default function PricingPage() {
         <h3 className="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h3>
         <div className="space-y-4">
           {[
-            { q: "Can I cancel my subscription anytime?", a: "Yes, you can easily cancel your automated card subscription from your profile dashboard at any time without extra fees." },
-            { q: "How do USDT and BaridiMob options work?", a: "When you select a plan, you can copy our wallet address or RIP. After making the transfer manually, please contact support with your transaction proof to activate your credits manually." },
-            { q: "Is card payment safe here?", a: "Absolutely. We route all credit card payments securely via Lemon Squeezy, ensuring total encryption and data safety." }
+            { q: "How does the credit consumption model work?", a: "To make it completely fair, we charge per second. Generating 1 second of cinematic video costs 1 credit. If you make a 5-second video, it deducts 5 credits. Generating ultra-realistic photos or AI voices takes just 1 credit per execution." },
+            { q: "Can I cancel my subscription anytime?", a: "Yes, you can easily cancel your automated card subscription from your profile dashboard at any time without any hidden extra fees." },
+            { q: "How do USDT and BaridiMob options work?", a: "When you select a plan, you can copy our wallet address or RIP. After making the transfer manually, please contact our support team with your transaction proof to activate your credits instantly." },
+            { q: "Is card payment safe here?", a: "Absolutely. We route all credit card payments securely via Lemon Squeezy, ensuring total encryption, industry-standard safety, and instant activation." }
           ].map((item, index) => (
             <div key={index} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden transition-all">
               <button
@@ -182,10 +226,10 @@ export default function PricingPage() {
                 className="w-full text-left p-5 font-medium text-white flex justify-between items-center hover:bg-white/10"
               >
                 <span>{item.q}</span>
-                <span className="text-gray-400">{openFaq === index ? "−" : "+"}</span>
+                <span className="text-neutral-400">{openFaq === index ? "−" : "+"}</span>
               </button>
               {openFaq === index && (
-                <div className="p-5 pt-0 text-gray-400 text-sm leading-relaxed border-t border-white/5 bg-white/[0.02]">
+                <div className="p-5 pt-0 text-neutral-400 text-sm leading-relaxed border-t border-white/5 bg-white/[0.02]">
                   {item.a}
                 </div>
               )}
@@ -198,13 +242,16 @@ export default function PricingPage() {
       {selectedPlan && plan && (
         <Modal>
           <h2 className="text-xl font-bold text-center mb-2">Complete Payment</h2>
+          <p className="text-center text-xs text-neutral-400 mb-1 font-medium tracking-wide uppercase">
+            Plan: {selectedPlan === "creator" ? "Creator Pass" : selectedPlan === "pro" ? "Pro Pack" : "Premium Studio"}
+          </p>
           
-          <p className="text-center text-gray-400 mb-6">
+          <p className="text-center text-sm font-bold text-cyan-400 mb-6 bg-white/5 py-2.5 rounded-xl border border-white/5">
             {plan.usd} USD • {plan.usdt} USDT • {plan.dzd} DZD
           </p>
 
           {error && (
-            <div className="mb-4 rounded bg-red-500/20 border border-red-500 p-3 text-red-300 text-sm">
+            <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-red-300 text-xs leading-relaxed">
               {error}
             </div>
           )}
@@ -212,17 +259,17 @@ export default function PricingPage() {
           <button
             onClick={() => goToCheckout(selectedPlan)}
             disabled={loadingCheckout}
-            className="w-full bg-cyan-500 text-black py-3 rounded-xl font-bold disabled:opacity-50 hover:bg-cyan-400 transition-colors"
+            className="w-full bg-cyan-500 text-black py-3.5 rounded-xl font-bold disabled:opacity-50 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/10"
           >
-            {loadingCheckout ? "Processing..." : "💳 Pay with Card"}
+            {loadingCheckout ? "Processing Secure Checkout..." : "💳 Pay with Card (Instant)"}
           </button>
 
-          <div className="text-center my-4 text-xs text-gray-500 font-semibold uppercase tracking-wider">
-            OR USE MANUAL TRANSFER Below
+          <div className="text-center my-5 text-[10px] text-neutral-500 font-bold uppercase tracking-widest border-t border-white/5 pt-4">
+            OR USE MANUAL TRANSFER BELOW
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <PaymentBox title="USDT" value={paymentInfo.usdt} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <PaymentBox title="USDT Wallet Address" value={paymentInfo.usdt} />
             <PaymentBox title="BaridiMob (RIP)" value={paymentInfo.rip} />
           </div>
 
@@ -231,9 +278,9 @@ export default function PricingPage() {
               setSelectedPlan(null);
               setError(null);
             }}
-            className="mt-6 text-gray-400 hover:text-white transition-colors w-full text-center block text-sm"
+            className="mt-6 text-neutral-500 hover:text-neutral-300 transition-colors w-full text-center block text-xs font-semibold uppercase tracking-wider"
           >
-            Close Window
+            Cancel & Close Window
           </button>
         </Modal>
       )}
@@ -242,39 +289,57 @@ export default function PricingPage() {
   );
 }
 
-function PlanCard({ title, price, credits, features, highlight, onClick }: any) {
+function PlanCard({ title, price, originalPrice, credits, creditsDetail, features, highlight, onClick, borderColor }: any) {
   return (
     <div
       onClick={onClick}
-      className={`p-8 rounded-2xl cursor-pointer border flex flex-col justify-between transition-all duration-300 transform hover:-translate-y-1 ${
-        highlight
-          ? "border-cyan-500 bg-cyan-500/10 shadow-lg shadow-cyan-500/5 relative"
-          : "border-white/10 bg-white/5 hover:border-white/20"
+      className={`p-8 rounded-3xl cursor-pointer border flex flex-col justify-between transition-all duration-300 transform hover:-translate-y-1 relative backdrop-blur-md ${borderColor} ${
+        highlight ? "border-purple-500" : "hover:border-white/20 border-white/10"
       }`}
     >
       {highlight && (
-        <span className="absolute -top-3 left-6 bg-cyan-500 text-black text-xs px-3 py-0.5 rounded-full font-bold uppercase">
-          Popular
+        <span className="absolute -top-3 left-6 bg-purple-500 text-white text-[10px] px-3 py-1 rounded-full font-extrabold uppercase tracking-wider shadow-md shadow-purple-500/20">
+          Most Popular
+        </span>
+      )}
+      {!highlight && (
+        <span className="absolute top-3 right-3 text-[9px] text-neutral-500 font-bold border border-neutral-800 px-2 py-0.5 rounded-full uppercase">
+          50% OFF
         </span>
       )}
       <div>
-        <h2 className="text-2xl font-bold text-white">{title}</h2>
-        <p className="text-4xl font-extrabold mt-3 text-white">{price}</p>
-        <p className="text-cyan-400 text-sm font-semibold mt-1">{credits}</p>
+        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          {title === "Creator Pass" ? "🎬" : title === "Pro Pack" ? "🔥" : "👑"} {title}
+        </h2>
         
-        <ul className="mt-6 space-y-3 border-t border-white/5 pt-5 text-sm text-gray-300">
+        <div className="flex items-baseline gap-2 mt-4">
+          <p className="text-4xl font-black text-white">{price}</p>
+          <span className="text-sm text-neutral-500 line-through font-medium">{originalPrice}</span>
+          <span className="text-neutral-400 text-xs">/mo</span>
+        </div>
+
+        <div className="mt-3 bg-white/[0.02] border border-white/5 p-3 rounded-xl">
+          <p className="text-cyan-400 text-sm font-bold">{credits}</p>
+          <p className="text-neutral-500 text-[11px] mt-0.5">{creditsDetail}</p>
+        </div>
+        
+        <ul className="mt-6 space-y-3.5 border-t border-white/5 pt-5 text-xs sm:text-sm text-neutral-300">
           {features?.map((f: string, i: number) => (
-            <li key={i} className="flex items-center gap-2">
-              <span className="text-cyan-500">✓</span> {f}
+            <li key={i} className="flex items-center gap-2.5">
+              <span className="text-cyan-500 text-xs">✓</span> <span className="text-neutral-300 text-xs sm:text-sm">{f}</span>
             </li>
           ))}
         </ul>
       </div>
 
-      <button className={`mt-8 w-full py-3 rounded-xl font-bold transition-colors ${
-        highlight ? "bg-cyan-500 text-black hover:bg-cyan-400" : "bg-white text-black hover:bg-gray-200"
+      <button className={`mt-8 w-full py-3 rounded-xl font-bold text-sm transition-all ${
+        highlight 
+          ? "bg-purple-500 text-white hover:bg-purple-400 shadow-lg shadow-purple-500/10" 
+          : title === "Creator Pass"
+          ? "bg-cyan-500 text-black hover:bg-cyan-400 shadow-lg shadow-cyan-500/10"
+          : "bg-white text-black hover:bg-neutral-200"
       }`}>
-        Choose Plan
+        Choose {title.split(" ")[0]}
       </button>
     </div>
   );
@@ -291,29 +356,19 @@ function PaymentBox({ title, value }: any) {
   };
 
   return (
-    <div className="p-4 border border-white/10 rounded-xl bg-white/[0.01] flex flex-col justify-between">
+    <div className="p-3.5 border border-white/10 rounded-xl bg-white/[0.01] flex flex-col justify-between">
       <div>
-        <p className="text-xs text-gray-400 font-medium mb-1">{title}</p>
-        <p className="text-xs font-mono break-all text-white select-all">
+        <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider mb-1">{title}</p>
+        <p className="text-xs font-mono break-all text-white select-all font-medium">
           {value}
         </p>
       </div>
       <button
         onClick={handleCopy}
-        className="mt-3 w-full bg-white/10 text-xs py-1.5 rounded hover:bg-white/20 text-white transition-colors"
+        className="mt-3 w-full bg-white/5 border border-white/5 text-xs py-1.5 rounded-lg hover:bg-white/10 text-white transition-colors font-medium"
       >
         {copied ? "Copied! ✓" : "Copy Info"}
       </button>
-    </div>
-  );
-}
-
-function Modal({ children }: any) {
-  return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-fadeIn">
-      <div className="bg-[#0f0f0f] border border-white/10 p-8 rounded-2xl w-full max-w-md shadow-2xl">
-        {children}
-      </div>
     </div>
   );
 }

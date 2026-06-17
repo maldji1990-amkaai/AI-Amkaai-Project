@@ -1,3 +1,5 @@
+// lib/credits.ts
+
 import { db } from "@/lib/db";
 import { AI_COSTS, AIType } from "@/lib/config";
 import { UsageStatus } from "@prisma/client";
@@ -8,6 +10,7 @@ import { UsageStatus } from "@prisma/client";
 
 type UseCreditsOptions = {
   reference?: string;
+  duration?: number; // 🌟 إضافة معامل المدة بالثواني ديناميكياً للفيديو
 };
 
 //////////////////////////////////////////////////
@@ -19,12 +22,18 @@ export async function useCredits(
   type: AIType,
   options?: UseCreditsOptions
 ) {
-  // 1. جلب تكلفة العملية من الإعدادات
-  const cost = AI_COSTS[type];
+  // 1. جلب التكلفة الأساسية من الإعدادات
+  const baseCost = AI_COSTS[type];
 
-  if (!cost) {
+  if (!baseCost) {
     throw new Error("Invalid AI type");
   }
+
+  // 🌟 حساب التكلفة الفعلية: إذا كان الطلب فيديو، نضرب التكلفة الأساسية في عدد الثواني (الافتراضي 1 ثانية لو لم تُرسل)
+  // أما لو كانت صور أو صوت، فستظل التكلفة ثابتة كما هي محددة في الـ config
+  const cost = type === "video" && options?.duration 
+    ? baseCost * options.duration 
+    : baseCost;
 
   const reference = options?.reference ?? null;
 
@@ -34,7 +43,7 @@ export async function useCredits(
     //////////////////////////////////////////////////
     // 🛡️ LEMON SQUEEZY SUBSCRIPTION CHECK
     //////////////////////////////////////////////////
-    // 🛠️ الحل الجذري: نطلب فقط حقل status لتجنب عدم مطابقة تسمية حقل الوقت في Prisma Schema
+    // نطلب فقط حقل status لتجنب عدم مطابقة تسمية حقل الوقت في Prisma Schema
     const subscription = await tx.subscription.findFirst({
       where: { userId },
       select: { status: true }, 
@@ -48,7 +57,7 @@ export async function useCredits(
         throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
       }
 
-      // فحص إضافي آمن وديناميكي: التحقق من وجود أي حقل تاريخ انتهاء صلاحية (سواء كان endsAt أو expiresAt) دون إجبار الـ linter عليه
+      // فحص إضافي آمن وديناميكي: التحقق من وجود أي حقل تاريخ انتهاء صلاحية (endsAt) دون إجبار الـ linter عليه
       const subscriptionEndsAt = subscription.endsAt || subscription.expiresAt || null;
       if (subscriptionEndsAt && new Date() > new Date(subscriptionEndsAt)) {
         throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
@@ -58,7 +67,7 @@ export async function useCredits(
     //////////////////////////////////////////////////
     // 💸 DEDUCT CREDITS SAFELY (ANTI-RACE CONDITION)
     //////////////////////////////////////////////////
-    // الخصم الحصين يتم فقط إذا كان رصيد المستخدم الحالي أكبر من أو يساوي تكلفة العملية
+    // الخصم الحصين يتم فقط إذا كان رصيد المستخدم الحالي أكبر من أو يساوي التكلفة الفعلية (الديناميكية)
     const update = await tx.user.updateMany({
       where: {
         id: userId,
@@ -73,7 +82,7 @@ export async function useCredits(
       },
     });
 
-    // إذا كانت النتيجة 0، فهذا يعني أن نقاط المستخدم لا تكفي
+    // إذا كانت النتيجة 0، فهذا يعني أن نقاط المستخدم لا تكفي التكلفة المحسوبة
     if (update.count === 0) {
       throw new Error("NOT_ENOUGH_CREDITS");
     }
@@ -86,7 +95,7 @@ export async function useCredits(
       data: {
         userId,
         type,
-        cost,
+        cost, // حفظ التكلفة الفعلية المستهلكة في السجل برقمها الدقيق
         status: UsageStatus.PENDING, 
         refunded: false,
         referenceId: reference, 
@@ -174,7 +183,7 @@ export async function refundCredits(reference: string) {
     //////////////////////////////////////////////////
     // 💸 INCREMENT USER CREDITS
     //////////////////////////////////////////////////
-    // إعادة النقاط بأمان وبشكل كامل إلى الحساب الرئيسي للمستخدم
+    // إعادة النقاط الفعلية (المحسوبة بالثواني) كاملةً إلى حساب المستخدم في حال فشل السيرفر
     await tx.user.update({
       where: { id: usage.userId },
       data: {
