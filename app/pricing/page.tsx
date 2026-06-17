@@ -93,7 +93,7 @@ export default function PricingPage() {
   const plan = selectedPlan ? PLANS[selectedPlan] : null;
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center justify-start px-6 py-16 font-sans">
+    <main className="min-h-screen bg-black text-white flex flex-col items-center justify-start px-6 py-16 font-sans relative overflow-x-hidden">
       
       {/* 1. Header Section */}
       <div className="text-center max-w-2xl mx-auto mb-14">
@@ -238,51 +238,54 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* 6. Checkout Modal Component */}
+      {/* 🌟 6. Checkout Modal Component (FIXED & FULLY INTEGRATED) */}
       {selectedPlan && plan && (
-        <Modal>
-          <h2 className="text-xl font-bold text-center mb-2">Complete Payment</h2>
-          <p className="text-center text-xs text-neutral-400 mb-1 font-medium tracking-wide uppercase">
-            Plan: {selectedPlan === "creator" ? "Creator Pass" : selectedPlan === "pro" ? "Pro Pack" : "Premium Studio"}
-          </p>
-          
-          <p className="text-center text-sm font-bold text-cyan-400 mb-6 bg-white/5 py-2.5 rounded-xl border border-white/5">
-            {plan.usd} USD • {plan.usdt} USDT • {plan.dzd} DZD
-          </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 transition-all">
+          <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl max-w-md w-full relative shadow-2xl overflow-y-auto max-h-[90vh]">
+            
+            <h2 className="text-xl font-bold text-center mb-2 text-white">Complete Payment</h2>
+            <p className="text-center text-xs text-neutral-400 mb-1 font-medium tracking-wide uppercase">
+              Plan: {selectedPlan === "creator" ? "Creator Pass" : selectedPlan === "pro" ? "Pro Pack" : "Premium Studio"}
+            </p>
+            
+            <p className="text-center text-sm font-bold text-cyan-400 mb-6 bg-white/5 py-2.5 rounded-xl border border-white/5">
+              {plan.usd} USD • {plan.usdt} USDT • {plan.dzd} DZD
+            </p>
 
-          {error && (
-            <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-red-300 text-xs leading-relaxed">
-              {error}
+            {error && (
+              <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-red-300 text-xs leading-relaxed">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={() => goToCheckout(selectedPlan)}
+              disabled={loadingCheckout}
+              className="w-full bg-cyan-500 text-black py-3.5 rounded-xl font-bold disabled:opacity-50 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/10"
+            >
+              {loadingCheckout ? "Processing Secure Checkout..." : "💳 Pay with Card (Instant)"}
+            </button>
+
+            <div className="text-center my-5 text-[10px] text-neutral-500 font-bold uppercase tracking-widest border-t border-white/5 pt-4">
+              OR USE MANUAL TRANSFER BELOW
             </div>
-          )}
 
-          <button
-            onClick={() => goToCheckout(selectedPlan)}
-            disabled={loadingCheckout}
-            className="w-full bg-cyan-500 text-black py-3.5 rounded-xl font-bold disabled:opacity-50 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/10"
-          >
-            {loadingCheckout ? "Processing Secure Checkout..." : "💳 Pay with Card (Instant)"}
-          </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <PaymentBox title="USDT Wallet Address" value={paymentInfo.usdt} />
+              <PaymentBox title="BaridiMob (RIP)" value={paymentInfo.rip} />
+            </div>
 
-          <div className="text-center my-5 text-[10px] text-neutral-500 font-bold uppercase tracking-widest border-t border-white/5 pt-4">
-            OR USE MANUAL TRANSFER BELOW
+            <button
+              onClick={() => {
+                setSelectedPlan(null);
+                setError(null);
+              }}
+              className="mt-6 text-neutral-500 hover:text-neutral-300 transition-colors w-full text-center block text-xs font-semibold uppercase tracking-wider"
+            >
+              Cancel & Close Window
+            </button>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <PaymentBox title="USDT Wallet Address" value={paymentInfo.usdt} />
-            <PaymentBox title="BaridiMob (RIP)" value={paymentInfo.rip} />
-          </div>
-
-          <button
-            onClick={() => {
-              setSelectedPlan(null);
-              setError(null);
-            }}
-            className="mt-6 text-neutral-500 hover:text-neutral-300 transition-colors w-full text-center block text-xs font-semibold uppercase tracking-wider"
-          >
-            Cancel & Close Window
-          </button>
-        </Modal>
+        </div>
       )}
 
     </main>
