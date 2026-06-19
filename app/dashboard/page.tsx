@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useUser, UserButton } from "@clerk/nextjs";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import {
@@ -202,22 +202,22 @@ export default function DashboardPage() {
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside initial={{ x: -300, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -300, opacity: 0 }} className="w-72 border-r border-white/5 bg-[#070709] flex flex-col justify-between z-30">
-            <div>
-              <div className="border-b border-white/5 p-5 flex items-center justify-between">
+            <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar">
+              <div className="border-b border-white/5 p-5 flex items-center justify-between shrink-0">
                 <Link href="/" className="bg-gradient-to-r from-cyan-400 via-teal-400 to-indigo-400 bg-clip-text text-lg font-black tracking-tighter text-transparent flex items-center gap-2">
                   <Flame size={16} className="text-cyan-400 animate-pulse" /> AMKAAI STUDIO PRO
                 </Link>
                 <button onClick={() => setSidebarOpen(false)} className="text-gray-500 hover:text-white transition"><PanelLeft size={16} /></button>
               </div>
 
-              <div className="p-4">
+              <div className="p-4 shrink-0">
                 <button onClick={createChat} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-4 py-2.5 text-xs font-bold text-white hover:opacity-95 transition shadow-lg">
                   <Plus size={14} /> Open Production Desk
                 </button>
               </div>
 
               {/* RENDER QUEUE SYSTEM */}
-              <div className="px-4 mb-4">
+              <div className="px-4 mb-4 shrink-0">
                 <div className="bg-white/5 rounded-xl p-3 border border-white/5 space-y-2">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
                     <span>Active GPU Queue</span>
@@ -240,10 +240,36 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="p-4 border-t border-white/5 bg-black/30">
+            {/* الخانة السفلية المحتوية على الرصيد ومعلومات المستخدم وزر الخروج الفخم */}
+            <div className="p-4 border-t border-white/5 bg-black/30 space-y-3 shrink-0">
               <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 flex justify-between items-center text-xs">
                 <span className="text-gray-400 font-mono">Allocation State</span>
                 <span className="font-bold text-cyan-400 font-mono">{credits} Nodes</span>
+              </div>
+              
+              {/* CLERK USER PROFILE & SIGN OUT MATRIX */}
+              <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <UserButton 
+                    afterSignOutUrl="/" 
+                    appearance={{
+                      elements: {
+                        avatarBox: "h-8 w-8 rounded-lg ring-1 ring-white/10"
+                      }
+                    }}
+                  />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-bold text-gray-200 truncate">
+                      {user?.fullName || user?.username || "Identity Synced"}
+                    </span>
+                    <span className="text-[10px] text-gray-500 truncate font-mono">
+                      {user?.primaryEmailAddress?.emailAddress || "Verified Node"}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-emerald-400 font-mono scale-90">
+                  Online
+                </div>
               </div>
             </div>
           </motion.aside>
