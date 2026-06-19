@@ -251,7 +251,6 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <UserButton 
-                    afterSignOutUrl="/" 
                     appearance={{
                       elements: {
                         avatarBox: "h-8 w-8 rounded-lg ring-1 ring-white/10"
