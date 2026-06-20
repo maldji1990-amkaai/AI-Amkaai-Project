@@ -25,9 +25,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Video generation is temporarily disabled" }, { status: 503 });
     }
 
-    // 📦 استقبال وقراءة البيانات القادمة من واجهة المستخدم (الـ Dashboard Control Desktop)
+    // 📦 استقبال وقراءة البيانات القادمة من واجهة المستخدم (الـ Dashboard Control)
     const body = await req.json();
-    const { prompt, aspectRatio, creativity, cameraMotion } = body;
+    const { prompt, aspectRatio, creativity, cameraMotion, userPlan } = body; 
+    // ملاحظة: نقوم باستقبال الـ userPlan (سواء 'trial' أو 'quarterly' أو 'biannually') الممررة من الواجهة أو قاعدة البيانات
 
     // 🔐 التحقق من قيود الـ Prompt الأمنية المحددة في ملف الـ Config
     if (!prompt || prompt.length < LIMITS.minPromptLength) {
@@ -38,43 +39,54 @@ export async function POST(req: Request) {
     }
 
     // 🛡️ محاولة حجز النقاط وفحص اشتراك Lemon Squeezy
-    // إذا كان الاشتراك منتهياً أو النقاط لا تكفي، سيتوقف الكود فوراً هنا دون لمس سيرفرات الـ AI تلافياً للخسارة المادية.
     const creditResult = await useCredits(userId, "video", { reference: referenceId });
 
     try {
       
       //////////////////////////////////////////////////////////////////
-      // 🎬 استدعاء سيرفر الذكاء الاصطناعي الفعلي (Kling AI / Luma)
+      // 🎬 إعداد نظام النماذج الذكي والديناميكي لحماية الهامش الربحي لـ Amkaai
       //////////////////////////////////////////////////////////////////
       
-      // نقوم بإنشاء الـ Prediction لبدء عملية الريندر على سيرفرات الـ GPU الخارجة
-      const prediction = await replicate.predictions.create({
-        // استخدام نسق Kling AI المتقدم أو Luma Video Text-to-Video المستقر
-        version: "kling-ai/kling-v1.5-video", 
-        input: {
+      let modelIdentifier = "";
+      let modelInput: Record<string, any> = {};
+
+      // فحص باقة المستخدم لتحديد المحرك والجودة تلقائياً
+      if (userPlan === "biannually") {
+        // ⭐ الباقة الفاخرة لـ 6 أشهر: نوفر جودة هوليوود Kling v1.5 بدقة 1080p
+        // نستخدم الموديل مباشرة كاسم نصي متوافق مع دالة replicate.run الحديثة والمستقرة
+        modelIdentifier = "kling-ai/kling-v1.5-video";
+        modelInput = {
           prompt: prompt,
           aspect_ratio: aspectRatio || "16:9",
-          camera_control: cameraMotion || "static", // تمرير الحركة المتجهة المختارة من قبل العميل ديناميكياً
-          cfg_scale: creativity ? creativity * 10 : 7.5, // موازنة مدخل التوجيه الإبداعي
-        },
-      });
-
-      // 🔄 حلقة الانتظار الذكي (Polling Loop) داخل السيرفر لحين انتهاء معالجة الفيديو بالكامل
-      let result = await replicate.predictions.get(prediction.id);
-      
-      while (result.status !== "succeeded" && result.status !== "failed") {
-        // ننتظر 3 ثوانٍ قبل إعادة التحقق لتجنب استهلاك معدل الطلبات (Rate Limit)
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        result = await replicate.predictions.get(prediction.id);
+          camera_control: cameraMotion || "static",
+          cfg_scale: creativity ? creativity * 10 : 7.5,
+          resolution: "1080p" // حصرية دقة الـ Full HD السينمائية هنا
+        };
+      } else {
+        // 💰 باقة التجربة بـ 0.99$ والباقة الربع سنوية: نوفر Wan 2.5 Fast بدقة 720p لضمان أعلى هامش ربح
+        modelIdentifier = "wan-video/wan-2.5-t2v-14b"; // مسار نموذج Wan الرسمي النصي المستقر عبر ريبليكيت
+        modelInput = {
+          prompt: prompt,
+          size: aspectRatio === "1:1" ? "1024*1024" : (aspectRatio === "9:16" ? "720*1280" : "1280*720"), // تمرير أبعاد الـ 720p الذكية
+          frame_num: 81, // ما يعادل حوالي 5 ثوانٍ سينمائية سريعة
+          advanced_sampling: false
+        };
       }
 
+      // 💥 استدعاء سيرفر الذكاء الاصطناعي الفعلي باستخدام نظام التوليد الموحد والمضمون لـ Replicate
+      // قمنا باستبدال التنبؤ المفرط بالدالة المباشرة لتفادي مشاكل الـ version hash المتقلبة
+      const output = await replicate.run(
+        modelIdentifier as `${string}/${string}`,
+        { input: modelInput }
+      );
+
       // في حال فشل معالجة الفيديو بداخل خوادم السيرفر الخارجي، نرفع خطأ لتشغيل الـ Refund فوراً
-      if (result.status === "failed") {
+      if (!output) {
         throw new Error("AI_SERVER_RENDER_FAILED");
       }
 
       // استخراج الرابط الحقيقي والنهائي لملف الـ MP4 الناتج عن المعالجة الذكية
-      const finalVideoUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+      const finalVideoUrl = Array.isArray(output) ? output[0] : output;
 
       // 🎯 تثبيت نجاح العملية في قاعدة البيانات وتحويل حالة الـ Usage من PENDING إلى COMPLETED لخصم النقاط بثبات
       await markUsageSuccess(referenceId);

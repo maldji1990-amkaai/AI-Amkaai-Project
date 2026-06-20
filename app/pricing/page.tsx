@@ -2,40 +2,53 @@
 
 import { useState, useEffect } from "react";
 
+// 1. إعادة بناء الباقات المحدثة ديناميكياً لتتوافق مع نظام الـ API والأسعار الجديدة
 const PLANS = {
-  creator: {
-    id: "creator",
-    usd: 7,
-    usdt: 7,
-    dzd: 2100,
-    credits: 70,
-    features: ["70 Monthly Credits", "Optimized 480p Quality", "1 Credit = 1 Second of Video", "No Watermark Downloads"],
+  trial: {
+    id: "trial",
+    name: "3-Day Full Access", // تم الحفاظ على مسمى الوضوح والشفافية
+    priceMain: "$1.99", // ◄ تم التعديل إلى السعر الجديد 1.99$
+    priceSub: "for 3 days",
+    dueNowText: "$1.99", // ◄ المستحق الآن أصبح 1.99$
+    usd: 1.99, usdt: 1.99, dzd: 400, // ◄ تم تعديل القيمة بالدينار الجزائري لتناسب الـ 1.99$ تلقائياً (400 دج)
+    quality: "720p HD Quality",
+    badge: "",
+    terms: "Get a 3-day trial for just $1.99 with 30 credits and 720p access. After the trial, you'll be charged $17.99/month unless you cancel through your account settings.",
   },
-  pro: {
-    id: "pro",
-    usd: 15,
-    usdt: 15,
-    dzd: 4500,
-    credits: 200, // تمت زيادتها لـ 200 لتتناسب مع الـ 15$ ديناميكياً وتنافسياً
-    features: ["200 Monthly Credits", "Cinematic HD 720p Quality", "Turbo Rendering Process", "Commercial License"],
+  quarterly: {
+    id: "quarterly",
+    name: "🎬 Creator Pro", // ◄ مسمى تسويقي قوي ومغري لصناع المحتوى
+    priceMain: "$14.99",
+    priceSub: "per month",
+    dueNowText: "$44.97",
+    usd: 44.97, usdt: 44.97, dzd: 9000,
+    quality: "720p HD Quality",
+    badge: "Most Popular", // ◄ شارة ذهبية لتحفيز الاختيار وزيادة المبيعات
+    terms: "You will be charged a quarterly subscription of $44.97 every 3 months with 720p HD access (equivalent to $14.99/month). Cancel anytime.",
   },
-  premium: {
-    id: "premium",
-    usd: 25,
-    usdt: 25,
-    dzd: 7500,
-    credits: 400, // تمت موازنتها لـ 400 نقطة لتتناسب مع قيمة الـ 25$ بدقة
-    features: ["400 Monthly Credits", "Studio Full HD 1080p Quality", "Priority Queue (Instant)", "VIP Support 24/7"],
+  biannually: {
+    id: "biannually",
+    name: "👑 Studio Ultra 1080p", // ◄ مسمى فاخر يبرر القوة الكبيرة لمحرك Kling والدقة العالية
+    priceMain: "$12.99",
+    priceSub: "per month",
+    dueNowText: "$77.94",
+    usd: 77.94, usdt: 77.94, dzd: 15500,
+    quality: "1080p Full HD Cinematic",
+    badge: "Ultra Quality", // ◄ شارة تعكس فخامة وجودة الانتاج الحصرية
+    isPremium: true,
+    terms: "You will be charged a semi-annual subscription of $77.94 every 6 months (equivalent to $12.99/month). Unlocks exclusive 1080p Full HD Cinematic generation.",
   },
 };
 
-type PlanKey = "creator" | "pro" | "premium";
+type PlanKey = "trial" | "quarterly" | "biannually";
 
 export default function PricingPage() {
-  const [selectedPlan, setSelectedPlan] = useState<PlanKey | null>(null);
+  // جعل باقة الـ 3 أيام هي الباقة المحددة تلقائياً لرفع نسبة التحويل (Conversion Rate) كما في لقطة الشاشة
+  const [selectedPlan, setSelectedPlan] = useState<PlanKey>("trial");
   const [paymentInfo, setPaymentInfo] = useState({ rip: "", usdt: "" });
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showManualTransfer, setShowManualTransfer] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => {
@@ -61,7 +74,7 @@ export default function PricingPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan }), // تمرير المعرف المحدث بدقة إلى الـ Backend
       });
 
       const text = await res.text();
@@ -90,146 +103,171 @@ export default function PricingPage() {
     }
   };
 
-  const plan = selectedPlan ? PLANS[selectedPlan] : null;
+  const currentPlanData = PLANS[selectedPlan];
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col items-center justify-start px-6 py-16 font-sans relative overflow-x-hidden">
+    <main className="min-h-screen bg-[#0d0d0d] text-white flex flex-col items-center justify-start px-4 py-12 font-sans relative overflow-x-hidden">
       
-      {/* 1. Header Section */}
-      <div className="text-center max-w-2xl mx-auto mb-14">
-        <h1 className="text-5xl font-black mb-4 bg-gradient-to-r from-white via-neutral-300 to-neutral-500 bg-clip-text text-transparent tracking-tight">
-          Flexible Cinematic Plans 🎬
-        </h1>
-        <p className="text-neutral-400 text-base max-w-lg mx-auto mb-8 leading-relaxed">
-          Unlock the true potential of AI generation. Choose a budget-friendly plan with a smart credit-based system.
-        </p>
-        <button
-          onClick={() => (window.location.href = "/dashboard")}
-          className="bg-white text-black px-8 py-3.5 rounded-xl font-bold shadow-xl hover:bg-neutral-200 hover:scale-[1.01] active:scale-[0.99] transition-all"
-        >
-          🚀 Try Free Dashboard
-        </button>
-      </div>
-
-      {/* 2. Pricing Cards Grid (Three Columns now) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mb-16 items-stretch">
-        <PlanCard
-          title="Creator Pass"
-          price={`$${PLANS.creator.usd}`}
-          originalPrice="$14"
-          credits={`${PLANS.creator.credits} Credits`}
-          creditsDetail="1 point = 1 second of video generation"
-          features={PLANS.creator.features}
-          onClick={() => setSelectedPlan("creator")}
-          borderColor="border-cyan-500/20 bg-cyan-500/[0.02]"
-        />
-        <PlanCard
-          title="Pro Pack"
-          price={`$${PLANS.pro.usd}`}
-          originalPrice="$30"
-          credits={`${PLANS.pro.credits} Credits`}
-          creditsDetail="Flexible use for ultra cinematic content"
-          features={PLANS.pro.features}
-          highlight
-          onClick={() => setSelectedPlan("pro")}
-          borderColor="border-purple-500 bg-purple-500/5 shadow-purple-500/5 shadow-2xl"
-        />
-        <PlanCard
-          title="Premium Studio"
-          price={`$${PLANS.premium.usd}`}
-          originalPrice="$50"
-          credits={`${PLANS.premium.credits} Credits`}
-          creditsDetail="Designed for pro agencies & top directors"
-          features={PLANS.premium.features}
-          onClick={() => setSelectedPlan("premium")}
-          borderColor="border-amber-500/20 bg-amber-500/[0.02]"
-        />
-      </div>
-
-      {/* 3. Trust & Security Badges */}
-      <div className="max-w-xl mx-auto text-center border-t border-white/10 pt-8 mb-16 w-full">
-        <p className="text-sm text-neutral-400 mb-3">🔒 Secured and encrypted automated checkouts</p>
-        <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-neutral-500 font-medium">
-          <span>• Card Processing via Lemon Squeezy</span>
-          <span>• Supports Credit Card, USDT & BaridiMob</span>
+      {/* حاوية الكاش أوت الرأسية المقتبسة من نمط DaVinci الاحترافي الفاخر */}
+      <div className="w-full max-w-[440px] bg-[#0d0d0d] p-2 rounded-3xl flex flex-col mt-4">
+        
+        {/* 1. نصوص المقدمة */}
+        <div className="text-left text-neutral-200 text-[15px] font-normal leading-relaxed px-2 mb-5">
+          Full access to premium AI models, cinematic image generation, and video simulation.
         </div>
-      </div>
 
-      {/* 4. Features Comparison Table */}
-      <div className="w-full max-w-4xl mb-20 bg-white/[0.02] border border-white/10 rounded-2xl p-6 shadow-xl backdrop-blur-md">
-        <h3 className="text-xl font-bold mb-6 text-center text-white">Full Feature Comparison</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/10 text-neutral-400 text-sm">
-                <th className="pb-3 font-medium">Feature</th>
-                <th className="pb-3 font-medium">Creator Pass</th>
-                <th className="pb-3 font-medium text-purple-400">Pro Pack</th>
-                <th className="pb-3 font-medium text-amber-400">Premium Studio</th>
-              </tr>
-            </thead>
-            <tbody className="text-neutral-300 divide-y divide-white/5 text-xs sm:text-sm">
-              <tr>
-                <td className="py-4 font-medium text-white">AI Generation Credits</td>
-                <td className="py-4">70 Credits</td>
-                <td className="py-4 font-semibold text-purple-400">200 Credits</td>
-                <td className="py-4 font-bold text-amber-400">400 Credits</td>
-              </tr>
-              <tr>
-                <td className="py-4 font-medium text-white">Consumption Model</td>
-                <td className="py-4 text-neutral-400">1 credit = 1 second</td>
-                <td className="py-4 text-neutral-400">1 credit = 1 second</td>
-                <td className="py-4 text-neutral-400">1 credit = 1 second</td>
-              </tr>
-              <tr>
-                <td className="py-4 font-medium text-white">Maximum Quality</td>
-                <td className="py-4 text-cyan-400">Optimized 480p</td>
-                <td className="py-4 text-purple-400 font-semibold">Cinematic HD 720p</td>
-                <td className="py-4 text-amber-400 font-bold">Studio Full HD 1080p</td>
-              </tr>
-              <tr>
-                <td className="py-4 font-medium text-white">Rendering Queue</td>
-                <td className="py-4">Standard Fast</td>
-                <td className="py-4">Turbo Queue</td>
-                <td className="py-4 font-bold text-amber-400">Instant VIP Priority</td>
-              </tr>
-              <tr>
-                <td className="py-4 font-medium text-white">Watermark Free</td>
-                <td className="py-4">✓ Yes</td>
-                <td className="py-4">✓ Yes</td>
-                <td className="py-4">✓ Yes</td>
-              </tr>
-              <tr>
-                <td className="py-4 font-medium text-white">Customer Support</td>
-                <td className="py-4">Standard</td>
-                <td className="py-4">Priority Email</td>
-                <td className="py-4 text-amber-400">VIP Direct 24/7</td>
-              </tr>
-            </tbody>
-          </table>
+        {/* 2. شارة الدليل الاجتماعي المتحركة والديناميكية لجلب الثقة */}
+        <div className="mx-auto bg-[#1a3a2a] text-[#34d399] text-xs font-bold px-4 py-1.5 rounded-full mb-4 text-center tracking-wide">
+          ⚡ 4,852 people have used this offer today!
         </div>
+
+        {/* 3. مجموعة الخيارات الرأسية (Vertical Stack Choices) */}
+        <div className="flex flex-col gap-3 mb-5">
+          {(Object.keys(PLANS) as PlanKey[]).map((key) => {
+            const item = PLANS[key];
+            const isSelected = selectedPlan === key;
+            return (
+              <div
+                key={key}
+                onClick={() => setSelectedPlan(key)}
+                className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all duration-200 ${
+                  isSelected
+                    ? "border-[#3b82f6] bg-[#0b1528] shadow-[inset_0_0_0_1px_#3b82f6]"
+                    : "border-[#232326] bg-[#141416] hover:border-neutral-700"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  {/* الراديو المخصص الذكي */}
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                    isSelected ? "border-[#3b82f6] bg-[#3b82f6]" : "border-[#48484a]"
+                  }`}>
+                    {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                  
+                  {/* معلومات الخطة المحدثة بالجودة */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[16px] font-bold text-white">{item.name}</span>
+                    <span className={`text-[11px] px-2 py-0.5 rounded font-medium w-fit transition-colors ${
+                      item.isPremium 
+                        ? "bg-emerald-500/10 text-emerald-400" 
+                        : isSelected ? "bg-sky-500/10 text-sky-400" : "bg-[#232326] text-neutral-400"
+                    }`}>
+                      {item.quality}
+                    </span>
+                    {item.badge && (
+                      <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full w-fit mt-0.5">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* سعر الباقة الموضح جهة اليمين */}
+                <div className="text-right flex flex-col">
+                  <span className="text-[17px] font-black text-white">{item.priceMain}</span>
+                  <span className="text-[11px] text-neutral-500">{item.priceSub}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 4. الشروط القانونية التي تتغير بتغير الباقة المختارة تلقائياً لدعم الشفافية */}
+        <div className="text-[12px] text-neutral-400 leading-relaxed px-2 mb-6">
+          {currentPlanData.terms} By tapping Purchase, you agree to our{" "}
+          <a href="#" className="underline text-neutral-300">Terms</a> and{" "}
+          <a href="#" className="underline text-neutral-300">Refund Policy</a>.
+        </div>
+
+        {/* 5. قسم حساب السعر اللحظي المستحق الآن (Due Now) */}
+        <div className="flex justify-between items-center px-2 mb-6">
+          <span className="text-xl font-bold text-white">Due now</span>
+          <span className="text-2xl font-black text-white tracking-tight">{currentPlanData.dueNowText}</span>
+        </div>
+
+        {/* عرض رسائل الخطأ إن وجدت */}
+        {error && (
+          <div className="mb-4 mx-2 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-red-300 text-xs leading-relaxed">
+            {error}
+          </div>
+        )}
+
+        {/* 6. أزرار الدفع والتحصيل الفوري والذكي */}
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => goToCheckout(selectedPlan)}
+            disabled={loadingCheckout}
+            className="w-full bg-[#2563eb] text-white py-3.5 rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg text-[15px] disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loadingCheckout ? "Processing secure network..." : "💳 Credit or debit card"}
+          </button>
+
+          <button 
+            onClick={() => goToCheckout(selectedPlan)}
+            disabled={loadingCheckout}
+            className="w-full bg-[#ffc439] text-[#003087] py-3.5 rounded-xl font-bold italic text-lg hover:opacity-90 transition-all flex items-center justify-center"
+          >
+            PayPal
+          </button>
+
+          <button 
+            onClick={() => goToCheckout(selectedPlan)}
+            disabled={loadingCheckout}
+            className="w-full bg-white text-black py-3.5 rounded-xl font-bold hover:bg-neutral-200 transition-all flex items-center justify-center gap-2 text-[15px]"
+          >
+            G Pay
+          </button>
+
+          {/* زر التحويل اليدوي البديل (USDT / BaridiMob) المدمج بشكل مسطح وأنيق */}
+          <button
+            onClick={() => setShowManualTransfer(!showManualTransfer)}
+            className="w-full bg-neutral-900 border border-neutral-800 text-neutral-400 py-3 rounded-xl font-semibold text-xs uppercase tracking-wider hover:text-white transition-all mt-2"
+          >
+            {showManualTransfer ? "▲ Hide Local Payments" : "▼ Use USDT or BaridiMob"}
+          </button>
+        </div>
+
+        {/* حاوية بيانات التحويلات المحلية والعملات المشفرة إذا ضغط عليها العميل */}
+        {showManualTransfer && (
+          <div className="mt-4 p-4 rounded-2xl bg-[#141416] border border-[#232326] flex flex-col gap-4 animate-fade-in">
+            <p className="text-[11px] font-bold text-amber-400 uppercase tracking-widest text-center">
+              Equivalent Local Total: {(currentPlanData.dzd).toLocaleString()} DZD
+            </p>
+            <div className="grid grid-cols-1 gap-3">
+              <PaymentBox title="USDT Wallet Address" value={paymentInfo.usdt} />
+              <PaymentBox title="BaridiMob (RIP)" value={paymentInfo.rip} />
+            </div>
+            <p className="text-[10px] text-neutral-500 text-center leading-normal">
+              After transferring the amount manually, please send the transaction screenshot to our support team to activate your subscription instantly.
+            </p>
+          </div>
+        )}
+
+        <a href="/dashboard" className="text-center text-neutral-500 hover:text-neutral-300 text-xs mt-6 transition-colors font-medium">
+          See all plans →
+        </a>
+
       </div>
 
-      {/* 5. FAQ Section */}
-      <div className="w-full max-w-3xl border-t border-white/10 pt-12">
-        <h3 className="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h3>
-        <div className="space-y-4">
+      {/* 7. قسم الأسئلة الشائعة الفاخر أسفل كارت الشراء لزيادة الموثوقية */}
+      <div className="w-full max-w-[440px] mt-16 border-t border-neutral-800 pt-8">
+        <h3 className="text-xl font-bold text-center mb-6">Frequently Asked Questions</h3>
+        <div className="space-y-3">
           {[
-            { q: "How does the credit consumption model work?", a: "To make it completely fair, we charge per second. Generating 1 second of cinematic video costs 1 credit. If you make a 5-second video, it deducts 5 credits. Generating ultra-realistic photos or AI voices takes just 1 credit per execution." },
-            { q: "Can I cancel my subscription anytime?", a: "Yes, you can easily cancel your automated card subscription from your profile dashboard at any time without any hidden extra fees." },
-            { q: "How do USDT and BaridiMob options work?", a: "When you select a plan, you can copy our wallet address or RIP. After making the transfer manually, please contact our support team with your transaction proof to activate your credits instantly." },
-            { q: "Is card payment safe here?", a: "Absolutely. We route all credit card payments securely via Lemon Squeezy, ensuring total encryption, industry-standard safety, and instant activation." }
+            { q: "What is the difference in quality?", a: "The 3-Day access and Quarterly saver plans process rendering at 720p HD resolution using our ultra-fast engine. The 6-Month Cinematic plan unlocks full 1080p Full HD rendering utilizing advanced cinematic visual physics." },
+            { q: "Can I cancel my subscription anytime?", a: "Yes, you can easily stop or cancel your subscription directly from your account settings at any time without any commitments." },
+            { q: "Is card payment safe here?", a: "Completely safe. We handle all automated payments through Lemon Squeezy using standard banking security protocols and end-to-end data encryption." }
           ].map((item, index) => (
-            <div key={index} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden transition-all">
+            <div key={index} className="bg-[#141416] border border-[#232326] rounded-xl overflow-hidden">
               <button
                 onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                className="w-full text-left p-5 font-medium text-white flex justify-between items-center hover:bg-white/10"
+                className="w-full text-left p-4 font-medium text-[14px] text-white flex justify-between items-center hover:bg-neutral-800"
               >
                 <span>{item.q}</span>
-                <span className="text-neutral-400">{openFaq === index ? "−" : "+"}</span>
+                <span className="text-neutral-500">{openFaq === index ? "−" : "+"}</span>
               </button>
               {openFaq === index && (
-                <div className="p-5 pt-0 text-neutral-400 text-sm leading-relaxed border-t border-white/5 bg-white/[0.02]">
+                <div className="p-4 pt-0 text-neutral-400 text-xs leading-relaxed border-t border-white/5 bg-[#141416]">
                   {item.a}
                 </div>
               )}
@@ -238,117 +276,12 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* 🌟 6. Checkout Modal Component (FIXED & FULLY INTEGRATED) */}
-      {selectedPlan && plan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 transition-all">
-          <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl max-w-md w-full relative shadow-2xl overflow-y-auto max-h-[90vh]">
-            
-            <h2 className="text-xl font-bold text-center mb-2 text-white">Complete Payment</h2>
-            <p className="text-center text-xs text-neutral-400 mb-1 font-medium tracking-wide uppercase">
-              Plan: {selectedPlan === "creator" ? "Creator Pass" : selectedPlan === "pro" ? "Pro Pack" : "Premium Studio"}
-            </p>
-            
-            <p className="text-center text-sm font-bold text-cyan-400 mb-6 bg-white/5 py-2.5 rounded-xl border border-white/5">
-              {plan.usd} USD • {plan.usdt} USDT • {plan.dzd} DZD
-            </p>
-
-            {error && (
-              <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-red-300 text-xs leading-relaxed">
-                {error}
-              </div>
-            )}
-
-            <button
-              onClick={() => goToCheckout(selectedPlan)}
-              disabled={loadingCheckout}
-              className="w-full bg-cyan-500 text-black py-3.5 rounded-xl font-bold disabled:opacity-50 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/10"
-            >
-              {loadingCheckout ? "Processing Secure Checkout..." : "💳 Pay with Card (Instant)"}
-            </button>
-
-            <div className="text-center my-5 text-[10px] text-neutral-500 font-bold uppercase tracking-widest border-t border-white/5 pt-4">
-              OR USE MANUAL TRANSFER BELOW
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <PaymentBox title="USDT Wallet Address" value={paymentInfo.usdt} />
-              <PaymentBox title="BaridiMob (RIP)" value={paymentInfo.rip} />
-            </div>
-
-            <button
-              onClick={() => {
-                setSelectedPlan(null);
-                setError(null);
-              }}
-              className="mt-6 text-neutral-500 hover:text-neutral-300 transition-colors w-full text-center block text-xs font-semibold uppercase tracking-wider"
-            >
-              Cancel & Close Window
-            </button>
-          </div>
-        </div>
-      )}
-
     </main>
   );
 }
 
-function PlanCard({ title, price, originalPrice, credits, creditsDetail, features, highlight, onClick, borderColor }: any) {
-  return (
-    <div
-      onClick={onClick}
-      className={`p-8 rounded-3xl cursor-pointer border flex flex-col justify-between transition-all duration-300 transform hover:-translate-y-1 relative backdrop-blur-md ${borderColor} ${
-        highlight ? "border-purple-500" : "hover:border-white/20 border-white/10"
-      }`}
-    >
-      {highlight && (
-        <span className="absolute -top-3 left-6 bg-purple-500 text-white text-[10px] px-3 py-1 rounded-full font-extrabold uppercase tracking-wider shadow-md shadow-purple-500/20">
-          Most Popular
-        </span>
-      )}
-      {!highlight && (
-        <span className="absolute top-3 right-3 text-[9px] text-neutral-500 font-bold border border-neutral-800 px-2 py-0.5 rounded-full uppercase">
-          50% OFF
-        </span>
-      )}
-      <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-          {title === "Creator Pass" ? "🎬" : title === "Pro Pack" ? "🔥" : "👑"} {title}
-        </h2>
-        
-        <div className="flex items-baseline gap-2 mt-4">
-          <p className="text-4xl font-black text-white">{price}</p>
-          <span className="text-sm text-neutral-500 line-through font-medium">{originalPrice}</span>
-          <span className="text-neutral-400 text-xs">/mo</span>
-        </div>
-
-        <div className="mt-3 bg-white/[0.02] border border-white/5 p-3 rounded-xl">
-          <p className="text-cyan-400 text-sm font-bold">{credits}</p>
-          <p className="text-neutral-500 text-[11px] mt-0.5">{creditsDetail}</p>
-        </div>
-        
-        <ul className="mt-6 space-y-3.5 border-t border-white/5 pt-5 text-xs sm:text-sm text-neutral-300">
-          {features?.map((f: string, i: number) => (
-            <li key={i} className="flex items-center gap-2.5">
-              <span className="text-cyan-500 text-xs">✓</span> <span className="text-neutral-300 text-xs sm:text-sm">{f}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <button className={`mt-8 w-full py-3 rounded-xl font-bold text-sm transition-all ${
-        highlight 
-          ? "bg-purple-500 text-white hover:bg-purple-400 shadow-lg shadow-purple-500/10" 
-          : title === "Creator Pass"
-          ? "bg-cyan-500 text-black hover:bg-cyan-400 shadow-lg shadow-cyan-500/10"
-          : "bg-white text-black hover:bg-neutral-200"
-      }`}>
-        Choose {title.split(" ")[0]}
-      </button>
-    </div>
-  );
-}
-
-function PaymentBox({ title, value }: any) {
+// دالة نسخ الـ RIP والمحفظة بكفاءة عالية
+function PaymentBox({ title, value }: { title: string; value: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = (e: any) => {
@@ -359,16 +292,14 @@ function PaymentBox({ title, value }: any) {
   };
 
   return (
-    <div className="p-3.5 border border-white/10 rounded-xl bg-white/[0.01] flex flex-col justify-between">
+    <div className="p-3 border border-neutral-800 rounded-xl bg-black flex flex-col justify-between gap-2">
       <div>
         <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider mb-1">{title}</p>
-        <p className="text-xs font-mono break-all text-white select-all font-medium">
-          {value}
-        </p>
+        <p className="text-xs font-mono break-all text-white font-medium select-all">{value}</p>
       </div>
       <button
         onClick={handleCopy}
-        className="mt-3 w-full bg-white/5 border border-white/5 text-xs py-1.5 rounded-lg hover:bg-white/10 text-white transition-colors font-medium"
+        className="w-full bg-[#232326] text-white text-xs py-1.5 rounded-lg hover:bg-neutral-800 transition-colors font-medium"
       >
         {copied ? "Copied! ✓" : "Copy Info"}
       </button>

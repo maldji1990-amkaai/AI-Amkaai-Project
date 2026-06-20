@@ -10,7 +10,7 @@ import { UsageStatus } from "@prisma/client";
 
 type UseCreditsOptions = {
   reference?: string;
-  duration?: number; // 🌟 إضافة معامل المدة بالثواني ديناميكياً للفيديو
+  duration?: number; // 🌟 معامل المدة بالثواني الممرر ديناميكياً للفيديو من الـ Route
 };
 
 //////////////////////////////////////////////////
@@ -22,15 +22,15 @@ export async function useCredits(
   type: AIType,
   options?: UseCreditsOptions
 ) {
-  // 1. جلب التكلفة الأساسية من الإعدادات
+  // 1. جلب التكلفة الأساسية للعملية من الإعدادات
   const baseCost = AI_COSTS[type];
 
   if (!baseCost) {
     throw new Error("Invalid AI type");
   }
 
-  // 🌟 حساب التكلفة الفعلية: إذا كان الطلب فيديو، نضرب التكلفة الأساسية في عدد الثواني (الافتراضي 1 ثانية لو لم تُرسل)
-  // أما لو كانت صور أو صوت، فستظل التكلفة ثابتة كما هي محددة في الـ config
+  // 🌟 حساب التكلفة الفعلية: إذا كان الطلب فيديو، نضرب التكلفة الأساسية في عدد الثواني
+  // أما لو كانت صور أو صوت، فستظل التكلفة ثابتة كما هي محددة في ملف الـ config
   const cost = type === "video" && options?.duration 
     ? baseCost * options.duration 
     : baseCost;
@@ -43,7 +43,6 @@ export async function useCredits(
     //////////////////////////////////////////////////
     // 🛡️ LEMON SQUEEZY SUBSCRIPTION CHECK
     //////////////////////////////////////////////////
-    // نطلب فقط حقل status لتجنب عدم مطابقة تسمية حقل الوقت في Prisma Schema
     const subscription = await tx.subscription.findFirst({
       where: { userId },
       select: { status: true }, 
@@ -57,7 +56,7 @@ export async function useCredits(
         throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
       }
 
-      // فحص إضافي آمن وديناميكي: التحقق من وجود أي حقل تاريخ انتهاء صلاحية (endsAt) دون إجبار الـ linter عليه
+      // فحص إضافي آمن وديناميكي لتاريخ انتهاء الصلاحية المكتوب في جداول قاعدة البيانات
       const subscriptionEndsAt = subscription.endsAt || subscription.expiresAt || null;
       if (subscriptionEndsAt && new Date() > new Date(subscriptionEndsAt)) {
         throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
@@ -67,7 +66,7 @@ export async function useCredits(
     //////////////////////////////////////////////////
     // 💸 DEDUCT CREDITS SAFELY (ANTI-RACE CONDITION)
     //////////////////////////////////////////////////
-    // الخصم الحصين يتم فقط إذا كان رصيد المستخدم الحالي أكبر من أو يساوي التكلفة الفعلية (الديناميكية)
+    // الخصم الحصين يتم فقط إذا كان رصيد المستخدم أكبر من أو يساوي التكلفة الفعلية المحسوبة
     const update = await tx.user.updateMany({
       where: {
         id: userId,
@@ -90,7 +89,7 @@ export async function useCredits(
     //////////////////////////////////////////////////
     // 📊 USAGE LOG (RECORD INITIALIZATION)
     //////////////////////////////////////////////////
-    // إنشاء سجل الاستهلاك وتثبيت حالتها كـ PENDING لحين معالجة السيرفرات
+    // إنشاء سجل الاستهلاك وتثبيت حالتها كـ PENDING لحين انتهاء معالجة السيرفرات بالخارج
     const usage = await tx.usage.create({
       data: {
         userId,
@@ -105,7 +104,7 @@ export async function useCredits(
     //////////////////////////////////////////////////
     // 🔍 UTILITY: GET EXACT BALANCE
     //////////////////////////////////////////////////
-    // جلب الرصيد الدقيق المتبقي لحساب المستخدم
+    // جلب الرصيد الدقيق المتبقي لحساب المستخدم بعد الخصم الآمن
     const user = await tx.user.findUnique({
       where: { id: userId },
       select: { credits: true },
@@ -154,7 +153,7 @@ export async function refundCredits(reference: string) {
   }
 
   return await db.$transaction(async (tx) => {
-    // جلب سجل الاستهلاك بناءً على المعرّف الفريد
+    // جلب سجل الاستهلاك بناءً على المعرّف الفريد للعملية
     const usage = await tx.usage.findFirst({
       where: { referenceId: reference },
     });
@@ -171,7 +170,7 @@ export async function refundCredits(reference: string) {
     //////////////////////////////////////////////////
     // 🔒 LOCK USAGE STATE FIRST
     //////////////////////////////////////////////////
-    // نقوم بتغيير حالة السجل إلى فاشل ومسترجع أولاً لقطع الطريق على أي عملية تداخل برمجية
+    // تغيير حالة السجل إلى فاشل ومسترجع أولاً لقطع الطريق على أي عملية تداخل برمجية متزامنة
     await tx.usage.update({
       where: { id: usage.id },
       data: {
@@ -183,7 +182,7 @@ export async function refundCredits(reference: string) {
     //////////////////////////////////////////////////
     // 💸 INCREMENT USER CREDITS
     //////////////////////////////////////////////////
-    // إعادة النقاط الفعلية (المحسوبة بالثواني) كاملةً إلى حساب المستخدم في حال فشل السيرفر
+    // إعادة النقاط الفعلية كاملةً إلى حساب المستخدم لتأمين حقوقه في حال فشل السيرفر الخارجي
     await tx.user.update({
       where: { id: usage.userId },
       data: {

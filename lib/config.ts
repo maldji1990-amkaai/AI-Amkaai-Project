@@ -3,28 +3,28 @@
 import { PlanType as PrismaPlanType } from "@prisma/client";
 
 //////////////////////////////////////////////////
-// 💳 PLANS CONFIG (المصدر الوحيد للحقيقة - 3 باقات فقط)
+// 💳 PLANS CONFIG (المصدر الوحيد للحقيقة - الباقات المحدثة بجودة Amkaai)
 //////////////////////////////////////////////////
 
 export const PLANS = {
-  creator: {
-    name: "Creator Pass",
-    credits: 70, // 🌟 70 نقطة = 70 ثانية توليد فيديو مرن
-    price: 7,   // 7 USD
+  trial: {
+    name: "3-Day Full Access",
+    credits: 30, // 🌟 30 نقطة تجريبية كافية للفحص ومحميّة مالياً بـ Wan 2.5 Fast
+    price: 1.99, // 1.99 USD
     isPro: true,
   },
 
-  pro: {
-    name: "Pro Pack",
-    credits: 200, // 🌟 200 نقطة = 200 ثانية
-    price: 15,   // 15 USD
+  quarterly: {
+    name: "Quarterly Saver",
+    credits: 300, // 🌟 300 نقطة لتوليد فيديوهات مرنة بدقة 720p
+    price: 44.97, // 44.97 USD (دفعة واحدة لـ 3 أشهر)
     isPro: true,
   },
 
-  premium: {
-    name: "Premium Studio",
-    credits: 400, // 🌟 400 نقطة = 400 ثانية
-    price: 25,   // 25 USD
+  biannually: {
+    name: "6 Months Cinematic",
+    credits: 900, // 🌟 900 نقطة ضخمة وحصرية لجودة الـ 1080p الفاخرة عبر Kling 1.5
+    price: 77.94, // 77.94 USD (دفعة واحدة لـ 6 أشهر)
     isPro: true,
   },
 } as const;
@@ -38,19 +38,19 @@ export type ConfigPlanType = keyof typeof PLANS;
 export const AI_COSTS = {
   image: 1,
   voice: 1,  
-  video: 1,  // نظام مرن: 1 نقطة لكل 1 ثانية توليد فيديو (Pay-Per-Second)
+  video: 1,  // نظام مرن وثابت: 1 نقطة لكل 1 ثانية توليد فيديو (Pay-Per-Second)
 } as const;
 
 export type AIType = keyof typeof AI_COSTS;
 
 //////////////////////////////////////////////////
-// 🍋 LEMON SQUEEZY CONFIG
+// 🍋 LEMON SQUEEZY CONFIG (المعرفات الجديدة للباقات)
 //////////////////////////////////////////////////
 
 export const LEMON_VARIANTS = {
-  creator: process.env.LEMON_SQUEEZY_CREATOR_VARIANT_ID || "", 
-  pro: process.env.LEMON_SQUEEZY_PRO_VARIANT_ID || "",
-  premium: process.env.LEMON_SQUEEZY_PREMIUM_VARIANT_ID || "",
+  trial: process.env.LEMON_SQUEEZY_TRIAL_VARIANT_ID || "", 
+  quarterly: process.env.LEMON_SQUEEZY_QUARTERLY_VARIANT_ID || "",
+  premium: process.env.LEMON_SQUEEZY_PREMIUM_VARIANT_ID || "", // تركنا اسم المفتاح متوافقاً مع إعدادات سيرفر ليمون سكويزي القديمة
 };
 
 //////////////////////////////////////////////////
@@ -64,7 +64,7 @@ export const LIMITS = {
 };
 
 //////////////////////////////////////////////////
-// ⚡ FEATURE FLAGS (التحكم في تشغيل الميزات برمجيًا)
+// ⚡ FEATURE FLAGS (التحكم في تشغيل الميزات برمجياً)
 //////////////////////////////////////////////////
 
 export const FEATURES = {
@@ -77,7 +77,7 @@ export const FEATURES = {
 // 🧠 HELPER FUNCTIONS
 //////////////////////////////////////////////////
 
-// ✅ جلب نقاط الخطة بناءً على نوعها
+// ✅ جلب نقاط الخطة بناءً على نوعها بعد التحديث
 export function getPlanCredits(plan: ConfigPlanType) {
   return PLANS[plan]?.credits || 0;
 }
@@ -98,9 +98,9 @@ export function getPlanFromVariant(variantId: string | number | null): ConfigPla
 
   const incomingVariantStr = String(variantId);
 
-  if (incomingVariantStr === LEMON_VARIANTS.creator) return "creator"; 
-  if (incomingVariantStr === LEMON_VARIANTS.pro) return "pro";
-  if (incomingVariantStr === LEMON_VARIANTS.premium) return "premium";
+  if (incomingVariantStr === LEMON_VARIANTS.trial) return "trial"; 
+  if (incomingVariantStr === LEMON_VARIANTS.quarterly) return "quarterly";
+  if (incomingVariantStr === LEMON_VARIANTS.premium) return "biannually"; // تحويل المعرف الفاخر تلقائياً للباقة نصف السنوية
 
   return null;
 }
