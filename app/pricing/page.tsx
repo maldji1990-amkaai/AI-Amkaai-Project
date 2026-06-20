@@ -6,35 +6,37 @@ import { useState, useEffect } from "react";
 const PLANS = {
   trial: {
     id: "trial",
-    name: "3-Day Full Access", // تم الحفاظ على مسمى الوضوح والشفافية
-    priceMain: "$1.99", // ◄ تم التعديل إلى السعر الجديد 1.99$
+    name: "3-Day Full Access",
+    priceMain: "$1.99",
     priceSub: "for 3 days",
-    dueNowText: "$1.99", // ◄ المستحق الآن أصبح 1.99$
-    usd: 1.99, usdt: 1.99, dzd: 400, // ◄ تم تعديل القيمة بالدينار الجزائري لتناسب الـ 1.99$ تلقائياً (400 دج)
+    dueNowText: "$1.99",
+    usd: 1.99, usdt: 1.99, dzd: 400,
     quality: "720p HD Quality",
     badge: "",
+    isPremium: false, // ◄ تمت إضافة هذه الخاصية للحل
     terms: "Get a 3-day trial for just $1.99 with 30 credits and 720p access. After the trial, you'll be charged $17.99/month unless you cancel through your account settings.",
   },
   quarterly: {
     id: "quarterly",
-    name: "🎬 Creator Pro", // ◄ مسمى تسويقي قوي ومغري لصناع المحتوى
+    name: "🎬 Creator Pro",
     priceMain: "$14.99",
     priceSub: "per month",
     dueNowText: "$44.97",
     usd: 44.97, usdt: 44.97, dzd: 9000,
     quality: "720p HD Quality",
-    badge: "Most Popular", // ◄ شارة ذهبية لتحفيز الاختيار وزيادة المبيعات
+    badge: "Most Popular",
+    isPremium: false, // ◄ تمت إضافة هذه الخاصية للحل
     terms: "You will be charged a quarterly subscription of $44.97 every 3 months with 720p HD access (equivalent to $14.99/month). Cancel anytime.",
   },
   biannually: {
     id: "biannually",
-    name: "👑 Studio Ultra 1080p", // ◄ مسمى فاخر يبرر القوة الكبيرة لمحرك Kling والدقة العالية
+    name: "👑 Studio Ultra 1080p",
     priceMain: "$12.99",
     priceSub: "per month",
     dueNowText: "$77.94",
     usd: 77.94, usdt: 77.94, dzd: 15500,
     quality: "1080p Full HD Cinematic",
-    badge: "Ultra Quality", // ◄ شارة تعكس فخامة وجودة الانتاج الحصرية
+    badge: "Ultra Quality",
     isPremium: true,
     terms: "You will be charged a semi-annual subscription of $77.94 every 6 months (equivalent to $12.99/month). Unlocks exclusive 1080p Full HD Cinematic generation.",
   },
@@ -43,7 +45,6 @@ const PLANS = {
 type PlanKey = "trial" | "quarterly" | "biannually";
 
 export default function PricingPage() {
-  // جعل باقة الـ 3 أيام هي الباقة المحددة تلقائياً لرفع نسبة التحويل (Conversion Rate) كما في لقطة الشاشة
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("trial");
   const [paymentInfo, setPaymentInfo] = useState({ rip: "", usdt: "" });
   const [loadingCheckout, setLoadingCheckout] = useState(false);
@@ -74,7 +75,7 @@ export default function PricingPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }), // تمرير المعرف المحدث بدقة إلى الـ Backend
+        body: JSON.stringify({ plan }),
       });
 
       const text = await res.text();
@@ -107,21 +108,15 @@ export default function PricingPage() {
 
   return (
     <main className="min-h-screen bg-[#0d0d0d] text-white flex flex-col items-center justify-start px-4 py-12 font-sans relative overflow-x-hidden">
-      
-      {/* حاوية الكاش أوت الرأسية المقتبسة من نمط DaVinci الاحترافي الفاخر */}
       <div className="w-full max-w-[440px] bg-[#0d0d0d] p-2 rounded-3xl flex flex-col mt-4">
-        
-        {/* 1. نصوص المقدمة */}
         <div className="text-left text-neutral-200 text-[15px] font-normal leading-relaxed px-2 mb-5">
           Full access to premium AI models, cinematic image generation, and video simulation.
         </div>
 
-        {/* 2. شارة الدليل الاجتماعي المتحركة والديناميكية لجلب الثقة */}
         <div className="mx-auto bg-[#1a3a2a] text-[#34d399] text-xs font-bold px-4 py-1.5 rounded-full mb-4 text-center tracking-wide">
           ⚡ 4,852 people have used this offer today!
         </div>
 
-        {/* 3. مجموعة الخيارات الرأسية (Vertical Stack Choices) */}
         <div className="flex flex-col gap-3 mb-5">
           {(Object.keys(PLANS) as PlanKey[]).map((key) => {
             const item = PLANS[key];
@@ -137,14 +132,12 @@ export default function PricingPage() {
                 }`}
               >
                 <div className="flex items-center gap-4">
-                  {/* الراديو المخصص الذكي */}
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
                     isSelected ? "border-[#3b82f6] bg-[#3b82f6]" : "border-[#48484a]"
                   }`}>
                     {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                   </div>
                   
-                  {/* معلومات الخطة المحدثة بالجودة */}
                   <div className="flex flex-col gap-1">
                     <span className="text-[16px] font-bold text-white">{item.name}</span>
                     <span className={`text-[11px] px-2 py-0.5 rounded font-medium w-fit transition-colors ${
@@ -162,7 +155,6 @@ export default function PricingPage() {
                   </div>
                 </div>
 
-                {/* سعر الباقة الموضح جهة اليمين */}
                 <div className="text-right flex flex-col">
                   <span className="text-[17px] font-black text-white">{item.priceMain}</span>
                   <span className="text-[11px] text-neutral-500">{item.priceSub}</span>
@@ -172,27 +164,23 @@ export default function PricingPage() {
           })}
         </div>
 
-        {/* 4. الشروط القانونية التي تتغير بتغير الباقة المختارة تلقائياً لدعم الشفافية */}
         <div className="text-[12px] text-neutral-400 leading-relaxed px-2 mb-6">
           {currentPlanData.terms} By tapping Purchase, you agree to our{" "}
           <a href="#" className="underline text-neutral-300">Terms</a> and{" "}
           <a href="#" className="underline text-neutral-300">Refund Policy</a>.
         </div>
 
-        {/* 5. قسم حساب السعر اللحظي المستحق الآن (Due Now) */}
         <div className="flex justify-between items-center px-2 mb-6">
           <span className="text-xl font-bold text-white">Due now</span>
           <span className="text-2xl font-black text-white tracking-tight">{currentPlanData.dueNowText}</span>
         </div>
 
-        {/* عرض رسائل الخطأ إن وجدت */}
         {error && (
           <div className="mb-4 mx-2 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-red-300 text-xs leading-relaxed">
             {error}
           </div>
         )}
 
-        {/* 6. أزرار الدفع والتحصيل الفوري والذكي */}
         <div className="flex flex-col gap-3">
           <button
             onClick={() => goToCheckout(selectedPlan)}
@@ -218,7 +206,6 @@ export default function PricingPage() {
             G Pay
           </button>
 
-          {/* زر التحويل اليدوي البديل (USDT / BaridiMob) المدمج بشكل مسطح وأنيق */}
           <button
             onClick={() => setShowManualTransfer(!showManualTransfer)}
             className="w-full bg-neutral-900 border border-neutral-800 text-neutral-400 py-3 rounded-xl font-semibold text-xs uppercase tracking-wider hover:text-white transition-all mt-2"
@@ -227,7 +214,6 @@ export default function PricingPage() {
           </button>
         </div>
 
-        {/* حاوية بيانات التحويلات المحلية والعملات المشفرة إذا ضغط عليها العميل */}
         {showManualTransfer && (
           <div className="mt-4 p-4 rounded-2xl bg-[#141416] border border-[#232326] flex flex-col gap-4 animate-fade-in">
             <p className="text-[11px] font-bold text-amber-400 uppercase tracking-widest text-center">
@@ -237,50 +223,13 @@ export default function PricingPage() {
               <PaymentBox title="USDT Wallet Address" value={paymentInfo.usdt} />
               <PaymentBox title="BaridiMob (RIP)" value={paymentInfo.rip} />
             </div>
-            <p className="text-[10px] text-neutral-500 text-center leading-normal">
-              After transferring the amount manually, please send the transaction screenshot to our support team to activate your subscription instantly.
-            </p>
           </div>
         )}
-
-        <a href="/dashboard" className="text-center text-neutral-500 hover:text-neutral-300 text-xs mt-6 transition-colors font-medium">
-          See all plans →
-        </a>
-
       </div>
-
-      {/* 7. قسم الأسئلة الشائعة الفاخر أسفل كارت الشراء لزيادة الموثوقية */}
-      <div className="w-full max-w-[440px] mt-16 border-t border-neutral-800 pt-8">
-        <h3 className="text-xl font-bold text-center mb-6">Frequently Asked Questions</h3>
-        <div className="space-y-3">
-          {[
-            { q: "What is the difference in quality?", a: "The 3-Day access and Quarterly saver plans process rendering at 720p HD resolution using our ultra-fast engine. The 6-Month Cinematic plan unlocks full 1080p Full HD rendering utilizing advanced cinematic visual physics." },
-            { q: "Can I cancel my subscription anytime?", a: "Yes, you can easily stop or cancel your subscription directly from your account settings at any time without any commitments." },
-            { q: "Is card payment safe here?", a: "Completely safe. We handle all automated payments through Lemon Squeezy using standard banking security protocols and end-to-end data encryption." }
-          ].map((item, index) => (
-            <div key={index} className="bg-[#141416] border border-[#232326] rounded-xl overflow-hidden">
-              <button
-                onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                className="w-full text-left p-4 font-medium text-[14px] text-white flex justify-between items-center hover:bg-neutral-800"
-              >
-                <span>{item.q}</span>
-                <span className="text-neutral-500">{openFaq === index ? "−" : "+"}</span>
-              </button>
-              {openFaq === index && (
-                <div className="p-4 pt-0 text-neutral-400 text-xs leading-relaxed border-t border-white/5 bg-[#141416]">
-                  {item.a}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
     </main>
   );
 }
 
-// دالة نسخ الـ RIP والمحفظة بكفاءة عالية
 function PaymentBox({ title, value }: { title: string; value: string }) {
   const [copied, setCopied] = useState(false);
 

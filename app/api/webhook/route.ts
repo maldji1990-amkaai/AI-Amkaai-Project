@@ -75,8 +75,19 @@ export async function POST(req: Request) {
     const cleanPlanKey = planName.toLowerCase() as "creator" | "pro" | "premium";
     const dbPlan = planName.toUpperCase() as PlanType;
     
-    // جلب عدد النقاط ديناميكياً بناءً على ما حددته في ملف الـ Config (70 أو 200 أو 400)
-    const creditsToGrant = PLANS[cleanPlanKey]?.credits || 0;
+    // 🧠 خريطة تحويل ذكية لحل مشكلة الـ TypeScript مع الـ Keys الخاصة بكائن PLANS
+    const planMapping: Record<string, "trial" | "quarterly" | "biannually"> = {
+      trial: "trial",
+      creator: "quarterly",   // تحويل الباقة الثانية
+      pro: "quarterly",       // حماية إضافية في حال تم تمرير pro
+      premium: "biannually"   // تحويل الباقة الثالثة
+    };
+
+    // جلب المفتاح المحلي الصحيح المتوافق مع PLANS
+    const localPlanKey = planMapping[cleanPlanKey];
+
+    // جلب عدد النقاط ديناميكياً بناءً على ما حددته في ملف الـ Config بأمان تام
+    const creditsToGrant = localPlanKey ? (PLANS[localPlanKey] as any)?.credits || 0 : 0;
 
     const lemonCustomerId = attributes?.customer_id?.toString() || null;
     const lemonSubscriptionId = body?.data?.id?.toString() || null; 
