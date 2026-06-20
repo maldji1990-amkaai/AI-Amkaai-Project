@@ -39,8 +39,6 @@ const AI_GALLERY = [
 ];
 
 /* ================= MAIN PAGE ================= */ 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 export default function HomePage() {
   const { isSignedIn } = useAuth(); 
   const router = useRouter();       
