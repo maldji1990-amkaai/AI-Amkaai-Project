@@ -72,31 +72,34 @@ export async function POST(req: Request) {
     }
 
     // تأمين جلب اسم الباقة وصيغتها لقاعدة البيانات وملف الـ Config
-    const cleanPlanKey = planName.toLowerCase() as "creator" | "pro" | "premium";
-    const dbPlan = planName.toUpperCase() as PlanType;
-    
-    // 🧠 خريطة تحويل ذكية لحل مشكلة الـ TypeScript مع الـ Keys الخاصة بكائن PLANS
-    const planMapping: Record<string, "trial" | "quarterly" | "biannually"> = {
-      trial: "trial",
-      creator: "quarterly",   // تحويل الباقة الثانية
-      pro: "quarterly",       // حماية إضافية في حال تم تمرير pro
-      premium: "biannually"   // تحويل الباقة الثالثة
-    };
+    // ... (الكود السابق)
 
-    // جلب المفتاح المحلي الصحيح المتوافق مع PLANS
-    const localPlanKey = planMapping[cleanPlanKey];
+// 1. تحديد cleanPlanKey
+const cleanPlanKey = planName.toLowerCase() as "creator" | "pro" | "premium";
 
-    // جلب عدد النقاط ديناميكياً بناءً على ما حددته في ملف الـ Config بأمان تام
-    const creditsToGrant = localPlanKey ? (PLANS[localPlanKey] as any)?.credits || 0 : 0;
+// 2. تحديد planMapping و localPlanKey
+const planMapping: Record<string, "trial" | "quarterly" | "biannually"> = {
+  trial: "trial",
+  creator: "quarterly",
+  pro: "quarterly",
+  premium: "biannually"
+};
+const localPlanKey = planMapping[cleanPlanKey];
 
-    const lemonCustomerId = attributes?.customer_id?.toString() || null;
-    const lemonSubscriptionId = body?.data?.id?.toString() || null; 
-    const subscriptionStatus = attributes?.status; // active, cancelled, expired, past_due
-    const endsAt = attributes?.ends_at ? new Date(attributes?.ends_at) : null;
+// 3. تعريف dbPlan و creditsToGrant (يجب أن يكونا معاً في الأعلى)
+const dbPlan = (localPlanKey ? localPlanKey.toUpperCase() : "FREE") as PlanType;
+const creditsToGrant = localPlanKey ? (PLANS[localPlanKey] as any)?.credits || 0 : 0;
 
-    const existingSubscription = await db.subscription.findFirst({
-      where: { userId: user.id }
-    });
+// 4. بقية المتغيرات
+const lemonCustomerId = attributes?.customer_id?.toString() || null;
+const lemonSubscriptionId = body?.data?.id?.toString() || null; 
+const subscriptionStatus = attributes?.status; 
+const endsAt = attributes?.ends_at ? new Date(attributes?.ends_at) : null;
+
+// وبعدها مباشرة يأتي باقي الكود...
+const existingSubscription = await db.subscription.findFirst({
+  where: { userId: user.id }
+});
 
     ////////////////////////////////////////////////////////////////
     // 🧠 هندسة أحداث الاشتراكات (Subscription Logic Handler)

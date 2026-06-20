@@ -38,24 +38,26 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
-    const plan = body?.plan;
+    // ... داخل دالة POST بعد قراءة الـ body
+const body = await req.json();
+const plan = body?.plan; // عرفناه مرة واحدة فقط
 
-    // 🌟 التحديث هنا: إضافة 'creator' إلى الخطط المقبولة في الخادم
-    if (plan !== "creator" && plan !== "pro" && plan !== "premium") {
-      return NextResponse.json(
-        { error: "Invalid plan", message: `Plan received: ${plan}` },
-        { status: 400 }
-      );
-    }
+// 1. التحقق من الخطة
+if (plan !== "trial" && plan !== "quarterly" && plan !== "biannually") {
+  return NextResponse.json(
+    { error: "Invalid plan", message: `Plan received: ${plan}` },
+    { status: 400 }
+  );
+}
 
-    // 🌟 التحديث هنا: توزيع الروابط الديناميكية لتشمل باقة الـ Creator Pass الجديدة بـ 7$
-    const baseCheckoutUrl =
-      plan === "premium"
-        ? process.env.LEMON_SQUEEZY_PREMIUM_URL
-        : plan === "pro"
-        ? process.env.LEMON_SQUEEZY_PRO_URL
-        : process.env.LEMON_SQUEEZY_CREATOR_URL; // رابط باقة الـ 7 دولار في ملف الـ .env
+// 2. توزيع الروابط (تأكد من استخدام plan مرة واحدة)
+const baseCheckoutUrl =
+  plan === "biannually"
+    ? process.env.LEMON_SQUEEZY_BIANNUALLY_URL
+    : plan === "quarterly"
+    ? process.env.LEMON_SQUEEZY_QUARTERLY_URL
+    : process.env.LEMON_SQUEEZY_TRIAL_URL;
+// ... باقي الكود
 
     if (!baseCheckoutUrl) {
       return NextResponse.json(
