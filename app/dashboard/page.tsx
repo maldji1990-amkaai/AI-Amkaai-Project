@@ -3,6 +3,7 @@
 import { useUser, UserButton } from "@clerk/nextjs";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Send, Plus, LifeBuoy, X, Settings, Bot, User, PanelLeft, Trash2, Wand2, 
   ImageIcon, Video, Mic, SlidersHorizontal, Tv, Flame, Upload, Sparkles, 
@@ -45,6 +46,7 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
   const [credits, setCredits] = useState(240);
 
   // 🎛️ خيارات التحكم الأساسية لـ Generation Pipeline
@@ -64,6 +66,8 @@ export default function DashboardPage() {
   const [compareSlider, setCompareSlider] = useState(50);
   const [supportOpen, setSupportOpen] = useState(false);
   const [supportInput, setSupportInput] = useState("");
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<"trial" | "quarterly" | "biannually">("trial");
 
   const [renderQueue, setRenderQueue] = useState<RenderJob[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -188,7 +192,11 @@ export default function DashboardPage() {
 
     } catch (e: any) {
       console.error(e);
-      alert(`Render Core Alert: ${e.message}`);
+      if (e.message?.toLowerCase().includes("insufficient") || e.message?.toLowerCase().includes("credits") || e.message?.toLowerCase().includes("upgrade")) {
+        router.push("/pricing");
+      } else {
+        alert(`Render Core Alert: ${e.message}`);
+      }
       setRenderQueue(prev => prev.filter(j => j.id !== clientJobId));
     } finally {
       setLoading(false);
@@ -290,7 +298,7 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-3">
             <button onClick={() => setSupportOpen(true)} className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-xs text-gray-400 font-mono hover:text-white transition"><LifeBuoy size={12} /> Live Support</button>
-            <Link href="/pricing" className="bg-gradient-to-r from-zinc-900 to-black px-4 py-2 rounded-full border border-white/10 hover:border-amber-500/30 transition text-xs font-bold text-gray-300">💎 Upgrade Plan</Link>
+            <button onClick={() => setPricingModalOpen(true)} className="bg-gradient-to-r from-zinc-900 to-black px-4 py-2 rounded-full border border-white/10 hover:border-amber-500/30 transition text-xs font-bold text-gray-300">💎 Upgrade Plan</button>
             <button className="hidden items-center gap-1.5 rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-xs text-gray-400 md:flex font-mono"><Layers3 size={12} /> Asset Desk</button>
           </div>
         </header>
@@ -535,6 +543,140 @@ export default function DashboardPage() {
               </div>
               <button onClick={() => setSupportOpen(false)} className="absolute right-4 top-4 text-gray-500 hover:text-white" aria-label="Close support dispatch dashboard"><X size={16} /></button>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 💳 PRICING UPGRADE MODAL */}
+      <AnimatePresence>
+        {pricingModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 sm:pb-0"
+            onClick={(e) => { if (e.target === e.currentTarget) setPricingModalOpen(false); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 60, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 40, scale: 0.95 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="w-full max-w-sm bg-[#0f0f17] border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between p-6 pb-4">
+                <div>
+                  <h2 className="text-xl font-black text-white">Unlock all models</h2>
+                  <h2 className="text-xl font-black text-white">with Pro!</h2>
+                  <p className="text-sm text-gray-400 mt-2 font-light leading-relaxed">
+                    Full access to premium AI models, image generation, and video generation.
+                  </p>
+                </div>
+                <button onClick={() => setPricingModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0 ml-4 mt-0.5">
+                  ✕
+                </button>
+              </div>
+
+              {/* Social proof */}
+              <div className="mx-6 mb-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">
+                <p className="text-[11px] text-emerald-400 font-bold text-center">
+                  🔥 7,068+ people have used this offer today!
+                </p>
+              </div>
+
+              {/* Plans */}
+              <div className="px-6 space-y-2.5 mb-5">
+                <button
+                  onClick={() => setSelectedPlan("trial")}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition ${selectedPlan === "trial" ? "border-blue-500 bg-blue-500/10" : "border-white/10 bg-white/[0.02]"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedPlan === "trial" ? "border-blue-500" : "border-gray-600"}`}>
+                      {selectedPlan === "trial" && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                    </div>
+                    <span className="text-sm font-bold text-white">3-Day Full Access Trial</span>
+                  </div>
+                  <span className="text-sm font-black text-white">$1.99</span>
+                </button>
+
+                <button
+                  onClick={() => setSelectedPlan("quarterly")}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition ${selectedPlan === "quarterly" ? "border-blue-500 bg-blue-500/10" : "border-white/10 bg-white/[0.02]"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedPlan === "quarterly" ? "border-blue-500" : "border-gray-600"}`}>
+                      {selectedPlan === "quarterly" && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                    </div>
+                    <span className="text-sm font-bold text-white">Quarterly</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">Save 33%</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-black text-white">$14.99</div>
+                    <div className="text-[10px] text-gray-500">per month</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setSelectedPlan("biannually")}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition ${selectedPlan === "biannually" ? "border-blue-500 bg-blue-500/10" : "border-white/10 bg-white/[0.02]"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedPlan === "biannually" ? "border-blue-500" : "border-gray-600"}`}>
+                      {selectedPlan === "biannually" && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                    </div>
+                    <span className="text-sm font-bold text-white">6 Months</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">Save 44%</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-black text-white">$12.99</div>
+                    <div className="text-[10px] text-gray-500">per month</div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Fine print */}
+              <div className="px-6 mb-4">
+                <p className="text-[10px] text-gray-500 leading-relaxed">
+                  {selectedPlan === "trial"
+                    ? "Get a 3-day trial for just $1.99. After the trial, you'll be charged $17.99/month unless you cancel through your account settings."
+                    : selectedPlan === "quarterly"
+                    ? "Billed as $44.97 every 3 months. Cancel anytime through your account settings."
+                    : "Billed as $77.94 every 6 months. Cancel anytime through your account settings."
+                  }{" "}
+                  By tapping Purchase, you agree to our <span className="underline cursor-pointer">Terms</span>, <span className="underline cursor-pointer">Privacy</span> and <span className="underline cursor-pointer">Refund Policy</span>.
+                </p>
+              </div>
+
+              {/* Due now */}
+              <div className="px-6 flex items-center justify-between mb-4">
+                <span className="text-base font-black text-white">Due now</span>
+                <span className="text-base font-black text-white">
+                  {selectedPlan === "trial" ? "$1.99" : selectedPlan === "quarterly" ? "$44.97" : "$77.94"}
+                </span>
+              </div>
+
+              {/* CTA */}
+              <div className="px-6 pb-6">
+                <button
+                  onClick={async () => {
+                    setPricingModalOpen(false);
+                    try {
+                      const res = await fetch("/api/checkout", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ plan: selectedPlan }),
+                      });
+                      const data = await res.json();
+                      if (data?.url) window.location.href = data.url;
+                    } catch (e) { console.error(e); }
+                  }}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-indigo-500 text-black font-black text-sm uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:opacity-90 transition"
+                >
+                  Purchase Now →
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

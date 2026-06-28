@@ -167,6 +167,17 @@ export default function RootLayout({
           {/* 🌌 GLOBAL BACKGROUND */}
           <div className="fixed inset-0 -z-50 bg-black" />
 
+          {/* 🎬 BG VIDEO — خلفية فيديو خافتة */}
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="pointer-events-none fixed inset-0 -z-[45] h-full w-full object-cover opacity-[0.12]"
+          >
+            <source src="/bg-video.mp4" type="video/mp4" />
+          </video>
+
           {/* ✨ CYAN GLOW */}
           <div className="pointer-events-none fixed left-1/2 top-0 -z-40 h-[550px] w-[1000px] -translate-x-1/2 rounded-full bg-cyan-500/10 blur-3xl" />
 

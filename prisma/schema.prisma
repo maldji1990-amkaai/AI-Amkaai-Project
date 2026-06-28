@@ -14,7 +14,7 @@ model User {
   /// ///////////////////////////////////////////////
   /// ///////////////////////////////////////////////
   plan                PlanType            @default(FREE)
-  credits             Int                 @default(10)
+  credits             Int                 @default(0)
   lemonCustomerId     String?
   lemonSubscriptionId String?
   /// ///////////////////////////////////////////////

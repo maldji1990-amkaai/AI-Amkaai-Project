@@ -52,24 +52,23 @@ export async function POST(req: Request) {
 
       // فحص باقة المستخدم لتحديد المحرك والجودة تلقائياً
       if (userPlan === "biannually") {
-        // ⭐ الباقة الفاخرة لـ 6 أشهر: نوفر جودة هوليوود Kling v1.5 بدقة 1080p
-        // نستخدم الموديل مباشرة كاسم نصي متوافق مع دالة replicate.run الحديثة والمستقرة
-        modelIdentifier = "kling-ai/kling-v1.5-video";
+        // ⭐ الباقة الفاخرة: Wan 2.5 بدقة 1080p — جودة عالية بتكلفة نصف Kling
+        modelIdentifier = "wan-video/wan-2.5-t2v-14b";
         modelInput = {
           prompt: prompt,
-          aspect_ratio: aspectRatio || "16:9",
-          camera_control: cameraMotion || "static",
+          size: aspectRatio === "1:1" ? "1080*1080" : (aspectRatio === "9:16" ? "1080*1920" : "1920*1080"),
+          frame_num: 81,
+          advanced_sampling: true, // جودة أعلى للباقة الفاخرة
           cfg_scale: creativity ? creativity * 10 : 7.5,
-          resolution: "1080p" // حصرية دقة الـ Full HD السينمائية هنا
         };
       } else {
-        // 💰 باقة التجربة بـ 0.99$ والباقة الربع سنوية: نوفر Wan 2.5 Fast بدقة 720p لضمان أعلى هامش ربح
-        modelIdentifier = "wan-video/wan-2.5-t2v-14b"; // مسار نموذج Wan الرسمي النصي المستقر عبر ريبليكيت
+        // 💰 باقة التجربة والربع سنوية: Wan 2.5 بدقة 720p لأعلى هامش ربح
+        modelIdentifier = "wan-video/wan-2.5-t2v-14b";
         modelInput = {
           prompt: prompt,
-          size: aspectRatio === "1:1" ? "1024*1024" : (aspectRatio === "9:16" ? "720*1280" : "1280*720"), // تمرير أبعاد الـ 720p الذكية
-          frame_num: 81, // ما يعادل حوالي 5 ثوانٍ سينمائية سريعة
-          advanced_sampling: false
+          size: aspectRatio === "1:1" ? "720*720" : (aspectRatio === "9:16" ? "720*1280" : "1280*720"),
+          frame_num: 81,
+          advanced_sampling: false,
         };
       }
 

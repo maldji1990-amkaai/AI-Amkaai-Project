@@ -45,6 +45,8 @@ export default function AIChangeConsole() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [credits, setCredits] = useState(240);
+const [selectedDuration, setSelectedDuration] = useState(30);
+const [showDurationModal, setShowDurationModal] = useState(false);
 
   // 🎛️ خيارات التحكم الأساسية لـ Generation Pipeline
   const [activeType, setActiveType] = useState<MediaType>("ai-video");
@@ -108,6 +110,7 @@ export default function AIChangeConsole() {
   };
 
   // 🔥 دالة توليد الفيديو الحية وتحديث قائمة الانتظار (Queue) والسجلات
+  // 🔥 دالة توليد الفيديو الحية وتحديث قائمة الانتظار (Queue) والسجلات
   const handleGenerateVideo = async () => {
     if (!prompt.trim() || !activeChat) return alert("الرجاء كتابة الوصف النصي أولاً!");
 
@@ -130,7 +133,6 @@ export default function AIChangeConsole() {
     const clientJobId = crypto.randomUUID();
     setRenderQueue(prev => [{ id: clientJobId, prompt: currentPrompt, progress: 5, status: "rendering", type: activeType }, ...prev]);
 
-    // محاكاة شريط التحميل المستوحى من السيرفرات الحقيقية
     const interval = setInterval(() => {
       setProgress((prev) => {
         const nextProgress = prev + Math.floor(Math.random() * 12) + 4;
@@ -146,7 +148,10 @@ export default function AIChangeConsole() {
       if (activeType === "image-to-avatar") targetEndpoint = "/api/generate-image";
       if (activeType === "voice-clone") targetEndpoint = "/api/generate-voice";
 
-      const requestBody: any = { prompt: currentPrompt };
+     const requestBody: any = { 
+  prompt: currentPrompt,
+  duration: selectedDuration
+};
       if (activeType === "ai-video") {
         requestBody.aspectRatio = aspectRatio;
         requestBody.cameraMotion = cameraMotion;
@@ -167,6 +172,17 @@ export default function AIChangeConsole() {
         body: JSON.stringify(requestBody)
       });
 
+      // التحقق من الرصيد
+      if (response.status === 402) {
+        window.location.href = "/pricing";
+        return;
+      }
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "حدث خطأ غير متوقع");
+      }
+
       const data = await response.json();
       clearInterval(interval);
       setProgress(100);
@@ -179,7 +195,7 @@ export default function AIChangeConsole() {
 
       const reply: Message = { 
         role: "assistant", 
-        content: `⚡ تم الانتهاء من معالجة روتينات الإخراج عبر خوادم السيرفر الأساسية بنجاح.\n• الرصيد المتبقي: ${data.remainingCredits || (credits - 10)} عقدة جي بي يو.`, 
+        content: `⚡ تم الانتهاء من معالجة روتينات الإخراج بنجاح.\n• الرصيد المتبقي: ${data.remainingCredits || (credits - 10)}`, 
         outputUrl: outputUrl,
         meta: { type: (activeType === "voice-clone" && isLipSyncActive) ? "ai-video" : activeType }
       };
@@ -191,17 +207,7 @@ export default function AIChangeConsole() {
     } catch (e: any) {
       clearInterval(interval);
       console.error(e);
-      // في حال لم يتم إعداد الـ API بعد، سيقوم النظام تلقائياً بتوفير لقطة Demo تجريبية لحماية مرونة تجربة المستخدم
-      const fallbackUrl = "https://assets.mixkit.co/videos/preview/mixkit-abstract-laser-lights-background-32124-large.mp4";
-      const reply: Message = { 
-        role: "assistant", 
-        content: `💡 نمط المحاكاة الافتراضي (Demo Mode) نشط حالياً لحين ربط قواعد البيانات الخلفية بالكامل بنجاح.`, 
-        outputUrl: fallbackUrl,
-        meta: { type: activeType }
-      };
-      setChats((prev) => prev.map((c) => c.id === activeChatId ? { ...c, messages: [...c.messages, reply] } : c));
-      setRenderQueue(prev => prev.map(j => j.id === clientJobId ? { ...j, progress: 100, status: "completed" } : j));
-      setCredits(prev => prev - 10);
+      alert(e.message || "حدث خطأ أثناء التوليد");
     } finally {
       setIsGenerating(false);
     }
@@ -510,9 +516,13 @@ export default function AIChangeConsole() {
                   className="max-h-24 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-1.5 text-xs outline-none text-white placeholder:text-gray-700"
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerateVideo(); } }}
                 />
-                <button onClick={handleGenerateVideo} disabled={isGenerating || !prompt.trim()} className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white disabled:opacity-20 transition shadow-md">
-                  {isGenerating ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                </button>
+                <button 
+  onClick={() => setShowDurationModal(true)} // هذا التغيير سيفتح النافذة بدلاً من التوليد المباشر
+  disabled={isGenerating || !prompt.trim()} 
+  className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white disabled:opacity-20 transition shadow-md"
+>
+  {isGenerating ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+</button>
               </div>
               <div className="text-[10px] text-zinc-500 text-center font-mono">
                 Output Engine: AMKAAI-Video-v2.6 • Resolution up to 4K Ultra
@@ -543,6 +553,33 @@ export default function AIChangeConsole() {
           </motion.div>
         )}
       </AnimatePresence>
-    </main>
-  );
+{/* نافذة اختيار المدة الزمنية */}
+        {showDurationModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#121215] p-6 shadow-2xl">
+              <h2 className="text-lg font-bold text-white mb-6">Select Video Duration</h2>
+              
+              <input 
+                type="range" min="5" max="180" step="5" 
+                value={selectedDuration} 
+                onChange={(e) => setSelectedDuration(Number(e.target.value))}
+                className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-purple-500 mb-2"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mb-6 font-mono">
+                <span>5s</span><span>30s</span><span>1m</span><span>3m</span>
+              </div>
+              
+              <div className="text-4xl font-black text-white mb-8 text-center tracking-tighter">{selectedDuration}s</div>
+              
+              <button 
+                onClick={() => { setShowDurationModal(false); handleGenerateVideo(); }}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 font-bold text-white transition hover:opacity-90"
+              >
+                Confirm ({Math.ceil(selectedDuration / 5) * 3} credits)
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+    );
 }
