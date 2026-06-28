@@ -498,28 +498,87 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Input Desk Area */}
-            <div className="p-4 border-t border-white/5 bg-[#070709]/90 backdrop-blur-md space-y-3">
-              <div className="grid grid-cols-4 gap-2">
+            {/* Input Desk Area — PROMINENT */}
+            <div className="p-5 border-t-2 border-cyan-500/30 bg-[#0a0a10] backdrop-blur-md space-y-4 shadow-[0_-4px_32px_rgba(6,182,212,0.08)]">
+
+              {/* Label row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="text-xs font-black uppercase tracking-widest text-cyan-400">
+                    {activeType === "voice-clone" ? "🎙️ اكتب النص هنا" : "✦ Describe Your Vision"}
+                  </span>
+                </div>
+                <span className="text-[10px] text-gray-600 font-mono">↵ Enter to generate</span>
+              </div>
+
+              {/* Main Textarea Box */}
+              <div className="relative rounded-2xl border-2 border-white/20 bg-[#12121a] transition-all duration-300 focus-within:border-cyan-500 focus-within:shadow-[0_0_0_1px_rgba(6,182,212,0.4),0_0_28px_rgba(6,182,212,0.2)] focus-within:bg-[#0d0d18]">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={
+                    activeType === "voice-clone"
+                      ? "اكتب النص المراد تحويله لبصمتك الصوتية المستنسخة..."
+                      : activeType === "ai-avatar"
+                      ? "Describe the avatar's appearance, attire, and speaking style... e.g. Professional Arabic news anchor in a modern studio, elegant suit, ultra-realistic."
+                      : activeType === "image-to-avatar"
+                      ? "Describe the scene and motion you want applied to the uploaded image..."
+                      : "Describe your cinematic vision here... e.g. A futuristic city at night with neon lights, slow camera pan, 8K ultra-realistic..."
+                  }
+                  rows={3}
+                  className="w-full resize-none bg-transparent px-4 pt-4 pb-2 text-sm outline-none text-white placeholder:text-gray-500 font-mono leading-relaxed"
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); executeGeneration(); } }}
+                />
+                <div className="px-4 pb-3 flex items-center justify-between">
+                  <span className="text-[10px] text-gray-600 font-mono">
+                    {input.length === 0
+                      ? "Start typing your prompt..."
+                      : input.length < 30
+                      ? `${input.length} chars — add more detail for better results`
+                      : input.length < 80
+                      ? `${input.length} chars — good detail level`
+                      : `${input.length} chars — excellent detail ✦`}
+                  </span>
+                  <span className={`text-[10px] font-black font-mono ${input.length === 0 ? "text-gray-700" : input.length < 30 ? "text-red-400" : input.length < 80 ? "text-amber-400" : "text-emerald-400"}`}>
+                    {input.length === 0 ? "" : input.length < 30 ? "⚠ Poor" : input.length < 80 ? "◐ Good" : "✦ Excellent"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Style Pills */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0">Quick Style:</span>
                 {PRESET_STYLES.map(style => (
-                  <button key={style.id} onClick={() => handlePresetApply(style)} className="relative h-8 rounded-xl overflow-hidden border border-white/5 bg-neutral-900 flex items-center justify-center p-1 hover:border-white/20 transition">
-                    <span className="text-[10px] font-bold text-gray-400">{style.name}</span>
+                  <button
+                    key={style.id}
+                    onClick={() => handlePresetApply(style)}
+                    className="h-7 rounded-lg border border-white/10 bg-white/5 hover:border-cyan-500/40 hover:bg-cyan-500/10 hover:text-cyan-300 transition text-[10px] font-bold text-gray-400 px-3"
+                  >
+                    {style.name}
                   </button>
                 ))}
               </div>
 
-              <div className="flex items-end gap-3 bg-[#030304] border border-white/5 rounded-2xl p-2.5 focus-within:border-cyan-500/30 transition">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={activeType === "voice-clone" ? "اكتب هنا النص المراد تحويله لبصمتك الصوتية المستنسخة أو الصوت الجاهز..." : "Describe your production criteria for this pipeline execution..."}
-                  className="max-h-24 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-1.5 text-xs outline-none text-white placeholder:text-gray-700"
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); executeGeneration(); } }}
-                />
-                <button onClick={executeGeneration} disabled={loading || !input.trim()} className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500 text-black disabled:opacity-20 transition shadow-md">
-                  <Send size={13} />
-                </button>
-              </div>
+              {/* Generate Button */}
+              <button
+                onClick={executeGeneration}
+                disabled={loading || !input.trim()}
+                className={`w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed
+                  ${credits <= 0
+                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-black shadow-amber-500/20 hover:opacity-90"
+                    : "bg-gradient-to-r from-cyan-500 to-indigo-500 text-black shadow-cyan-500/20 hover:opacity-95 hover:shadow-[0_0_32px_rgba(6,182,212,0.4)]"
+                  }`}
+              >
+                {loading ? (
+                  <><div className="w-4 h-4 border-2 border-black/40 border-t-black rounded-full animate-spin" /> Rendering Pipeline...</>
+                ) : credits <= 0 ? (
+                  <>💎 Upgrade to Generate</>
+                ) : (
+                  <><Sparkles size={16} /> Generate Now</>
+                )}
+              </button>
+
             </div>
 
           </div>
