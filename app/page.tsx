@@ -124,18 +124,17 @@ export default function HomePage() {
   const [renderETA, setRenderETA] = useState<number | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [videosGenerated] = useState(12847 + Math.floor(Math.random() * 200));
+  const [videosGenerated, setVideosGenerated] = useState(12847);
+  useEffect(() => { setVideosGenerated(12847 + Math.floor(Math.random() * 200)); }, []);
   const [locale, setLocale] = useState<'ar' | 'en'>('en');
 
-  // DETECT LOCALE BY IP
+  // DETECT LOCALE BY BROWSER LANGUAGE (no CORS issues)
   useEffect(() => {
-    fetch('https://ipapi.co/json/')
-      .then(r => r.json())
-      .then(data => {
-        const arabicCountries = ['DZ','SA','EG','MA','TN','IQ','AE','KW','QA','BH','OM','JO','LB','LY','YE','SD','SY','PS','MR','SO','KM','DJ'];
-        if (arabicCountries.includes(data.country_code)) setLocale('ar');
-      })
-      .catch(() => {});
+    const lang = navigator.language || '';
+    const arabicLangs = ['ar', 'ar-DZ', 'ar-SA', 'ar-EG', 'ar-MA', 'ar-TN', 'ar-IQ', 'ar-AE'];
+    if (arabicLangs.some(l => lang.startsWith(l)) || lang.startsWith('ar')) {
+      setLocale('ar');
+    }
   }, []);
 
   // LIVE COUNT — يتغير كل ثانية
@@ -1134,7 +1133,7 @@ export default function HomePage() {
               {/* Social proof */}
               <div className="mx-6 mb-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">
                 <p className="text-[11px] text-emerald-400 font-bold text-center">
-                  🔥 {(7068 + Math.floor(visitors / 2)).toLocaleString()} people have used this offer today!
+                  🔥 7,068+ people have used this offer today!
                 </p>
               </div>
 
