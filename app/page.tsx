@@ -319,7 +319,7 @@ export default function HomePage() {
         className="fixed inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
         style={{ zIndex: 0 }}
       >
-        <source src="/videos/demo.mp4" type="video/mp4" />
+        <source src="/demo/videos/demo.mp4" type="video/mp4" />
       </video>
       {/* overlay داكن */}
       <div className="fixed inset-0 bg-[#030303]/75 pointer-events-none" style={{ zIndex: 1 }} />
