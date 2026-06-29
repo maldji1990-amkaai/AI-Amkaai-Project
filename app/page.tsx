@@ -494,13 +494,18 @@ export default function HomePage() {
 
         <div className="mt-8 flex flex-wrap justify-center gap-4 text-[11px] font-mono text-gray-500">
           <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-red-400 font-bold">LIVE</span>
-            <span className="text-white font-black tabular-nums">{liveCount.toLocaleString()}</span>
-            <span className="text-gray-500">active now</span>
+            <Users size={12} className="text-cyan-400" />
+            <span className="text-white font-black">Join 1,000+ creators</span>
+            <span className="text-gray-500">already generating</span>
           </div>
-          <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl"><Users size={12} className="text-cyan-400" /> {visitors} Industrial Creators Active</div>
-          <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> {online} Cluster Rendering Nodes</div>
+          <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-emerald-400 font-bold">Live GPU Rendering</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
+            <ShieldCheck size={12} className="text-cyan-400" />
+            <span className="text-gray-400">No watermark on Pro</span>
+          </div>
         </div>
 
         {/* ── 4 TOOL BUTTONS ── */}
@@ -590,6 +595,122 @@ export default function HomePage() {
             </div>
           )}
         </motion.div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          HOW IT WORKS — 3 STEPS
+      ═══════════════════════════════════════════════════ */}
+      <section className="relative z-10 mx-auto max-w-5xl px-6 py-20">
+        <div className="text-center mb-12">
+          <p className="text-[11px] font-mono text-cyan-500 uppercase tracking-[0.2em] mb-3">Simple Process</p>
+          <h2 className="text-3xl md:text-4xl font-black text-white">How It Works</h2>
+          <p className="text-gray-500 text-sm mt-3 max-w-xl mx-auto">From prompt to cinematic video in under a minute — no editing skills needed.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+          {/* connector line */}
+          <div className="hidden md:block absolute top-10 left-[16%] right-[16%] h-px bg-gradient-to-r from-cyan-500/20 via-indigo-500/40 to-cyan-500/20" />
+          {[
+            { step: "01", icon: "✍️", title: "Describe Your Vision", desc: "Type a prompt in plain language. Be as detailed or as brief as you like — our AI understands context, style, and emotion.", color: "from-cyan-500/20 to-transparent", border: "border-cyan-500/20", badge: "text-cyan-400" },
+            { step: "02", icon: "⚡", title: "AI Renders Instantly", desc: "Our GPU cluster processes your request in real-time — applying cinematic grading, face-lock, voice synthesis, and motion.", color: "from-indigo-500/20 to-transparent", border: "border-indigo-500/20", badge: "text-indigo-400" },
+            { step: "03", icon: "🎬", title: "Download & Share", desc: "Export in HD, share directly to social media, or embed anywhere. No watermark on Pro plans.", color: "from-purple-500/20 to-transparent", border: "border-purple-500/20", badge: "text-purple-400" },
+          ].map((s) => (
+            <motion.div key={s.step} whileHover={{ y: -4 }} className={`relative rounded-2xl border ${s.border} bg-gradient-to-b ${s.color} p-7 backdrop-blur-md`}>
+              <div className={`text-[11px] font-black font-mono ${s.badge} mb-4 tracking-widest`}>STEP {s.step}</div>
+              <div className="text-3xl mb-4">{s.icon}</div>
+              <h3 className="text-base font-black text-white mb-2">{s.title}</h3>
+              <p className="text-[12px] text-gray-500 leading-relaxed">{s.desc}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          GALLERY — Real Examples
+      ═══════════════════════════════════════════════════ */}
+      <section className="relative z-10 mx-auto max-w-6xl px-6 py-10 pb-20">
+        <div className="text-center mb-10">
+          <p className="text-[11px] font-mono text-cyan-500 uppercase tracking-[0.2em] mb-3">Made with AMKAAI</p>
+          <h2 className="text-3xl md:text-4xl font-black text-white">Real Generations</h2>
+          <p className="text-gray-500 text-sm mt-3">Examples created by our users — no post-editing.</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {AI_GALLERY.map((item) => (
+            <motion.div
+              key={item.id}
+              whileHover={{ scale: 1.03 }}
+              onHoverStart={() => setHoveredGalleryId(item.id)}
+              onHoverEnd={() => setHoveredGalleryId(null)}
+              className="relative rounded-2xl overflow-hidden border border-white/5 aspect-video cursor-pointer group"
+            >
+              <img src={item.url} alt={item.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={(e) => { (e.target as HTMLImageElement).style.display="none"; }} />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+              <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${hoveredGalleryId === item.id ? "opacity-100" : "opacity-0"}`}>
+                <div className="w-10 h-10 rounded-full bg-white/20 border border-white/30 flex items-center justify-center backdrop-blur-md">
+                  <Play size={16} className="text-white ml-0.5" />
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-3">
+                <p className="text-[11px] font-black text-white truncate">{item.label}</p>
+                <p className="text-[9px] text-gray-400 font-mono mt-0.5 truncate">{item.prompt.slice(0, 40)}...</p>
+              </div>
+              <div className="absolute top-2 right-2 text-[9px] bg-black/60 border border-white/10 px-2 py-0.5 rounded-full text-gray-400 font-mono backdrop-blur-sm">{item.type}</div>
+            </motion.div>
+          ))}
+        </div>
+        <div className="text-center mt-8">
+          <button onClick={() => openStudio("ai-video")} className="inline-flex items-center gap-2 px-8 py-3 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-500/30 hover:bg-cyan-500/5 text-sm font-bold text-gray-300 hover:text-white transition">
+            <Sparkles size={14} className="text-cyan-400" /> Create yours now
+          </button>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════
+          COMMUNITY — Discord + Affiliate
+      ═══════════════════════════════════════════════════ */}
+      <section className="relative z-10 mx-auto max-w-5xl px-6 py-10 pb-24">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          {/* Discord */}
+          <motion.div whileHover={{ y: -3 }} className="relative rounded-3xl border border-indigo-500/20 bg-gradient-to-br from-indigo-950/40 to-violet-950/20 p-8 overflow-hidden">
+            <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-2xl" />
+            <div className="text-4xl mb-4">💬</div>
+            <h3 className="text-xl font-black text-white mb-2">Join our Discord</h3>
+            <p className="text-sm text-gray-400 leading-relaxed mb-6">Connect with 500+ creators. Share prompts, get feedback, and stay up to date with new features and model releases.</p>
+            <div className="flex items-center gap-3 mb-6">
+              {["🧑‍💻", "👩‍🎨", "🎬", "🤖", "🌍"].map((e, i) => (
+                <div key={i} className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-sm">{e}</div>
+              ))}
+              <span className="text-[11px] text-gray-500 font-mono">+500 members</span>
+            </div>
+            <a href="https://discord.gg/amkaai" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-black transition shadow-[0_0_24px_rgba(99,102,241,0.3)]">
+              Join Discord →
+            </a>
+          </motion.div>
+
+          {/* Affiliate */}
+          <motion.div whileHover={{ y: -3 }} className="relative rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/40 to-teal-950/20 p-8 overflow-hidden">
+            <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-emerald-500/10 blur-2xl" />
+            <div className="text-4xl mb-4">💸</div>
+            <h3 className="text-xl font-black text-white mb-2">Affiliate Program</h3>
+            <p className="text-sm text-gray-400 leading-relaxed mb-6">Earn <span className="text-emerald-400 font-bold">30% recurring commission</span> for every user you refer. No cap, paid monthly directly to your account.</p>
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {[
+                { val: "30%", label: "Commission" },
+                { val: "90d", label: "Cookie" },
+                { val: "Monthly", label: "Payouts" },
+              ].map(s => (
+                <div key={s.label} className="text-center p-3 rounded-xl border border-white/5 bg-white/[0.02]">
+                  <p className="text-base font-black text-emerald-400">{s.val}</p>
+                  <p className="text-[10px] text-gray-600 font-mono mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+            <a href="mailto:affiliate@amkaai.net" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-black transition shadow-[0_0_24px_rgba(16,185,129,0.3)]">
+              Apply Now →
+            </a>
+          </motion.div>
+
+        </div>
       </section>
 
       {/* 🎛️ STUDIO CONSOLE — يظهر فقط بعد اختيار أداة */}
@@ -1027,6 +1148,66 @@ export default function HomePage() {
         </div>
       </section>
       )} {/* end studioVisible */}
+
+      {/* ════════════════════════════════════
+          FOOTER
+      ════════════════════════════════════ */}
+      <footer className="relative z-10 border-t border-white/5 bg-[#070709]/80 backdrop-blur-md mt-8">
+        <div className="mx-auto max-w-6xl px-6 py-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+            {/* Brand */}
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 text-lg font-black bg-gradient-to-r from-cyan-400 to-indigo-400 bg-clip-text text-transparent mb-3">
+                <Sparkles size={16} className="text-cyan-400" /> AMKAAI
+              </div>
+              <p className="text-[11px] text-gray-600 leading-relaxed max-w-[180px]">The world's most powerful AI cinematic engine — built for creators.</p>
+              <div className="flex items-center gap-3 mt-4">
+                <a href="https://discord.gg/amkaai" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-xl border border-indigo-500/30 bg-indigo-500/10 flex items-center justify-center text-sm hover:bg-indigo-500/20 transition" title="Discord">💬</a>
+                <a href="https://twitter.com/amkaai" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-sm hover:bg-white/10 transition" title="Twitter/X">𝕏</a>
+              </div>
+            </div>
+            {/* Product */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-4 font-mono">Product</p>
+              <div className="space-y-2.5">
+                {["AI Video Generator", "AI Avatar Creator", "Voice Cloning", "Image to Video"].map(l => (
+                  <button key={l} onClick={() => openStudio("ai-video")} className="block text-[12px] text-gray-500 hover:text-white transition text-left">{l}</button>
+                ))}
+              </div>
+            </div>
+            {/* Developers */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-4 font-mono">Developers</p>
+              <div className="space-y-2.5">
+                {[
+                  { label: "API Reference", action: () => setDevModalOpen(true) },
+                  { label: "SDKs & Libraries", action: () => setDevModalOpen(true) },
+                  { label: "Webhooks", action: () => setDevModalOpen(true) },
+                  { label: "Changelog", action: () => {} },
+                ].map(item => (
+                  <button key={item.label} onClick={item.action} className="block text-[12px] text-gray-500 hover:text-white transition text-left">{item.label}</button>
+                ))}
+              </div>
+            </div>
+            {/* Community */}
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-4 font-mono">Community</p>
+              <div className="space-y-2.5">
+                <a href="https://discord.gg/amkaai" target="_blank" rel="noreferrer" className="block text-[12px] text-gray-500 hover:text-indigo-400 transition">Discord Community</a>
+                <a href="mailto:affiliate@amkaai.net" className="block text-[12px] text-gray-500 hover:text-emerald-400 transition">Affiliate Program — 30%</a>
+                <button onClick={() => setPlatformModalOpen(true)} className="block text-[12px] text-gray-500 hover:text-white transition text-left">Enterprise</button>
+                <a href="mailto:hello@amkaai.net" className="block text-[12px] text-gray-500 hover:text-white transition">Contact Us</a>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
+            <p className="text-[10px] text-gray-700 font-mono">© 2025 AMKAAI. All rights reserved.</p>
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-700">
+              <ShieldCheck size={11} className="text-cyan-500/40" /> Secure payments via Lemon Squeezy
+            </div>
+          </div>
+        </div>
+      </footer>
       {/* 📋 TEMPLATE MODAL */}
       <AnimatePresence>
         {templateModalOpen && (
@@ -1311,12 +1492,12 @@ console.log(video.credits); // 12  (remaining credits)`}</pre>
 
                 {/* CTA */}
                 <div className="flex gap-3">
-                  <button className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-500 text-black text-sm font-black hover:opacity-90 transition shadow-[0_0_24px_rgba(6,182,212,0.25)]">
+                  <Link href="/sign-up" onClick={() => setDevModalOpen(false)} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-500 text-black text-sm font-black hover:opacity-90 transition shadow-[0_0_24px_rgba(6,182,212,0.25)] text-center">
                     Get Free API Key →
-                  </button>
-                  <button className="px-6 py-3 rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 text-sm font-bold hover:bg-white/[0.07] transition">
-                    View Docs
-                  </button>
+                  </Link>
+                  <a href="mailto:api@amkaai.net" className="px-6 py-3 rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 text-sm font-bold hover:bg-white/[0.07] transition">
+                    Contact API Team
+                  </a>
                 </div>
               </div>
             </motion.div>
