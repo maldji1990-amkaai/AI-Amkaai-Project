@@ -264,7 +264,21 @@ export default function DashboardPage() {
                         avatarBox: "h-8 w-8 rounded-lg ring-1 ring-white/10"
                       }
                     }}
-                  />
+                  >
+                    <UserButton.MenuItems>
+                      <UserButton.Action
+                        label="My Account & Subscription"
+                        labelIcon={<UserSquare2 size={14} />}
+                        onClick={() => router.push("/dashboard/account")}
+                      />
+                      <UserButton.Action
+                        label="My Videos"
+                        labelIcon={<Video size={14} />}
+                        onClick={() => router.push("/dashboard/videos")}
+                      />
+                    </UserButton.MenuItems>
+                    {/* صفحة الحساب الافتراضية لـ Clerk معطّلة هنا لأننا نستخدم صفحتنا الخاصة بالاشتراك */}
+                  </UserButton>
                   <div className="flex flex-col min-w-0">
                     <span className="text-xs font-bold text-gray-200 truncate">
                       {user?.fullName || user?.username || "Identity Synced"}
