@@ -1,0 +1,1 @@
+INSERT INTO "User" ("id", "clerkId", "email", "plan", "credits", "createdAt", "updatedAt") VALUES (gen_random_uuid(), 'user_3FDouW32V3cZZdhXMMuHgw1cSrg', 'kaouabd2022@gmail.com', 'FREE', 0, NOW(), NOW());

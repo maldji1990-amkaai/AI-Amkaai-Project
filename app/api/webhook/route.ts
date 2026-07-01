@@ -95,7 +95,12 @@ export async function POST(req: Request) {
       }
 
       const creditsToGrant = (PLANS[planName] as any)?.credits || 0;
-      const dbPlan = planName.toUpperCase() as PlanType;
+      const planMap: Record<string, PlanType> = {
+        trial: PlanType.CREATOR,
+        quarterly: PlanType.PRO,
+        biannually: PlanType.PREMIUM,
+      };
+      const dbPlan = planMap[planName] || PlanType.FREE;
       const lemonCustomerId = attributes?.customer_id?.toString() || null;
 
       await db.$transaction([
@@ -126,8 +131,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unknown variant" }, { status: 400 });
     }
 
-    const dbPlan = planName.toUpperCase() as PlanType;
     const creditsToGrant = (PLANS[planName] as any)?.credits || 0;
+    const subPlanMap: Record<string, PlanType> = {
+      trial: PlanType.CREATOR,
+      quarterly: PlanType.PRO,
+      biannually: PlanType.PREMIUM,
+    };
+    const dbPlan = subPlanMap[planName] || PlanType.FREE;
 
     const lemonCustomerId = attributes?.customer_id?.toString() || null;
     const lemonSubscriptionId = body?.data?.id?.toString() || null;
