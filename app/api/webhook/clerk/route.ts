@@ -24,12 +24,11 @@ export async function POST(req: Request) {
     const email = email_addresses?.[0]?.email_address;
 
     await db.user.upsert({
-      where: { id },
+      where: { clerkId: id },
       update: {},
       create: {
-        id,
+        clerkId: id,
         email,
-        name: `${first_name || ""} ${last_name || ""}`.trim() || null,
         plan: "FREE",
         credits: 0,
       },

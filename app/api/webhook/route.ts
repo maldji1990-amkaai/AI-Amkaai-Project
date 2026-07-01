@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 
     // 🔍 البحث عن المستخدم: أولوية لـ Clerk userId ثم fallback للإيميل
     const user = customDataUserId
-      ? await db.user.findUnique({ where: { id: customDataUserId } })
+      ? await db.user.findUnique({ where: { clerkId: customDataUserId } })
       : await db.user.findUnique({ where: { email } });
 
     if (!user) {
