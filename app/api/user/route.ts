@@ -14,7 +14,7 @@ export async function GET() {
   }
 
   const user = await db.user.findUnique({
-    where: { id: userId },
+    where: { clerkId: userId },
   });
 
   return NextResponse.json({
