@@ -1144,7 +1144,7 @@ export default function HomePage() {
         </div>
 
         <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] font-mono text-zinc-600">
-          <ShieldCheck size={12} className="text-cyan-500/60" /> Secure payment gateways layered via Lemon Squeezy Merchant Global Node.
+          <ShieldCheck size={12} className="text-cyan-500/60" /> Secure payment gateways layered via PayPal Merchant Global Node.
         </div>
       </section>
       )} {/* end studioVisible */}
@@ -1203,7 +1203,7 @@ export default function HomePage() {
           <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
             <p className="text-[10px] text-gray-700 font-mono">© 2025 AMKAAI. All rights reserved.</p>
             <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-700">
-              <ShieldCheck size={11} className="text-cyan-500/40" /> Secure payments via Lemon Squeezy
+              <ShieldCheck size={11} className="text-cyan-500/40" /> Secure payments via PayPal
             </div>
           </div>
         </div>

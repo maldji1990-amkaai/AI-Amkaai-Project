@@ -1,15 +1,50 @@
 import { NextResponse } from "next/server";
-import { auth, getAuth } from "@clerk/nextjs/server"; // 👈 استيراد getAuth كحل بديل قوي جداً
+import { auth, getAuth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 
-// ⚡ إجبار Vercel على معاملة هذا المسار كـ Dynamic لمنع الـ Cache
 export const dynamic = "force-dynamic";
+
+// ⚙️ خرائط الخطط إلى PayPal Plan IDs (استبدلها بالقيم الحقيقية من PayPal بعد إنشاء الخطط)
+const PAYPAL_PLAN_IDS: Record<string, string | undefined> = {
+  trial: process.env.PAYPAL_PLAN_ID_TRIAL,
+  quarterly: process.env.PAYPAL_PLAN_ID_QUARTERLY,
+  biannually: process.env.PAYPAL_PLAN_ID_BIANNUALLY,
+};
+
+// 🌍 استخدم api-m.paypal.com للحساب الحقيقي (Live) أو api-m.sandbox.paypal.com للتجربة
+const PAYPAL_API_BASE =
+  process.env.PAYPAL_MODE === "live"
+    ? "https://api-m.paypal.com"
+    : "https://api-m.sandbox.paypal.com";
+
+// 🔑 جلب access token من PayPal
+async function getPayPalAccessToken() {
+  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!;
+  const secret = process.env.PAYPAL_SECRET_KEY!;
+  const basicAuth = Buffer.from(`${clientId}:${secret}`).toString("base64");
+
+  const res = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`PayPal auth failed: ${errText}`);
+  }
+
+  const data = await res.json();
+  return data.access_token as string;
+}
 
 export async function POST(req: Request) {
   try {
     let userId: string | null = null;
 
-    // 🔄 المحاولة الأولى: جلب الـ auth بالطريقة القياسية
     try {
       const authObj = await auth();
       userId = authObj?.userId;
@@ -17,7 +52,6 @@ export async function POST(req: Request) {
       console.warn("Standard auth() failed, trying fallback getAuth(req)...", e);
     }
 
-    // 🔄 المحاولة الثانية: الحل البديل الحاسم أونلاين (يقرأ التوكن مباشرة من ترويسة الطلب الحي)
     if (!userId) {
       try {
         const authObjFallback = getAuth(req as any);
@@ -27,91 +61,105 @@ export async function POST(req: Request) {
       }
     }
 
-    // 🛑 إذا لم يتم العثور على مستخدم مسجل الدخول، نوقف العملية فوراً
     if (!userId) {
       return NextResponse.json(
-        { 
-          error: "Unauthorized", 
-          message: "Clerk can't detect your session. Please clear cookies/cache and try again." 
+        {
+          error: "Unauthorized",
+          message: "Clerk can't detect your session. Please clear cookies/cache and try again.",
         },
         { status: 401 }
       );
     }
 
-    // ... داخل دالة POST بعد قراءة الـ body
-const body = await req.json();
-const plan = body?.plan; // عرفناه مرة واحدة فقط
+    const body = await req.json();
+    const plan = body?.plan;
 
-// 1. التحقق من الخطة
-if (plan !== "trial" && plan !== "quarterly" && plan !== "biannually") {
-  return NextResponse.json(
-    { error: "Invalid plan", message: `Plan received: ${plan}` },
-    { status: 400 }
-  );
-}
-
-// 2. توزيع الروابط (تأكد من استخدام plan مرة واحدة)
-const baseCheckoutUrl =
-  plan === "biannually"
-    ? process.env.LEMON_SQUEEZY_BIANNUALLY_URL
-    : plan === "quarterly"
-    ? process.env.LEMON_SQUEEZY_QUARTERLY_URL
-    : process.env.LEMON_SQUEEZY_TRIAL_URL;
-// ... باقي الكود
-
-    if (!baseCheckoutUrl) {
+    if (plan !== "trial" && plan !== "quarterly" && plan !== "biannually") {
       return NextResponse.json(
-        { 
-          error: "Missing checkout URL", 
-          message: `Environment variables for Lemon Squeezy URLs are missing on the server for plan: ${plan}` 
+        { error: "Invalid plan", message: `Plan received: ${plan}` },
+        { status: 400 }
+      );
+    }
+
+    const paypalPlanId = PAYPAL_PLAN_IDS[plan];
+
+    if (!paypalPlanId) {
+      return NextResponse.json(
+        {
+          error: "Missing PayPal plan ID",
+          message: `Environment variable for PayPal plan is missing for: ${plan}`,
         },
         { status: 500 }
       );
     }
 
-    // 🔍 2. الاعتماد الكلي على قاعدة البيانات لجلب بيانات المستخدم الآمنة
+    // 🔍 جلب بيانات المستخدم من قاعدة البيانات
     let dbUserId = userId;
     let fallbackEmail = "";
 
     try {
       const user = await db.user.findUnique({
-        where: {
-          clerkId: userId,
-        },
+        where: { clerkId: userId },
       });
-      
+
       if (user) {
         dbUserId = user.id;
         fallbackEmail = user.email || "";
       }
     } catch (dbError: any) {
       console.warn("Database lookup failed:", dbError);
-      // لا تجعل خطأ قاعدة البيانات يوقف الدفع، سيستخدم الـ clerkId كبديل طوارئ
     }
 
     ////////////////////////////////////////////////////////////////
-    // 🔗 🚀 هندسة الرابط الديناميكي لـ Lemon Squeezy 
+    // 🔗 🚀 إنشاء الاشتراك عبر PayPal API
     ////////////////////////////////////////////////////////////////
-    const checkoutParams = new URLSearchParams();
-    
-    if (fallbackEmail) {
-      checkoutParams.append("checkout[email]", fallbackEmail);
+    const accessToken = await getPayPalAccessToken();
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.amkaai.net";
+
+    const subscriptionRes = await fetch(`${PAYPAL_API_BASE}/v1/billing/subscriptions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        plan_id: paypalPlanId,
+        subscriber: fallbackEmail ? { email_address: fallbackEmail } : undefined,
+        custom_id: dbUserId,
+        application_context: {
+          brand_name: "AMKAAI",
+          user_action: "SUBSCRIBE_NOW",
+          return_url: `${appUrl}/dashboard?payment=success`,
+          cancel_url: `${appUrl}/pricing?payment=cancelled`,
+        },
+      }),
+    });
+
+    if (!subscriptionRes.ok) {
+      const errText = await subscriptionRes.text();
+      throw new Error(`PayPal subscription creation failed: ${errText}`);
     }
-    
-    const customData = JSON.stringify({ userId: dbUserId, plan });
-    checkoutParams.append("checkout[custom][user_id]", dbUserId);
-    checkoutParams.append("passthrough", customData); 
 
-    const finalCheckoutUrl = `${baseCheckoutUrl}${baseCheckoutUrl.includes("?") ? "&" : "?"}${checkoutParams.toString()}`;
+    const subscriptionData = await subscriptionRes.json();
 
-    // 📊 تسجيل محاولة الدفع المتروكة (محمية بـ try/catch معزول تماماً)
+    // 🔗 رابط الموافقة (approve) هو الذي يفتح نافذة الدفع للمستخدم
+    const approvalLink = subscriptionData.links?.find(
+      (link: any) => link.rel === "approve"
+    )?.href;
+
+    if (!approvalLink) {
+      throw new Error("PayPal approval link not found in response");
+    }
+
+    // 📊 تسجيل محاولة الدفع المتروكة
     try {
       if (fallbackEmail) {
         await db.abandonedCheckout.create({
           data: {
             userId: dbUserId,
             email: fallbackEmail,
-            checkoutUrl: finalCheckoutUrl,
+            checkoutUrl: approvalLink,
             plan,
           },
         });
@@ -121,22 +169,19 @@ const baseCheckoutUrl =
     }
 
     return NextResponse.json({
-      url: finalCheckoutUrl,
+      url: approvalLink,
+      subscriptionId: subscriptionData.id,
     });
-
   } catch (error: any) {
     console.error("CRITICAL CHECKOUT ERROR:", error);
 
-    // 🔬 كاشف الأخطاء الحقيقي أونلاين: سيعيد لك سبب الـ 500 في صفحة المتصفح فوراً!
     return NextResponse.json(
       {
         error: "Internal Server Error (500)",
         message: error?.message || String(error),
-        stack: error?.stack || "No stack trace available"
+        stack: error?.stack || "No stack trace available",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
