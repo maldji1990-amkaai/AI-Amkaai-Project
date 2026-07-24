@@ -1202,8 +1202,16 @@ export default function HomePage() {
           </div>
           <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
             <p className="text-[10px] text-gray-700 font-mono">© 2025 AMKAAI. All rights reserved.</p>
-            <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-700">
-              <ShieldCheck size={11} className="text-cyan-500/40" /> Secure payments via PayPal
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <Link href="/terms" className="text-[10px] text-gray-600 hover:text-gray-400 transition font-mono">Terms</Link>
+                <Link href="/privacy" className="text-[10px] text-gray-600 hover:text-gray-400 transition font-mono">Privacy</Link>
+                <Link href="/refund" className="text-[10px] text-gray-600 hover:text-gray-400 transition font-mono">Refund</Link>
+                <Link href="/contact" className="text-[10px] text-gray-600 hover:text-gray-400 transition font-mono">Contact</Link>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-700">
+                <ShieldCheck size={11} className="text-cyan-500/40" /> Secure payments via PayPal
+              </div>
             </div>
           </div>
         </div>
@@ -1380,7 +1388,10 @@ export default function HomePage() {
                     ? "Billed as $44.97 every 3 months. Cancel anytime through your account settings."
                     : "Billed as $77.94 every 6 months. Cancel anytime through your account settings."
                   }{" "}
-                  By tapping Purchase, you agree to our <span className="underline cursor-pointer">Terms</span>, <span className="underline cursor-pointer">Privacy</span> and <span className="underline cursor-pointer">Refund Policy</span>.
+                  By tapping Purchase, you agree to our{" "}
+                  <Link href="/terms" className="underline cursor-pointer hover:text-white transition">Terms</Link>,{" "}
+                  <Link href="/privacy" className="underline cursor-pointer hover:text-white transition">Privacy</Link> and{" "}
+                  <Link href="/refund" className="underline cursor-pointer hover:text-white transition">Refund Policy</Link>.
                 </p>
               </div>
 
