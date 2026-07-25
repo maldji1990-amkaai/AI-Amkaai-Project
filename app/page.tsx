@@ -301,7 +301,7 @@ export default function HomePage() {
   const studioTabs = [
     { id: "video" as MediaType, title: "AI Video", subtitle: "توليد فيديو ذكي", icon: Video, color: "text-blue-400", bgGlow: "from-blue-500/20", placeholder: "صف موضوع أو مشهد الفيديو السينمائي الذي ترغب في توليده بالتفصيل بواسطة الذكاء الاصطناعي..." },
     { id: "avatar" as MediaType, title: "AI Avatar", subtitle: "شخصية رقمية متحدثة", icon: UserSquare2, color: "text-cyan-400", bgGlow: "from-cyan-500/20", placeholder: "اكتب النص أو السيناريو الكامل الذي ترغب من الشخصية الرقمية (الأفاتار) التحدث به ومحاكاته أمام الكاميرا..." },
-    { id: "voice" as MediaType, title: "AI Voice Cloning & Lip-Sync", subtitle: "استنساخ ومزامنة الصوت حركياً", icon: Mic, color: "text-amber-400", bgGlow: "from-amber-500/20", placeholder: "اكتب هنا النص المراد تحويله لبصمتك الصوتية المستنسخة أو الصوت الجاهز مع ميزة تركيب وحركة الشفايف الاحترافية..." },
+    { id: "voice" as MediaType, title: "AI Voice Generator & Lip-Sync", subtitle: "توليد ومزامنة الصوت حركياً", icon: Mic, color: "text-amber-400", bgGlow: "from-amber-500/20", placeholder: "اكتب هنا النص المراد تحويله لصوتك الاحترافي مع ميزة تركيب وحركة الشفايف الاحترافية..." },
   ];
 
   const currentTabInfo = studioTabs.find(t => t.id === type)!;
@@ -489,7 +489,7 @@ export default function HomePage() {
           <span className="bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">AI Cinematic Orchestration Engine</span>
         </motion.h1>
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mt-6 max-w-3xl text-sm md:text-base text-gray-400 leading-relaxed font-light">
-          Unlock uncompressed latent diffusion chains, multi-layered fluid mechanics, persistent face-lock geometry, and automated AI acoustics inside a single timeline terminal.
+          Unlock uncompressed latent diffusion chains, multi-layered fluid mechanics, advanced AI rendering geometry, and automated AI acoustics inside a single timeline terminal.
         </motion.p>
 
         <div className="mt-8 flex flex-wrap justify-center gap-4 text-[11px] font-mono text-gray-500">
@@ -567,7 +567,7 @@ export default function HomePage() {
               <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-emerald-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
             </motion.button>
 
-            {/* 4 — AI Voice Cloning & Lip-Sync */}
+            {/* 4 — AI AI Voice Generator & Lip-Sync */}
             <motion.button
               whileHover={{ y: -4, scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
@@ -579,8 +579,8 @@ export default function HomePage() {
               </div>
               <div>
                 <p className="text-[13px] font-black text-white leading-tight">AI Voice</p>
-                <p className="text-[13px] font-black text-white leading-tight">Cloning & Lip-Sync</p>
-                <p className="text-[10px] text-gray-500 mt-1 font-mono">Cloning Matrix</p>
+                <p className="text-[13px] font-black text-white leading-tight">Generator & Lip-Sync</p>
+                <p className="text-[10px] text-gray-500 mt-1 font-mono">Voice Matrix</p>
               </div>
               <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-amber-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
             </motion.button>
@@ -611,7 +611,7 @@ export default function HomePage() {
           <div className="hidden md:block absolute top-10 left-[16%] right-[16%] h-px bg-gradient-to-r from-cyan-500/20 via-indigo-500/40 to-cyan-500/20" />
           {[
             { step: "01", icon: "✍️", title: "Describe Your Vision", desc: "Type a prompt in plain language. Be as detailed or as brief as you like — our AI understands context, style, and emotion.", color: "from-cyan-500/20 to-transparent", border: "border-cyan-500/20", badge: "text-cyan-400" },
-            { step: "02", icon: "⚡", title: "AI Renders Instantly", desc: "Our GPU cluster processes your request in real-time — applying cinematic grading, face-lock, voice synthesis, and motion.", color: "from-indigo-500/20 to-transparent", border: "border-indigo-500/20", badge: "text-indigo-400" },
+            { step: "02", icon: "⚡", title: "AI Renders Instantly", desc: "Our GPU cluster processes your request in real-time — applying cinematic grading, AI color science, voice synthesis, and motion.", color: "from-indigo-500/20 to-transparent", border: "border-indigo-500/20", badge: "text-indigo-400" },
             { step: "03", icon: "🎬", title: "Download & Share", desc: "Export in HD, share directly to social media, or embed anywhere. No watermark on Pro plans.", color: "from-purple-500/20 to-transparent", border: "border-purple-500/20", badge: "text-purple-400" },
           ].map((s) => (
             <motion.div key={s.step} whileHover={{ y: -4 }} className={`relative rounded-2xl border ${s.border} bg-gradient-to-b ${s.color} p-7 backdrop-blur-md`}>
@@ -726,7 +726,7 @@ export default function HomePage() {
               {activeStudioTool === "ai-video" && "AI Video Generator"}
               {activeStudioTool === "ai-avatar" && "Create an Avatar"}
               {activeStudioTool === "image-to-avatar" && "Image to Video"}
-              {activeStudioTool === "voice-clone" && "AI Voice Cloning & Lip-Sync"}
+              {activeStudioTool === "voice-clone" && "AI Voice Generator & Lip-Sync"}
             </span>
             <button
               onClick={() => { setStudioVisible(false); setActiveStudioTool(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}
@@ -870,8 +870,8 @@ export default function HomePage() {
                   <button onClick={() => setDashType("voice-clone")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "voice-clone" ? "bg-amber-600/10 border-amber-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
                     <Mic size={14} className={dashType === "voice-clone" ? "text-amber-400" : "text-gray-500"} />
                     <div>
-                      <p className="text-[10px] font-black tracking-tight leading-none">AI Voice Cloning & Lip-Sync</p>
-                      <span className="text-[9px] text-gray-500 font-mono">Cloning Matrix</span>
+                      <p className="text-[10px] font-black tracking-tight leading-none">AI Voice Generator & Lip-Sync</p>
+                      <span className="text-[9px] text-gray-500 font-mono">Voice Matrix</span>
                     </div>
                   </button>
                 </div>
@@ -1122,7 +1122,7 @@ export default function HomePage() {
                   <textarea
                     value={dashInput}
                     onChange={(e) => setDashInput(e.target.value)}
-                    placeholder={scriptMode ? "Paste your full script here — Scene 1: ...\nScene 2: ...\nNarrator: ..." : dashType === "voice-clone" ? "اكتب النص المراد تحويله لبصمتك الصوتية..." : "Describe your production criteria for this pipeline execution..."}
+                    placeholder={scriptMode ? "Paste your full script here — Scene 1: ...\nScene 2: ...\nNarrator: ..." : dashType === "voice-clone" ? "اكتب النص المراد تحويله لصوتك الاحترافي..." : "Describe your production criteria for this pipeline execution..."}
                     rows={scriptMode ? 4 : 2}
                     className="max-h-32 min-h-[40px] flex-1 resize-none bg-transparent px-3 py-1.5 text-xs outline-none text-white placeholder:text-gray-700 font-mono"
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !scriptMode) { e.preventDefault(); executeDash(); } }}
@@ -1170,7 +1170,7 @@ export default function HomePage() {
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-4 font-mono">Product</p>
               <div className="space-y-2.5">
-                {["AI Video Generator", "AI Avatar Creator", "Voice Cloning", "Image to Video"].map(l => (
+                {["AI Video Generator", "AI Avatar Creator", "AI Voice Generator", "Image to Video"].map(l => (
                   <button key={l} onClick={() => openStudio("ai-video")} className="block text-[12px] text-gray-500 hover:text-white transition text-left">{l}</button>
                 ))}
               </div>
@@ -1456,7 +1456,7 @@ export default function HomePage() {
                 </div>
                 <p className="text-sm text-gray-400 mb-7 leading-relaxed max-w-2xl">
                   Integrate the full power of AMKAAI's AI engine directly into your apps and pipelines.
-                  Generate cinematic videos, lifelike avatars, and voice clones at scale — with a single API call.
+                  Generate cinematic videos, lifelike avatars, and AI voices at scale — with a single API call.
                 </p>
 
                 {/* code block */}
@@ -1476,7 +1476,7 @@ const video = await client.video.generate({
   prompt:      "Professional Arabic presenter, studio lighting, 4K",
   aspectRatio: "16:9",
   duration:    10,          // seconds
-  facelock:    true,
+  quality:     "cinematic",
 });
 
 console.log(video.url);    // https://cdn.amkaai.com/v/abc123.mp4
