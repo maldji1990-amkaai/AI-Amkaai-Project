@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth, useClerk } from "@clerk/nextjs";   
 import {
   Sparkles, Video, BarChart3, ArrowRight, Play, ShieldCheck,
-  Flame, Users, HelpCircle, ChevronDown, CheckCircle2, 
+  Flame, HelpCircle, ChevronDown, CheckCircle2, 
   Wand2, Move, AudioLines, Compass, Tv, RefreshCw, UserSquare2, LayoutDashboard, Settings, Mic, Plus,
   ImageIcon, Send, Download, PanelLeft, Layers3, SlidersHorizontal, Bot, User as UserIcon, Columns,
   Share2, Subtitles, FileText, Clock, Palette, BookTemplate, TrendingUp, Copy, Check
@@ -493,11 +493,6 @@ export default function HomePage() {
         </motion.p>
 
         <div className="mt-8 flex flex-wrap justify-center gap-4 text-[11px] font-mono text-gray-500">
-          <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
-            <Users size={12} className="text-cyan-400" />
-            <span className="text-white font-black">Join 1,000+ creators</span>
-            <span className="text-gray-500">already generating</span>
-          </div>
           <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-emerald-400 font-bold">Live GPU Rendering</span>
