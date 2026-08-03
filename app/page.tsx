@@ -1334,7 +1334,7 @@ export default function HomePage() {
                     </div>
                     <span className="text-sm font-bold text-white">3-Day Full Access Trial</span>
                   </div>
-                  <span className="text-sm font-black text-white">$1.99</span>
+                  <span className="text-sm font-black text-white">$0</span>
                 </button>
 
                 {/* Quarterly */}
@@ -1378,7 +1378,7 @@ export default function HomePage() {
               <div className="px-6 mb-5">
                 <p className="text-[10px] text-gray-500 leading-relaxed">
                   {selectedPlan === "trial"
-                    ? "Get a 3-day trial for just $1.99. After the trial, you'll be charged $17.99/month unless you cancel through your account settings."
+                    ? "Get a 3-day trial for just $0. After the trial, you'll be charged $17.99/month unless you cancel through your account settings."
                     : selectedPlan === "quarterly"
                     ? "Billed as $44.97 every 3 months. Cancel anytime through your account settings."
                     : "Billed as $77.94 every 6 months. Cancel anytime through your account settings."
@@ -1394,7 +1394,7 @@ export default function HomePage() {
               <div className="px-6 flex items-center justify-between mb-4">
                 <span className="text-base font-black text-white">Due now</span>
                 <span className="text-base font-black text-white">
-                  {selectedPlan === "trial" ? "$1.99" : selectedPlan === "quarterly" ? "$44.97" : "$77.94"}
+                  {selectedPlan === "trial" ? "$0" : selectedPlan === "quarterly" ? "$44.97" : "$77.94"}
                 </span>
               </div>
 
