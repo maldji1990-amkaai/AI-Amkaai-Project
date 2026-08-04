@@ -67,7 +67,8 @@ export default function HomePage() {
   const [online, setOnline] = useState(34);
   const [liveCount, setLiveCount] = useState(3241);
   const [duration, setDuration] = useState<5 | 10 | 30 | 60>(10);
-  const [watermarkOff, setWatermarkOff] = useState(false);
+  const [isPaidSubscriber, setIsPaidSubscriber] = useState(false); // true once the user is on the paid $17.99/mo plan (after the 3-day trial converts)
+  const watermarkOff = isPaidSubscriber; // watermark is automatically shown during trial, removed once paid
   const [loadingPlan, setLoadingPlan] = useState<PlanType | null>(null);
   const [hoveredGalleryId, setHoveredGalleryId] = useState<number | null>(null);
   
@@ -97,6 +98,7 @@ export default function HomePage() {
   const [dashType, setDashType] = useState<DashMediaType>("ai-video");
   const [dashAspect, setDashAspect] = useState<AspectRatioType>("16:9");
   const [dashCamera, setDashCamera] = useState("static");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [renderQueue, setRenderQueue] = useState<{id:string;prompt:string;progress:number}[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [credits, setCredits] = useState(0);
@@ -163,7 +165,7 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // FETCH REAL CREDITS FROM API
+  // FETCH REAL CREDITS + SUBSCRIPTION STATUS FROM API
   useEffect(() => {
     if (!isSignedIn) return;
     const fetchCredits = async () => {
@@ -173,6 +175,13 @@ export default function HomePage() {
         const data = await res.json();
         if (data?.credits !== undefined) setCredits(data.credits);
         else if (data?.remainingCredits !== undefined) setCredits(data.remainingCredits);
+        // ⚠️ يفترض أن الـ backend يرجع حالة الاشتراك الفعلية (بعد التحقق من بوابة الدفع/الويبهوك)
+        // عدّل اسم الحقل هنا (plan / status / subscriptionStatus) ليطابق استجابة الـ API الحقيقية عندك
+        if (data?.plan === "paid" || data?.subscriptionStatus === "active" || data?.isPaidSubscriber === true) {
+          setIsPaidSubscriber(true);
+        } else {
+          setIsPaidSubscriber(false);
+        }
       } catch (e) {
         console.error("Credits fetch failed:", e);
       }
@@ -822,6 +831,7 @@ export default function HomePage() {
           <div className="flex flex-1 overflow-hidden">
 
             {/* SYNTHESIS CONTROL HUB */}
+            {advancedOpen && (
             <div className="w-72 border-r border-white/5 bg-[#050507] p-5 space-y-5 overflow-y-auto shrink-0">
               
               {/* Toggle sidebar if closed */}
@@ -829,9 +839,12 @@ export default function HomePage() {
                 <button onClick={() => setSidebarOpen(true)} className="mb-2 text-gray-500 hover:text-white transition"><PanelLeft size={14} /></button>
               )}
 
-              <div className="flex items-center gap-1.5 border-b border-white/5 pb-3">
-                <SlidersHorizontal size={13} className="text-cyan-400" />
-                <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Synthesis Control Hub</h2>
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-1.5">
+                  <SlidersHorizontal size={13} className="text-cyan-400" />
+                  <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Synthesis Control Hub</h2>
+                </div>
+                <button onClick={() => setAdvancedOpen(false)} className="text-gray-500 hover:text-white transition text-[10px]">✕</button>
               </div>
 
               {/* AI Generation Engine */}
@@ -966,6 +979,7 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
+            )}
 
             {/* ── CINEMA MONITOR + INPUT ── */}
             <div className="flex-1 flex flex-col bg-black overflow-hidden">
@@ -991,17 +1005,17 @@ export default function HomePage() {
                         </button>
                       ))}
                     </div>
-                    {/* Watermark toggle */}
-                    <button
-                      onClick={() => setWatermarkOff(v => !v)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold border transition ${watermarkOff ? "bg-blue-500/20 border-blue-500/40 text-blue-300" : "bg-white/5 border-white/10 text-gray-500 hover:text-white"}`}
+                    {/* Watermark status — automatic, tied to subscription */}
+                    <div
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold border ${watermarkOff ? "bg-blue-500/20 border-blue-500/40 text-blue-300" : "bg-white/5 border-white/10 text-gray-500"}`}
+                      title={watermarkOff ? "Paid subscribers: watermark removed" : "Trial plan: watermark shown until you upgrade"}
                     >
-                      <span className={`w-3 h-3 rounded-full border transition flex items-center justify-center ${watermarkOff ? "bg-blue-500 border-blue-500" : "border-gray-600"}`}>
+                      <span className={`w-3 h-3 rounded-full border flex items-center justify-center ${watermarkOff ? "bg-blue-500 border-blue-500" : "border-gray-600"}`}>
                         {watermarkOff && <span className="w-1.5 h-1.5 bg-white rounded-full block" />}
                       </span>
                       <span>Watermark {watermarkOff ? "Off" : "On"}</span>
-                      {!watermarkOff && <span className="text-[8px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1 rounded">subscribers only</span>}
-                    </button>
+                      {!watermarkOff && <span className="text-[8px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1 rounded">upgrade to remove</span>}
+                    </div>
                     {/* Live counter */}
                     <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
                       <TrendingUp size={10} /> {videosGenerated.toLocaleString()} videos today

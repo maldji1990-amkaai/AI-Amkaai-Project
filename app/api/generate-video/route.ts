@@ -2,11 +2,20 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { useCredits, refundCredits, markUsageSuccess } from "@/lib/credits";
 import { LIMITS, FEATURES } from "@/lib/config";
+import { getUserPlan } from "@/lib/subscription";
 import Replicate from "replicate";
+import { v2 as cloudinary } from "cloudinary";
 
 // تهيئة محرك اتصال Replicate
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
+});
+
+// تهيئة Cloudinary (نفس الإعدادات المستخدمة في lib/upload.ts)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD!,
+  api_key: process.env.CLOUDINARY_API_KEY!,
+  api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
 export async function POST(req: Request) {
@@ -27,8 +36,11 @@ export async function POST(req: Request) {
 
     // 📦 استقبال وقراءة البيانات القادمة من واجهة المستخدم (الـ Dashboard Control)
     const body = await req.json();
-    const { prompt, aspectRatio, creativity, cameraMotion, userPlan } = body; 
-    // ملاحظة: نقوم باستقبال الـ userPlan (سواء 'trial' أو 'quarterly' أو 'biannually') الممررة من الواجهة أو قاعدة البيانات
+    const { prompt, aspectRatio, creativity, cameraMotion } = body;
+
+    // 🔒 [أمان] نجيب باقة المستخدم الحقيقية من قاعدة البيانات مباشرة — لا نثق أبداً بأي "userPlan" قادم من الفرونت إند،
+    // لأن أي مستخدم يقدر يتلاعب بالـ request عبر أدوات المطور ويدّعي إنه مشترك بباقة أعلى للحصول على جودة/إزالة علامة مائية مجاناً
+    const userPlan = await getUserPlan(userId);
 
     // 🔐 التحقق من قيود الـ Prompt الأمنية المحددة في ملف الـ Config
     if (!prompt || prompt.length < LIMITS.minPromptLength) {
@@ -49,20 +61,21 @@ export async function POST(req: Request) {
       
       let modelIdentifier = "";
       let modelInput: Record<string, any> = {};
+      const normalizedPlanForModel = (userPlan || "").toString().toLowerCase();
 
       // فحص باقة المستخدم لتحديد المحرك والجودة تلقائياً
-      if (userPlan === "biannually") {
-        // ⭐ الباقة الفاخرة: Wan 2.5 بدقة 1080p — جودة عالية بتكلفة نصف Kling
+      if (normalizedPlanForModel === "biannually" || normalizedPlanForModel === "quarterly") {
+        // ⭐ الباقتان الفصلية والنصف سنوية: Wan 2.5 بدقة 1080p — نفس الجودة تقريباً بنفس مستوى السعر
         modelIdentifier = "wan-video/wan-2.5-t2v-14b";
         modelInput = {
           prompt: prompt,
           size: aspectRatio === "1:1" ? "1080*1080" : (aspectRatio === "9:16" ? "1080*1920" : "1920*1080"),
           frame_num: 81,
-          advanced_sampling: true, // جودة أعلى للباقة الفاخرة
+          advanced_sampling: true, // جودة أعلى للباقتين المدفوعتين
           cfg_scale: creativity ? creativity * 10 : 7.5,
         };
       } else {
-        // 💰 باقة التجربة والربع سنوية: Wan 2.5 بدقة 720p لأعلى هامش ربح
+        // 💰 باقة التجربة فقط: Wan 2.5 بدقة 720p لأعلى هامش ربح
         modelIdentifier = "wan-video/wan-2.5-t2v-14b";
         modelInput = {
           prompt: prompt,
@@ -85,7 +98,40 @@ export async function POST(req: Request) {
       }
 
       // استخراج الرابط الحقيقي والنهائي لملف الـ MP4 الناتج عن المعالجة الذكية
-      const finalVideoUrl = Array.isArray(output) ? output[0] : output;
+      const rawVideoUrl = Array.isArray(output) ? output[0] : output;
+
+      // 💧 [علامة مائية] فقط لمستخدمي التجربة المجانية (trial) — نص "AMKAAI.NET" مدمج داخل الفيديو نفسه عبر Cloudinary
+      // حتى لا يستطيع المستخدم تحميل نسخة نظيفة بدون علامة قبل الاشتراك المدفوع
+      let finalVideoUrl = rawVideoUrl;
+
+      if (normalizedPlanForModel === "trial" || normalizedPlanForModel === "free") {
+        try {
+          const watermarked = await cloudinary.uploader.upload(rawVideoUrl, {
+            resource_type: "video",
+            folder: "generated-trial",
+            transformation: [
+              {
+                overlay: {
+                  font_family: "Arial",
+                  font_size: 36,
+                  font_weight: "bold",
+                  text: "AMKAAI.NET",
+                },
+                gravity: "south_east",
+                x: 24,
+                y: 24,
+                color: "white",
+                opacity: 75,
+              },
+            ],
+          });
+          finalVideoUrl = watermarked.secure_url;
+        } catch (watermarkError) {
+          // إذا فشلت إضافة العلامة المائية لأي سبب، لا نوقف العملية بالكامل، فقط نسجل الخطأ
+          // (يفضّل مراجعة هذا لاحقاً بدل تسليم فيديو trial بدون علامة بالخطأ)
+          console.error("🔥 Watermark overlay failed:", watermarkError);
+        }
+      }
 
       // 🎯 تثبيت نجاح العملية في قاعدة البيانات وتحويل حالة الـ Usage من PENDING إلى COMPLETED لخصم النقاط بثبات
       await markUsageSuccess(referenceId);
