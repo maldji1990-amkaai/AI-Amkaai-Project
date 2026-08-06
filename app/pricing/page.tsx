@@ -6,15 +6,17 @@ import { useState, useEffect } from "react";
 const PLANS = {
   trial: {
     id: "trial",
+    // ✅ مصحح: التجربة $0 فعلياً (كانت خطأً $1.99 - كانت ستُخصم فوراً من كل مستخدم عند بدء التجربة!)
     name: "3-Day Full Access",
-    priceMain: "$1.99",
+    priceMain: "$0",
     priceSub: "for 3 days",
-    dueNowText: "$1.99",
-    usd: 1.99, usdt: 1.99, dzd: 400,
+    dueNowText: "$0",
+    usd: 0, usdt: 0, dzd: 0,
     quality: "720p HD Quality",
     badge: "",
-    isPremium: false, // ◄ تمت إضافة هذه الخاصية للحل
-    terms: "Get a 3-day trial for just $1.99 with 30 credits and 720p access. After the trial, you'll be charged $17.99/month unless you cancel through your account settings.",
+    isPremium: false,
+    comingSoon: false,
+    terms: "Get a 3-day trial for free with 30 credits and 720p access. A payment card is required to start — after the trial, you'll be automatically charged $17.99/month unless you cancel through your account settings.",
   },
   quarterly: {
     id: "quarterly",
@@ -25,7 +27,8 @@ const PLANS = {
     usd: 44.97, usdt: 44.97, dzd: 9000,
     quality: "720p HD Quality",
     badge: "Most Popular",
-    isPremium: false, // ◄ تمت إضافة هذه الخاصية للحل
+    isPremium: false,
+    comingSoon: false,
     terms: "You will be charged a quarterly subscription of $44.97 every 3 months with 720p HD access (equivalent to $14.99/month). Cancel anytime.",
   },
   biannually: {
@@ -38,11 +41,28 @@ const PLANS = {
     quality: "1080p Full HD Cinematic",
     badge: "Ultra Quality",
     isPremium: true,
+    comingSoon: false,
     terms: "You will be charged a semi-annual subscription of $77.94 every 6 months (equivalent to $12.99/month). Unlocks exclusive 1080p Full HD Cinematic generation.",
+  },
+  // 🆕 باقة Business - أُضيفت في القائمة لكن بحالة "قريباً" (comingSoon: true) حتى يُحدَّد
+  // السعر النهائي فعلياً في lib/config.ts و PlanConfig وPayPal. لا يجب تفعيل الشراء الفعلي
+  // بسعر $0 عن طريق الخطأ - غيّر comingSoon إلى false فقط بعد ضبط السعر والـ PAYPAL_PLAN_ID_BUSINESS.
+  business: {
+    id: "business",
+    name: "🚀 Business Elite",
+    priceMain: "TBD",
+    priceSub: "coming soon",
+    dueNowText: "—",
+    usd: 0, usdt: 0, dzd: 0,
+    quality: "1080p + up to 2min videos",
+    badge: "Coming Soon",
+    isPremium: true,
+    comingSoon: true,
+    terms: "Business plan pricing will be announced soon. Includes 1080p resolution, videos up to 2 minutes long, top queue priority, and the largest credit allowance.",
   },
 };
 
-type PlanKey = "trial" | "quarterly" | "biannually";
+type PlanKey = "trial" | "quarterly" | "biannually" | "business";
 
 export default function PricingPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("trial");
@@ -67,6 +87,12 @@ export default function PricingPage() {
   }, []);
 
   const goToCheckout = async (plan: PlanKey) => {
+    // 🛡️ صمام أمان: يمنع محاولة شراء باقة "قريباً" حتى لو حدث خطأ في الواجهة
+    if (PLANS[plan].comingSoon) {
+      setError("This plan isn't available for purchase yet. Please check back soon.");
+      return;
+    }
+
     try {
       setLoadingCheckout(true);
       setError(null);
@@ -126,6 +152,8 @@ export default function PricingPage() {
                 key={key}
                 onClick={() => setSelectedPlan(key)}
                 className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all duration-200 ${
+                  item.comingSoon ? "opacity-60" : ""
+                } ${
                   isSelected
                     ? "border-[#3b82f6] bg-[#0b1528] shadow-[inset_0_0_0_1px_#3b82f6]"
                     : "border-[#232326] bg-[#141416] hover:border-neutral-700"
@@ -137,18 +165,20 @@ export default function PricingPage() {
                   }`}>
                     {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                   </div>
-                  
+
                   <div className="flex flex-col gap-1">
                     <span className="text-[16px] font-bold text-white">{item.name}</span>
                     <span className={`text-[11px] px-2 py-0.5 rounded font-medium w-fit transition-colors ${
-                      item.isPremium 
-                        ? "bg-emerald-500/10 text-emerald-400" 
+                      item.isPremium
+                        ? "bg-emerald-500/10 text-emerald-400"
                         : isSelected ? "bg-sky-500/10 text-sky-400" : "bg-[#232326] text-neutral-400"
                     }`}>
                       {item.quality}
                     </span>
                     {item.badge && (
-                      <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full w-fit mt-0.5">
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full w-fit mt-0.5 ${
+                        item.comingSoon ? "bg-neutral-700 text-neutral-300" : "bg-emerald-100 text-emerald-800"
+                      }`}>
                         {item.badge}
                       </span>
                     )}
@@ -184,37 +214,43 @@ export default function PricingPage() {
         <div className="flex flex-col gap-3">
           <button
             onClick={() => goToCheckout(selectedPlan)}
-            disabled={loadingCheckout}
+            disabled={loadingCheckout || currentPlanData.comingSoon}
             className="w-full bg-[#2563eb] text-white py-3.5 rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg text-[15px] disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loadingCheckout ? "Processing secure network..." : "💳 Credit or debit card"}
+            {currentPlanData.comingSoon
+              ? "Coming Soon"
+              : loadingCheckout
+              ? "Processing secure network..."
+              : "💳 Credit or debit card"}
           </button>
 
-          <button 
+          <button
             onClick={() => goToCheckout(selectedPlan)}
-            disabled={loadingCheckout}
-            className="w-full bg-[#ffc439] text-[#003087] py-3.5 rounded-xl font-bold italic text-lg hover:opacity-90 transition-all flex items-center justify-center"
+            disabled={loadingCheckout || currentPlanData.comingSoon}
+            className="w-full bg-[#ffc439] text-[#003087] py-3.5 rounded-xl font-bold italic text-lg hover:opacity-90 transition-all flex items-center justify-center disabled:opacity-50"
           >
             PayPal
           </button>
 
-          <button 
+          <button
             onClick={() => goToCheckout(selectedPlan)}
-            disabled={loadingCheckout}
-            className="w-full bg-white text-black py-3.5 rounded-xl font-bold hover:bg-neutral-200 transition-all flex items-center justify-center gap-2 text-[15px]"
+            disabled={loadingCheckout || currentPlanData.comingSoon}
+            className="w-full bg-white text-black py-3.5 rounded-xl font-bold hover:bg-neutral-200 transition-all flex items-center justify-center gap-2 text-[15px] disabled:opacity-50"
           >
             G Pay
           </button>
 
-          <button
-            onClick={() => setShowManualTransfer(!showManualTransfer)}
-            className="w-full bg-neutral-900 border border-neutral-800 text-neutral-400 py-3 rounded-xl font-semibold text-xs uppercase tracking-wider hover:text-white transition-all mt-2"
-          >
-            {showManualTransfer ? "▲ Hide Local Payments" : "▼ Use USDT or BaridiMob"}
-          </button>
+          {!currentPlanData.comingSoon && (
+            <button
+              onClick={() => setShowManualTransfer(!showManualTransfer)}
+              className="w-full bg-neutral-900 border border-neutral-800 text-neutral-400 py-3 rounded-xl font-semibold text-xs uppercase tracking-wider hover:text-white transition-all mt-2"
+            >
+              {showManualTransfer ? "▲ Hide Local Payments" : "▼ Use USDT or BaridiMob"}
+            </button>
+          )}
         </div>
 
-        {showManualTransfer && (
+        {showManualTransfer && !currentPlanData.comingSoon && (
           <div className="mt-4 p-4 rounded-2xl bg-[#141416] border border-[#232326] flex flex-col gap-4 animate-fade-in">
             <p className="text-[11px] font-bold text-amber-400 uppercase tracking-widest text-center">
               Equivalent Local Total: {(currentPlanData.dzd).toLocaleString()} DZD

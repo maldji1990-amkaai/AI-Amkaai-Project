@@ -11,6 +11,7 @@ export async function GET() {
     const user = await db.user.findUnique({
       where: { clerkId },
       select: {
+        id: true, // 🆕 أُضيف هنا لتفادي استعلام مكرر أدناه لجلب نفس المستخدم مرة ثانية
         plan: true,
         credits: true,
         createdAt: true,
@@ -19,14 +20,14 @@ export async function GET() {
     });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    // نجلب أحدث Subscription record للحصول على status و currentPeriodEnd
+    // ✅ مصحح: نستخدم user.id المتوفر بالفعل بدل استعلام findUnique إضافي مكرر
     const latestSub = await db.subscription.findFirst({
-      where: { userId: (await db.user.findUnique({ where: { clerkId } }))!.id },
+      where: { userId: user.id },
       orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json({
-      plan: user.plan,
+      plan: user.plan, // ✅ يعمل تلقائياً وصحيحاً مع enum الجديد (TRIAL/MONTHLY/QUARTERLY/BIANNUALLY/BUSINESS)
       credits: user.credits,
       createdAt: latestSub?.createdAt ?? user.createdAt,
       status: latestSub?.status ?? null,

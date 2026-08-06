@@ -8,22 +8,30 @@ import {
   CheckCircle2, AlertCircle, Zap, Loader2, ExternalLink,
 } from "lucide-react";
 
-type PlanType = "FREE" | "CREATOR" | "PRO" | "PREMIUM";
+// ✅ مصحح: يطابق الآن enum PlanType الجديد في prisma/schema.prisma بالضبط
+// (TRIAL بدل FREE، وأُضيفت MONTHLY وBUSINESS، وحُذفت CREATOR/PRO/PREMIUM القديمة)
+type PlanType = "TRIAL" | "MONTHLY" | "QUARTERLY" | "BIANNUALLY" | "BUSINESS";
 
 interface SubscriptionInfo {
   plan: PlanType;
-  status: string | null;          // "active" | "cancelled" | "expired" | null (FREE)
+  status: string | null;          // "active" | "cancelled" | "expired" | null (TRIAL بدون اشتراك بعد)
   credits: number;
   currentPeriodEnd: string | null;
   createdAt: string | null;
   lemonSubscriptionId: string | null;
 }
 
+// ⚠️ ملاحظة: هذه القيم (monthlyCredits) عرضية فقط للتصميم، والمصدر الحقيقي للنقاط
+// هو جدول PlanConfig في قاعدة البيانات (عبر lib/plan-config.ts). إذا عدّلت النقاط
+// من لوحة app/admin/plans، يجب تحديث هذه الأرقام هنا يدوياً أيضاً حتى تبقى متطابقة
+// بصرياً - أو الأفضل لاحقاً: اجعل هذه الصفحة تجلب القيم من /api/admin/plans مباشرة
+// (أو endpoint عام مكافئ) بدل تكرارها يدوياً في مكانين مختلفين.
 const PLAN_CONFIG: Record<PlanType, { label: string; color: string; gradient: string; monthlyCredits: number }> = {
-  FREE:    { label: "Free Plan",    color: "text-gray-400",    gradient: "from-gray-500 to-gray-600",      monthlyCredits: 10  },
-  CREATOR: { label: "Creator Plan", color: "text-cyan-400",    gradient: "from-cyan-500 to-teal-500",      monthlyCredits: 200 },
-  PRO:     { label: "Pro Plan",     color: "text-indigo-400",  gradient: "from-indigo-500 to-purple-500",  monthlyCredits: 500 },
-  PREMIUM: { label: "Premium Plan", color: "text-amber-400",   gradient: "from-amber-500 to-orange-500",   monthlyCredits: 1500 },
+  TRIAL:      { label: "3-Day Trial",       color: "text-gray-400",   gradient: "from-gray-500 to-gray-600",     monthlyCredits: 30   },
+  MONTHLY:    { label: "Monthly Plan",      color: "text-cyan-400",   gradient: "from-cyan-500 to-teal-500",     monthlyCredits: 100  },
+  QUARTERLY:  { label: "Quarterly Saver",   color: "text-indigo-400", gradient: "from-indigo-500 to-purple-500", monthlyCredits: 300  },
+  BIANNUALLY: { label: "6 Months Cinematic", color: "text-amber-400", gradient: "from-amber-500 to-orange-500",  monthlyCredits: 900  },
+  BUSINESS:   { label: "Business",          color: "text-fuchsia-400", gradient: "from-fuchsia-500 to-pink-500", monthlyCredits: 2000 },
 };
 
 function daysLeft(dateIso: string | null): number | null {
@@ -71,11 +79,14 @@ export default function MyAccountPage() {
     }
   };
 
-  const plan = sub?.plan || "FREE";
+  // ✅ مصحح: القيمة الافتراضية أصبحت "TRIAL" بدل "FREE"
+  const plan = sub?.plan || "TRIAL";
   const cfg = PLAN_CONFIG[plan];
   const remaining = daysLeft(sub?.currentPeriodEnd ?? null);
   const isActive = sub?.status === "active";
   const isCancelled = sub?.status === "cancelled";
+  // ✅ جديد: التمييز بين "لم يشترك بعد إطلاقاً" و "في فترة التجربة النشطة فعلياً"
+  const isTrialNotStarted = plan === "TRIAL" && !sub?.status;
 
   return (
     <div className="min-h-screen bg-[#030305] text-white font-sans">
@@ -130,13 +141,13 @@ export default function MyAccountPage() {
                     <div>
                       <p className={`text-lg font-black ${cfg.color}`}>{cfg.label}</p>
                       <p className="text-[11px] text-gray-500 font-mono">
-                        {plan === "FREE" ? "No active subscription" : `Subscribed since ${formatDate(sub?.createdAt ?? null)}`}
+                        {isTrialNotStarted ? "No active subscription" : `Subscribed since ${formatDate(sub?.createdAt ?? null)}`}
                       </p>
                     </div>
                   </div>
 
                   {/* Status badge */}
-                  {plan !== "FREE" && (
+                  {!isTrialNotStarted && (
                     <span className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${
                       isActive ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
                       : isCancelled ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
@@ -148,19 +159,19 @@ export default function MyAccountPage() {
                   )}
                 </div>
 
-                {plan === "FREE" ? (
-                  /* ── حالة الخطة المجانية ── */
+                {isTrialNotStarted ? (
+                  /* ── حالة: مسجّل لكن لم يبدأ اشتراكه/تجربته بعد ── */
                   <div className="space-y-4">
                     <p className="text-sm text-gray-400">
-                      You're currently on the Free plan with limited credits. Upgrade to unlock more AI generations every month.
+                      You haven't started your free trial yet. Start now to get 30 credits and 3 days of full access.
                     </p>
                     <Link href="/#pricing"
                       className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 text-black font-black text-sm hover:opacity-90 transition">
-                      <Zap size={14} /> Upgrade Plan
+                      <Zap size={14} /> Start Free Trial
                     </Link>
                   </div>
                 ) : (
-                  /* ── حالة الاشتراك النشط ── */
+                  /* ── حالة الاشتراك النشط (شامل فترة التجربة الفعلية) ── */
                   <div className="space-y-4">
                     {/* Renewal info */}
                     <div className="grid grid-cols-2 gap-3">
@@ -189,6 +200,16 @@ export default function MyAccountPage() {
                             style={{ width: `${Math.min(100, Math.max(4, (remaining / 30) * 100))}%` }}
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {plan === "TRIAL" && isActive && (
+                      <div className="flex items-start gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3">
+                        <AlertCircle size={14} className="text-cyan-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-cyan-300 leading-relaxed">
+                          You're in your 3-day free trial. Your card will be charged automatically
+                          and you'll move to the Monthly plan when the trial ends.
+                        </p>
                       </div>
                     )}
 
