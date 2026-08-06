@@ -18,6 +18,16 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
+// 🆕 مدة الفيديو بالثواني حسب الباقة (تُستخدم لحساب النقاط المستهلكة بدقة عبر useCredits)
+// ⚠️ قيم مؤقتة قابلة للتعديل لاحقاً من لوحة الإدارة
+const PLAN_VIDEO_DURATION: Record<string, number> = {
+  trial: 5,
+  monthly: 8,
+  quarterly: 8,
+  biannually: 10,
+  business: 120, // حتى دقيقتين كما هو مخطط
+};
+
 export async function POST(req: Request) {
   // 1. إنشاء معرف فريد للعملية لتتبع الاستهلاك والـ Refund تلقائياً
   const referenceId = `vid_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -38,9 +48,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { prompt, aspectRatio, creativity, cameraMotion } = body;
 
-    // 🔒 [أمان] نجيب باقة المستخدم الحقيقية من قاعدة البيانات مباشرة — لا نثق أبداً بأي "userPlan" قادم من الفرونت إند،
-    // لأن أي مستخدم يقدر يتلاعب بالـ request عبر أدوات المطور ويدّعي إنه مشترك بباقة أعلى للحصول على جودة/إزالة علامة مائية مجاناً
+    // 🔒 [أمان] نجيب باقة المستخدم الحقيقية من قاعدة البيانات مباشرة — لا نثق أبداً بأي "userPlan" قادم من الفرونت إند
     const userPlan = await getUserPlan(userId);
+    const normalizedPlanForModel = (userPlan || "").toString().toLowerCase();
 
     // 🔐 التحقق من قيود الـ Prompt الأمنية المحددة في ملف الـ Config
     if (!prompt || prompt.length < LIMITS.minPromptLength) {
@@ -50,61 +60,86 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Prompt too long. Maximum ${LIMITS.maxPromptLength} characters.` }, { status: 400 });
     }
 
-    // 🛡️ محاولة حجز النقاط وفحص اشتراك Lemon Squeezy
-    const creditResult = await useCredits(userId, "video", { reference: referenceId });
+    // 🆕 تحديد مدة الفيديو المستحقة لهذه الباقة، لتُخصم النقاط بدقة (خصوصاً لباقة Business بمدة أطول بكثير)
+    const durationForThisPlan = PLAN_VIDEO_DURATION[normalizedPlanForModel] ?? PLAN_VIDEO_DURATION.trial;
+
+    // 🛡️ محاولة حجز النقاط وفحص اشتراك PayPal — الآن مع تمرير duration الصحيح حسب الباقة
+    const creditResult = await useCredits(userId, "video", {
+      reference: referenceId,
+      duration: durationForThisPlan,
+    });
 
     try {
-      
       //////////////////////////////////////////////////////////////////
       // 🎬 إعداد نظام النماذج الذكي والديناميكي لحماية الهامش الربحي لـ Amkaai
       //////////////////////////////////////////////////////////////////
-      
+
       let modelIdentifier = "";
       let modelInput: Record<string, any> = {};
-      const normalizedPlanForModel = (userPlan || "").toString().toLowerCase();
 
-      // فحص باقة المستخدم لتحديد المحرك والجودة تلقائياً
-      if (normalizedPlanForModel === "biannually" || normalizedPlanForModel === "quarterly") {
-        // ⭐ الباقتان الفصلية والنصف سنوية: Wan 2.5 بدقة 1080p — نفس الجودة تقريباً بنفس مستوى السعر
-        modelIdentifier = "wan-video/wan-2.5-t2v-14b";
+      // 🆕 نظام الموديل الهجين (Hybrid):
+      // - الباقات ذات الجودة 1080p (business/biannually/quarterly) → wan-2.5-t2v العادي
+      //   (الموديل الوحيد الذي يدعم 1080p فعلياً على Replicate حتى الآن)
+      // - الباقات ذات الجودة 720p (trial/monthly) → wan-2.5-t2v-fast
+      //   أرخص وأسرع، بدون أي فرق ملموس بالجودة عند 720p تحديداً
+      const HIGH_RES_MODEL = "wan-video/wan-2.5-t2v-14b";
+      const FAST_MODEL = "wan-video/wan-2.5-t2v-fast";
+
+      if (normalizedPlanForModel === "business") {
+        // 🆕 أقوى باقة: 1080p + حتى دقيقتين + أعلى جودة sampling
+        modelIdentifier = HIGH_RES_MODEL;
+        modelInput = {
+          prompt: prompt,
+          size: aspectRatio === "1:1" ? "1080*1080" : (aspectRatio === "9:16" ? "1080*1920" : "1920*1080"),
+          frame_num: 81, // ⚠️ TODO: قد يحتاج تعديل فعلي حسب حدود الموديل لدعم مدة دقيقتين كاملة — يُراجع مع Replicate docs
+          advanced_sampling: true,
+          cfg_scale: creativity ? creativity * 10 : 7.5,
+        };
+      } else if (normalizedPlanForModel === "biannually" || normalizedPlanForModel === "quarterly") {
+        // ⭐ الباقتان الفصلية والنصف سنوية: 1080p
+        modelIdentifier = HIGH_RES_MODEL;
         modelInput = {
           prompt: prompt,
           size: aspectRatio === "1:1" ? "1080*1080" : (aspectRatio === "9:16" ? "1080*1920" : "1920*1080"),
           frame_num: 81,
-          advanced_sampling: true, // جودة أعلى للباقتين المدفوعتين
+          advanced_sampling: true,
           cfg_scale: creativity ? creativity * 10 : 7.5,
         };
-      } else {
-        // 💰 باقة التجربة فقط: Wan 2.5 بدقة 720p لأعلى هامش ربح
-        modelIdentifier = "wan-video/wan-2.5-t2v-14b";
+      } else if (normalizedPlanForModel === "monthly") {
+        // 🆕 باقة Monthly: 720p بدون علامة مائية، عبر الموديل السريع/الأرخص
+        modelIdentifier = FAST_MODEL;
         modelInput = {
           prompt: prompt,
           size: aspectRatio === "1:1" ? "720*720" : (aspectRatio === "9:16" ? "720*1280" : "1280*720"),
           frame_num: 81,
-          advanced_sampling: false,
+        };
+      } else {
+        // 💰 باقة التجربة (trial): 720p عبر الموديل السريع/الأرخص لأعلى هامش ربح + علامة مائية لاحقاً
+        modelIdentifier = FAST_MODEL;
+        modelInput = {
+          prompt: prompt,
+          size: aspectRatio === "1:1" ? "720*720" : (aspectRatio === "9:16" ? "720*1280" : "1280*720"),
+          frame_num: 81,
         };
       }
 
-      // 💥 استدعاء سيرفر الذكاء الاصطناعي الفعلي باستخدام نظام التوليد الموحد والمضمون لـ Replicate
-      // قمنا باستبدال التنبؤ المفرط بالدالة المباشرة لتفادي مشاكل الـ version hash المتقلبة
+      // 💥 استدعاء سيرفر الذكاء الاصطناعي الفعلي
       const output = await replicate.run(
         modelIdentifier as `${string}/${string}`,
         { input: modelInput }
       );
 
-      // في حال فشل معالجة الفيديو بداخل خوادم السيرفر الخارجي، نرفع خطأ لتشغيل الـ Refund فوراً
       if (!output) {
         throw new Error("AI_SERVER_RENDER_FAILED");
       }
 
-      // استخراج الرابط الحقيقي والنهائي لملف الـ MP4 الناتج عن المعالجة الذكية
       const rawVideoUrl = Array.isArray(output) ? output[0] : output;
 
-      // 💧 [علامة مائية] فقط لمستخدمي التجربة المجانية (trial) — نص "AMKAAI.NET" مدمج داخل الفيديو نفسه عبر Cloudinary
-      // حتى لا يستطيع المستخدم تحميل نسخة نظيفة بدون علامة قبل الاشتراك المدفوع
+      // 💧 [علامة مائية] فقط لمستخدمي التجربة (trial) - شفافية 40% - نص "AMKAAI" عمودي
+      // ✅ مصحح: أُزيل شرط "free" لأن FREE لم تعد قيمة موجودة في enum (TRIAL و FREE أصبحتا باقة واحدة)
       let finalVideoUrl = rawVideoUrl;
 
-      if (normalizedPlanForModel === "trial" || normalizedPlanForModel === "free") {
+      if (normalizedPlanForModel === "trial") {
         try {
           const watermarked = await cloudinary.uploader.upload(rawVideoUrl, {
             resource_type: "video",
@@ -117,43 +152,39 @@ export async function POST(req: Request) {
                   font_weight: "bold",
                   text: "AMKAAI.NET",
                 },
-                gravity: "south_east",
+                gravity: "east",
                 x: 24,
-                y: 24,
+                angle: -90,
                 color: "white",
-                opacity: 75,
+                opacity: 40,
               },
             ],
           });
           finalVideoUrl = watermarked.secure_url;
         } catch (watermarkError) {
-          // إذا فشلت إضافة العلامة المائية لأي سبب، لا نوقف العملية بالكامل، فقط نسجل الخطأ
-          // (يفضّل مراجعة هذا لاحقاً بدل تسليم فيديو trial بدون علامة بالخطأ)
           console.error("🔥 Watermark overlay failed:", watermarkError);
         }
       }
 
-      // 🎯 تثبيت نجاح العملية في قاعدة البيانات وتحويل حالة الـ Usage من PENDING إلى COMPLETED لخصم النقاط بثبات
+      // 🎯 تثبيت نجاح العملية في قاعدة البيانات
       await markUsageSuccess(referenceId);
 
       return NextResponse.json({
         success: true,
-        videoUrl: finalVideoUrl, // الرابط الفعلي القابل للتشغيل والتحميل في الفرونت إند
+        videoUrl: finalVideoUrl,
         remainingCredits: creditResult.remainingCredits,
       });
 
     } catch (aiError) {
-      // 💸 [صمام أمان] إذا فشل سيرفر الـ AI الخارجي أو قطع الاتصال، يتم استرجاع نقاط المستخدم فوراً تلقائياً دون خسارة العميل
       console.error("🔥 AI Generation Call Failed, triggering automatic credit refund:", aiError);
       await refundCredits(referenceId);
-      
+
       return NextResponse.json({ error: "Failed to communicate with AI generation engine. Your credits have been securely refunded." }, { status: 502 });
     }
 
   } catch (error: any) {
     console.error("🔥 GENERATE VIDEO ROUTE ERROR:", error);
 
-    // معالجة الأخطاء القادمة من دالة useCredits لمنح واجهة المستخدم رسالة واضحة
     if (error.message === "SUBSCRIPTION_EXPIRED_OR_INACTIVE") {
       return NextResponse.json({ error: "Your subscription has expired or is past due. Please check your billing dashboard." }, { status: 403 });
     }

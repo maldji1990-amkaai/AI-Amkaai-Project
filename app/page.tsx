@@ -1005,17 +1005,17 @@ export default function HomePage() {
                         </button>
                       ))}
                     </div>
-                    {/* Watermark status — automatic, tied to subscription */}
-                    <div
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold border ${watermarkOff ? "bg-blue-500/20 border-blue-500/40 text-blue-300" : "bg-white/5 border-white/10 text-gray-500"}`}
-                      title={watermarkOff ? "Paid subscribers: watermark removed" : "Trial plan: watermark shown until you upgrade"}
-                    >
-                      <span className={`w-3 h-3 rounded-full border flex items-center justify-center ${watermarkOff ? "bg-blue-500 border-blue-500" : "border-gray-600"}`}>
-                        {watermarkOff && <span className="w-1.5 h-1.5 bg-white rounded-full block" />}
-                      </span>
-                      <span>Watermark {watermarkOff ? "Off" : "On"}</span>
-                      {!watermarkOff && <span className="text-[8px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1 rounded">upgrade to remove</span>}
-                    </div>
+                    {/* Watermark status — shown only during the trial, hidden once the user is a paid subscriber */}
+                    {!isPaidSubscriber && (
+                      <div
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold border bg-white/5 border-white/10 text-gray-500"
+                        title="Trial plan: watermark shown until you upgrade"
+                      >
+                        <span className="w-3 h-3 rounded-full border border-gray-600 flex items-center justify-center" />
+                        <span>Watermark On</span>
+                        <span className="text-[8px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1 rounded">upgrade to remove</span>
+                      </div>
+                    )}
                     {/* Live counter */}
                     <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
                       <TrendingUp size={10} /> {videosGenerated.toLocaleString()} videos today

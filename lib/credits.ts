@@ -14,7 +14,7 @@ type UseCreditsOptions = {
 };
 
 //////////////////////////////////////////////////
-// 🚀 USE CREDITS (SAFE + ATOMIC + LEMON SQUEEZY SHIELD)
+// 🚀 USE CREDITS (SAFE + ATOMIC + SUBSCRIPTION SHIELD)
 //////////////////////////////////////////////////
 
 export async function useCredits(
@@ -31,27 +31,30 @@ export async function useCredits(
 
   // 🌟 حساب التكلفة الفعلية: إذا كان الطلب فيديو، نضرب التكلفة الأساسية في عدد الثواني
   // أما لو كانت صور أو صوت، فستظل التكلفة ثابتة كما هي محددة في ملف الـ config
-  const cost = type === "video" && options?.duration 
-    ? baseCost * options.duration 
+  const cost = type === "video" && options?.duration
+    ? baseCost * options.duration
     : baseCost;
 
   const reference = options?.reference ?? null;
 
   // تشغيل المعاملة الآمنة لضمان تنفيذ كل الخطوات أو إلغائها معاً (Atomicity)
   const result = await db.$transaction(async (tx) => {
-    
+
     //////////////////////////////////////////////////
-    // 🛡️ LEMON SQUEEZY SUBSCRIPTION CHECK
+    // 🛡️ SUBSCRIPTION CHECK (PayPal-backed)
     //////////////////////////////////////////////////
+    // ✅ مصحح: أُزيلت حالة "on_trial" لأنها مصطلح خاص بـ Lemon Squeezy وغير موجودة
+    // في نظام الدفع الفعلي المستخدم حالياً (PayPal). خلال الأيام الثلاثة الأولى (Trial)،
+    // يرسل PayPal حالة الاشتراك كـ "active" مباشرة (لا يوجد status منفصل لفترة التجربة)،
+    // لذلك "active" وحدها كافية لتغطية كل الحالات الصحيحة: trial ومدفوعة.
     const subscription = await tx.subscription.findFirst({
       where: { userId },
-      select: { status: true }, 
+      select: { status: true },
     }) as any;
 
     if (subscription) {
-      // الحالات المسموح لها بالتوليد فقط في Lemon Squeezy
-      const allowedStatuses = ["active", "on_trial"];
-      
+      const allowedStatuses = ["active"];
+
       if (!allowedStatuses.includes(subscription.status)) {
         throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
       }
@@ -95,9 +98,9 @@ export async function useCredits(
         userId,
         type,
         cost, // حفظ التكلفة الفعلية المستهلكة في السجل برقمها الدقيق
-        status: UsageStatus.PENDING, 
+        status: UsageStatus.PENDING,
         refunded: false,
-        referenceId: reference, 
+        referenceId: reference,
       },
     });
 
@@ -175,7 +178,7 @@ export async function refundCredits(reference: string) {
       where: { id: usage.id },
       data: {
         refunded: true,
-        status: UsageStatus.FAILED, 
+        status: UsageStatus.FAILED,
       },
     });
 

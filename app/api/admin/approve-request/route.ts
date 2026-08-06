@@ -1,11 +1,23 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { PlanType } from "@prisma/client";
+import { PLANS, ConfigPlanType } from "@/lib/config";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
+    //////////////////////////////////////////////////
+    // 🔐 [إصلاح حرج] هذا الـ route كان بدون أي حماية إطلاقاً — أي زائر يقدر
+    // يفعّل أي طلب دفع بدون أن يدفع فلساً واحداً. الآن محمي بنفس نمط الأدمن
+    // المستخدم في باقي مسارات app/api/admin.
+    //////////////////////////////////////////////////
+    const adminCheck = await requireAdmin();
+    if (!adminCheck.ok) {
+      return NextResponse.json({ error: adminCheck.error }, { status: adminCheck.status });
+    }
+
     //////////////////////////////////////////////////
     // 📥 INPUT SAFE PARSING
     //////////////////////////////////////////////////
@@ -65,17 +77,30 @@ export async function POST(req: Request) {
     //////////////////////////////////////////////////
     // 💰 CREDIT & PLAN CALCULATION
     //////////////////////////////////////////////////
-    const PLAN_CREDITS: Record<string, number> = {
-      FREE: 10,
-      PRO: 100,
-      PREMIUM: 300,
+    // ✅ مصحح: خريطة الباقات القديمة (FREE/PRO/PREMIUM) كانت مكسورة تماماً مع enum
+    // الجديد ولا تحتوي حتى على MONTHLY أو BUSINESS. الآن نقرأ القيم مباشرة من
+    // lib/config.ts (مصدر الحقيقة الوحيد لعدد نقاط كل باقة) بدل تكرارها هنا يدوياً.
+    const planKeyLower = payment.plan.toLowerCase() as ConfigPlanType;
+    const isValidPlanKey = planKeyLower in PLANS;
+
+    if (!isValidPlanKey) {
+      return NextResponse.json(
+        { error: `Unknown plan "${payment.plan}" on this payment record` },
+        { status: 400 }
+      );
+    }
+
+    const creditsToAdd = PLANS[planKeyLower].credits;
+
+    // تحويل مفتاح الباقة الصغير (trial/monthly/...) إلى قيمة enum الفعلية بقاعدة البيانات
+    const PLAN_KEY_TO_ENUM: Record<ConfigPlanType, PlanType> = {
+      trial: PlanType.TRIAL,
+      monthly: PlanType.MONTHLY,
+      quarterly: PlanType.QUARTERLY,
+      biannually: PlanType.BIANNUALLY,
+      business: PlanType.BUSINESS,
     };
-
-    const creditsToAdd = PLAN_CREDITS[payment.plan.toUpperCase()] ?? 10;
-
-    let targetPlan: PlanType = PlanType.FREE;
-    if (payment.plan.toUpperCase() === "PRO") targetPlan = PlanType.PRO;
-    if (payment.plan.toUpperCase() === "PREMIUM") targetPlan = PlanType.PREMIUM;
+    const targetPlan: PlanType = PLAN_KEY_TO_ENUM[planKeyLower];
 
     //////////////////////////////////////////////////
     // 💾 TRANSACTION (ATOMIC + SAFE)
@@ -105,6 +130,9 @@ export async function POST(req: Request) {
         data: {
           plan: targetPlan,
           credits: { increment: creditsToAdd },
+          // 🆕 دفعة يدوية مُوافَق عليها = ليست trial بالتعريف، نُلغي أي أثر لفترة تجربة سابقة
+          trialStartedAt: null,
+          trialEndsAt: null,
         },
       });
 
@@ -113,7 +141,7 @@ export async function POST(req: Request) {
         data: {
           userId: user.id,
           plan: targetPlan,
-          status: "ACTIVE",
+          status: "active",
           currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },
       });

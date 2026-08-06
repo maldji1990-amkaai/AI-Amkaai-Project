@@ -13,10 +13,12 @@ model User {
   email               String?             @unique
   /// ///////////////////////////////////////////////
   /// ///////////////////////////////////////////////
-  plan                PlanType            @default(FREE)
+  plan                PlanType            @default(TRIAL)
   credits             Int                 @default(0)
   lemonCustomerId     String?
   lemonSubscriptionId String?
+  trialStartedAt      DateTime?
+  trialEndsAt         DateTime?
   /// ///////////////////////////////////////////////
   /// ///////////////////////////////////////////////
   createdAt           DateTime            @default(now())
@@ -35,6 +37,37 @@ model User {
 
   @@index([clerkId])
   @@index([email])
+}
+
+// 🆕 جدول إعدادات الباقات الديناميكي — المصدر الوحيد للحقيقة الذي تتحكم به لوحة الإدارة
+// بدلاً من القيم المكتوبة يدوياً في lib/config.ts. كل صف يمثل باقة واحدة (trial/monthly/...)
+// ويمكن تعديل أي حقل من لوحة app/admin/plans بدون لمس الكود أو إعادة النشر.
+model PlanConfig {
+  id                 String   @id @default(cuid())
+  planKey            String   @unique // "trial" | "monthly" | "quarterly" | "biannually" | "business"
+  name               String
+  credits            Int // عدد النقاط الممنوحة عند الاشتراك/التجديد
+  price              Float // السعر بالدولار
+  isPro              Boolean  @default(true) // كل شيء عدا trial = true
+
+  // ⚙️ إعدادات توليد الفيديو
+  resolution         String // "720p" | "1080p"
+  maxDurationSeconds Int      @default(5) // مدة الفيديو بالثواني، تُستخدم لحساب النقاط المستهلكة (pay-per-second)
+  aiModel            String // معرّف موديل Replicate الكامل، مثال: "wan-video/wan-2.5-t2v-fast"
+  advancedSampling   Boolean  @default(false) // جودة sampling أعلى (للباقات 1080p فقط عادة)
+
+  // 💧 العلامة المائية
+  watermarkEnabled   Boolean  @default(false)
+  watermarkOpacity   Int      @default(40) // نسبة الشفافية 0-100
+  watermarkText      String   @default("AMKAAI.NET")
+
+  // 🚀 أولوية الطابور (تُستخدم لاحقاً عند تفعيل نظام VideoJob + Queue الكامل)
+  priority           Int      @default(0)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([planKey])
 }
 
 model Subscription {
@@ -237,10 +270,11 @@ model WebhookEvent {
 }
 
 enum PlanType {
-  FREE
-  CREATOR
-  PRO
-  PREMIUM
+  TRIAL
+  MONTHLY
+  QUARTERLY
+  BIANNUALLY
+  BUSINESS
 }
 
 enum JobStatus {

@@ -1,22 +1,13 @@
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(req: Request) {
   try {
-    // 🔒 Admin check
-    const { userId } = await await auth(); // ✅ FIX
-    const user = await currentUser();
-
-    if (!userId || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const userEmail = user.emailAddresses[0]?.emailAddress;
-
-    if (userEmail !== adminEmail) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // 🔒 Admin check — ✅ موحّد الآن عبر lib/admin-auth.ts (كان فيه خطأ "await await" سابقاً)
+    const adminCheck = await requireAdmin();
+    if (!adminCheck.ok) {
+      return NextResponse.json({ error: adminCheck.error }, { status: adminCheck.status });
     }
 
     // 📥 Body
@@ -39,7 +30,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Already rejected" }, { status: 400 });
     }
 
-    if (payment.status === "APPROVED") {
+    if (payment.status === "COMPLETED") {
       return NextResponse.json({ error: "Already approved" }, { status: 400 });
     }
 
@@ -50,7 +41,7 @@ export async function POST(req: Request) {
         where: { id: paymentId },
         data: {
           status: "REJECTED",
-          rejectedBy: userEmail || "admin",
+          rejectedBy: adminCheck.email || "admin",
           rejectReason: reason || "No reason provided",
           updatedAt: new Date(),
         },
@@ -73,7 +64,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       status: result.status,
-      rejectedBy: userEmail,
+      rejectedBy: adminCheck.email,
     });
 
   } catch (error) {

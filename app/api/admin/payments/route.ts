@@ -1,26 +1,17 @@
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     //////////////////////////////////////////////////
-    // 🔐 حماية المسار والتأكد من هوية المشرف
+    // 🔐 حماية المسار والتأكد من هوية المشرف (موحّد الآن عبر lib/admin-auth.ts)
     //////////////////////////////////////////////////
-    const { userId } = await auth(); // ✅ إصلاح: إزالة الـ await المزدوجة المسببة للأخطاء
-    const user = await currentUser();
-
-    if (!userId || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const userEmail = user.emailAddresses[0]?.emailAddress;
-
-    if (!adminEmail || userEmail !== adminEmail) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const adminCheck = await requireAdmin();
+    if (!adminCheck.ok) {
+      return NextResponse.json({ error: adminCheck.error }, { status: adminCheck.status });
     }
 
     //////////////////////////////////////////////////
@@ -28,7 +19,7 @@ export async function GET() {
     //////////////////////////////////////////////////
     const payments = await db.manualPayment.findMany({
       where: {
-        status: "PENDING", // 👈 ميزة إضافية: جلب الطلبات المعلقة فقط لتسريع وتحسين أداء اللوحة الحية
+        status: "PENDING",
       },
       orderBy: { createdAt: "desc" },
       include: {
@@ -50,7 +41,7 @@ export async function GET() {
       plan: p.plan,
       amount: p.amount,
       status: p.status,
-      method: p.method, // 👈 تمرير طريقة الدفع (baridimob أو crypto) لتعرضها البطاقة أونلاين
+      method: p.method,
       createdAt: p.createdAt,
     }));
 

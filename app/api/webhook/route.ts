@@ -12,11 +12,14 @@ const PAYPAL_API_BASE =
     : "https://api-m.sandbox.paypal.com";
 
 // ⚙️ خريطة عكسية: من PayPal Plan ID إلى اسم الخطة الداخلي في موقعك
-function getPlanFromPayPalPlanId(planId: string | undefined | null): "trial" | "quarterly" | "biannually" | null {
+function getPlanFromPayPalPlanId(
+  planId: string | undefined | null
+): "trial" | "quarterly" | "biannually" | "business" | null {
   if (!planId) return null;
   if (planId === process.env.PAYPAL_PLAN_ID_TRIAL) return "trial";
   if (planId === process.env.PAYPAL_PLAN_ID_QUARTERLY) return "quarterly";
   if (planId === process.env.PAYPAL_PLAN_ID_BIANNUALLY) return "biannually";
+  if (planId === process.env.PAYPAL_PLAN_ID_BUSINESS) return "business";
   return null;
 }
 
@@ -85,6 +88,22 @@ const ALLOWED_EVENTS = new Set([
   "PAYMENT.SALE.COMPLETED",
 ]);
 
+// 🆕 خريطة الحالة الأولى: عند أول تفعيل اشتراك (بداية Trial أو بداية باقة مدفوعة مباشرة)
+const PLAN_MAP_ON_ACTIVATE: Record<string, PlanType> = {
+  trial: PlanType.TRIAL,
+  quarterly: PlanType.QUARTERLY,
+  biannually: PlanType.BIANNUALLY,
+  business: PlanType.BUSINESS,
+};
+
+// 🆕 خريطة حالة الدفع الفعلي: أول خصم حقيقي بعد انتهاء الـ 3 أيام يحوّل trial إلى monthly تلقائياً
+const PLAN_MAP_ON_PAYMENT: Record<string, PlanType> = {
+  trial: PlanType.MONTHLY, // 🔑 هذا هو التحويل التلقائي المطلوب بعد 3 أيام
+  quarterly: PlanType.QUARTERLY,
+  biannually: PlanType.BIANNUALLY,
+  business: PlanType.BUSINESS,
+};
+
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
@@ -136,8 +155,8 @@ export async function POST(req: Request) {
 
     // 🔍 البحث عن المستخدم: أولوية لمعرف قاعدة البيانات ثم fallback للإيميل
     const user = customDataUserId
-      ? await db.user.findUnique({ where: { id: customDataUserId } }).catch(() => null) ||
-        await db.user.findUnique({ where: { clerkId: customDataUserId } })
+      ? (await db.user.findUnique({ where: { id: customDataUserId } }).catch(() => null)) ||
+        (await db.user.findUnique({ where: { clerkId: customDataUserId } }))
       : await db.user.findUnique({ where: { email } });
 
     if (!user) {
@@ -157,14 +176,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unknown plan" }, { status: 400 });
     }
 
-    const creditsToGrant = (PLANS[planName] as any)?.credits || 0;
-    const subPlanMap: Record<string, PlanType> = {
-      trial: PlanType.CREATOR,
-      quarterly: PlanType.PRO,
-      biannually: PlanType.PREMIUM,
-    };
-    const dbPlan = subPlanMap[planName] || PlanType.FREE;
-
     const paypalSubscriptionId: string | undefined = resource?.id;
     const subscriptionStatus: string | undefined = resource?.status?.toLowerCase();
     const paypalCustomerId: string | undefined =
@@ -179,12 +190,27 @@ export async function POST(req: Request) {
 
     // الحالة الأولى: تفعيل اشتراك جديد لأول مرة (شحن رصيد الباقة المشتراة)
     if (eventName === "BILLING.SUBSCRIPTION.ACTIVATED") {
+      const dbPlan = PLAN_MAP_ON_ACTIVATE[planName] || PlanType.TRIAL;
+      const isTrial = planName === "trial";
+      const creditsToGrant = (PLANS[planName] as any)?.credits || 0;
+
       await db.$transaction([
         db.user.update({
           where: { id: user.id },
           data: {
             plan: dbPlan,
             credits: { increment: creditsToGrant },
+            // 🆕 عند بداية Trial: نضبط تاريخ البداية والنهاية (3 أيام بالضبط)
+            // عند بداية أي باقة مدفوعة مباشرة (بدون المرور بـ trial): لا يوجد تاريخ trial
+            ...(isTrial
+              ? {
+                  trialStartedAt: new Date(),
+                  trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+                }
+              : {
+                  trialStartedAt: null,
+                  trialEndsAt: null,
+                }),
             ...(paypalCustomerId ? { lemonCustomerId: paypalCustomerId } : {}),
             ...(paypalSubscriptionId ? { lemonSubscriptionId: paypalSubscriptionId } : {}),
           },
@@ -211,26 +237,36 @@ export async function POST(req: Request) {
       console.log(`✅ ${user.email} Subscribed to ${dbPlan} (+${creditsToGrant} credits)`);
     }
 
-    // الحالة الثانية: نجاح دفعة تجديد تلقائي
+    // الحالة الثانية: نجاح دفعة (أول دفعة حقيقية بعد trial، أو تجديد دوري لباقة مدفوعة)
     else if (eventName === "PAYMENT.SALE.COMPLETED") {
+      const dbPlan = PLAN_MAP_ON_PAYMENT[planName] || PlanType.MONTHLY;
+      // 🔑 إذا كانت planName === "trial"، فهذه أول دفعة حقيقية (0$ لا تُرسل PAYMENT.SALE.COMPLETED من PayPal)
+      // لذلك نمنح نقاط باقة MONTHLY وليس نقاط trial
+      const creditsToGrant =
+        planName === "trial" ? (PLANS.monthly as any)?.credits || 0 : (PLANS[planName] as any)?.credits || 0;
+
       await db.$transaction([
         db.user.update({
           where: { id: user.id },
           data: {
             plan: dbPlan,
             credits: { increment: creditsToGrant },
+            // 🆕 إلغاء أي أثر لفترة التجربة نهائياً بعد أول خصم حقيقي
+            trialStartedAt: null,
+            trialEndsAt: null,
           },
         }),
         db.subscription.updateMany({
           where: { userId: user.id },
           data: {
             status: "active",
+            plan: dbPlan,
             ...(nextBillingTime ? { currentPeriodEnd: nextBillingTime } : {}),
           },
         }),
         db.webhookEvent.create({ data: { eventId: idempotencyKey } }),
       ]);
-      console.log(`🔄 ${user.email} Subscription renewed for ${dbPlan} (+${creditsToGrant} credits)`);
+      console.log(`🔄 ${user.email} Subscription payment completed -> ${dbPlan} (+${creditsToGrant} credits)`);
     }
 
     // الحالة الثالثة: تحديث حالة الاشتراك أو إلغاؤه/انتهاؤه/تعليقه
@@ -250,22 +286,27 @@ export async function POST(req: Request) {
             ...(nextBillingTime ? { currentPeriodEnd: nextBillingTime } : {}),
           },
         }),
-        ...(isEnded ? [
-          db.user.update({
-            where: { id: user.id },
-            data: {
-              plan: PlanType.FREE,
-              credits: 0,
-            },
-          }),
-        ] : []),
+        // ✅ مصحح: لم تعد FREE موجودة في enum — عند انتهاء/إلغاء الاشتراك نعيد المستخدم إلى TRIAL
+        // (بدون منحه نقاط تجربة جديدة، فقط لضمان عدم بقائه على باقة مدفوعة وهمياً)
+        ...(isEnded
+          ? [
+              db.user.update({
+                where: { id: user.id },
+                data: {
+                  plan: PlanType.TRIAL,
+                  credits: 0,
+                  trialStartedAt: null,
+                  trialEndsAt: null,
+                },
+              }),
+            ]
+          : []),
         db.webhookEvent.create({ data: { eventId: idempotencyKey } }),
       ]);
       console.log(`ℹ️ ${user.email} Subscription updated status to: ${subscriptionStatus}. Is Ended: ${isEnded}`);
     }
 
     return NextResponse.json({ success: true });
-
   } catch (error: any) {
     console.error("🔥 WEBHOOK ERROR:", error);
     return NextResponse.json(
