@@ -4,38 +4,28 @@ import { db } from "@/lib/db";
 
 export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
-
-    if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
-
+    const { userId: clerkId } = await auth();
+    if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await db.user.findUnique({ where: { clerkId: clerkId }, select: { id: true } });
+    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
     const body = await req.json();
-
-    const { plan, method, amount, currency, screenshot } = body;
-
-    if (!plan || !method || !amount) {
-      return new NextResponse("Missing fields", { status: 400 });
-    }
-
-    await db.manualPayment.create({
+    const amount = Number(body?.amount);
+    if (!body?.plan || !body?.method || !Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: "Missing or invalid fields" }, { status: 400 });
+    if (typeof body.screenshot === "string" && body.screenshot.length > 12_000_000) return NextResponse.json({ error: "Screenshot too large" }, { status: 413 });
+    const payment = await db.manualPayment.create({
       data: {
-        userId,
-        plan,
-        method,
+        userId: user.id,
+        plan: String(body.plan).toUpperCase(),
+        method: String(body.method).toLowerCase(),
         amount,
-        currency: currency || "DZD",
-        screenshotUrl: screenshot || null,
+        currency: String(body.currency || "DZD").toUpperCase(),
+        screenshotUrl: typeof body.screenshot === "string" ? body.screenshot : null,
+        status: "PENDING",
       },
     });
-
-    return NextResponse.json({
-      success: true,
-      message: "Payment uploaded successfully",
-    });
-
+    return NextResponse.json({ success: true, paymentId: payment.id });
   } catch (error) {
-    console.error("UPLOAD PAYMENT ERROR:", error);
-    return new NextResponse("Server error", { status: 500 });
+    console.error("UPLOAD PAYMENT ERROR", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

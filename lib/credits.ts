@@ -1,122 +1,74 @@
-// lib/credits.ts
-
 import { db } from "@/lib/db";
 import { AI_COSTS, AIType } from "@/lib/config";
 import { UsageStatus } from "@prisma/client";
 
-//////////////////////////////////////////////////
-// 🧠 TYPES & OPTIONS
-//////////////////////////////////////////////////
+type UseCreditsOptions = { reference?: string; duration?: number };
 
-type UseCreditsOptions = {
-  reference?: string;
-  duration?: number; // 🌟 معامل المدة بالثواني الممرر ديناميكياً للفيديو من الـ Route
-};
-
-//////////////////////////////////////////////////
-// 🚀 USE CREDITS (SAFE + ATOMIC + SUBSCRIPTION SHIELD)
-//////////////////////////////////////////////////
-
-export async function useCredits(
-  userId: string,
-  type: AIType,
-  options?: UseCreditsOptions
-) {
-  // 1. جلب التكلفة الأساسية للعملية من الإعدادات
+export async function useCredits(userId: string, type: AIType, options?: UseCreditsOptions) {
   const baseCost = AI_COSTS[type];
+  if (!baseCost) throw new Error("Invalid AI type");
 
-  if (!baseCost) {
-    throw new Error("Invalid AI type");
-  }
-
-  // 🌟 حساب التكلفة الفعلية: إذا كان الطلب فيديو، نضرب التكلفة الأساسية في عدد الثواني
-  // أما لو كانت صور أو صوت، فستظل التكلفة ثابتة كما هي محددة في ملف الـ config
   const cost = type === "video" && options?.duration
-    ? baseCost * options.duration
+    ? baseCost * Math.max(1, Math.ceil(options.duration))
     : baseCost;
-
   const reference = options?.reference ?? null;
 
-  // تشغيل المعاملة الآمنة لضمان تنفيذ كل الخطوات أو إلغائها معاً (Atomicity)
   const result = await db.$transaction(async (tx) => {
+    if (reference) {
+      const existing = await tx.usage.findUnique({ where: { referenceId: reference } });
+      if (existing) {
+        if (existing.userId !== userId) throw new Error("IDEMPOTENCY_KEY_REUSED");
+        const existingUser = await tx.user.findUnique({ where: { id: userId }, select: { credits: true } });
+        return { usage: existing, credits: existingUser?.credits ?? 0 };
+      }
+    }
 
-    //////////////////////////////////////////////////
-    // 🛡️ SUBSCRIPTION CHECK (PayPal-backed)
-    //////////////////////////////////////////////////
-    // ✅ مصحح: أُزيلت حالة "on_trial" لأنها مصطلح خاص بـ Lemon Squeezy وغير موجودة
-    // في نظام الدفع الفعلي المستخدم حالياً (PayPal). خلال الأيام الثلاثة الأولى (Trial)،
-    // يرسل PayPal حالة الاشتراك كـ "active" مباشرة (لا يوجد status منفصل لفترة التجربة)،
-    // لذلك "active" وحدها كافية لتغطية كل الحالات الصحيحة: trial ومدفوعة.
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { credits: true, plan: true, trialEndsAt: true },
+    });
+    if (!user) throw new Error("USER_NOT_FOUND");
+
     const subscription = await tx.subscription.findFirst({
       where: { userId },
-      select: { status: true },
-    }) as any;
-
-    if (subscription) {
-      const allowedStatuses = ["active"];
-
-      if (!allowedStatuses.includes(subscription.status)) {
-        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
-      }
-
-      // فحص إضافي آمن وديناميكي لتاريخ انتهاء الصلاحية المكتوب في جداول قاعدة البيانات
-      const subscriptionEndsAt = subscription.endsAt || subscription.expiresAt || null;
-      if (subscriptionEndsAt && new Date() > new Date(subscriptionEndsAt)) {
-        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
-      }
-    }
-
-    //////////////////////////////////////////////////
-    // 💸 DEDUCT CREDITS SAFELY (ANTI-RACE CONDITION)
-    //////////////////////////////////////////////////
-    // الخصم الحصين يتم فقط إذا كان رصيد المستخدم أكبر من أو يساوي التكلفة الفعلية المحسوبة
-    const update = await tx.user.updateMany({
-      where: {
-        id: userId,
-        credits: {
-          gte: cost,
-        },
-      },
-      data: {
-        credits: {
-          decrement: cost,
-        },
-      },
+      orderBy: { updatedAt: "desc" },
+      select: { status: true, currentPeriodEnd: true },
     });
 
-    // إذا كانت النتيجة 0، فهذا يعني أن نقاط المستخدم لا تكفي التكلفة المحسوبة
-    if (update.count === 0) {
-      throw new Error("NOT_ENOUGH_CREDITS");
+    const now = Date.now();
+    const isTrial = user.plan === "TRIAL";
+    if (isTrial) {
+      if (user.trialEndsAt && now > user.trialEndsAt.getTime()) {
+        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
+      }
+    } else if (subscription) {
+      if (subscription.status.toLowerCase() !== "active") {
+        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
+      }
+      if (subscription.currentPeriodEnd && now > subscription.currentPeriodEnd.getTime()) {
+        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
+      }
     }
 
-    //////////////////////////////////////////////////
-    // 📊 USAGE LOG (RECORD INITIALIZATION)
-    //////////////////////////////////////////////////
-    // إنشاء سجل الاستهلاك وتثبيت حالتها كـ PENDING لحين انتهاء معالجة السيرفرات بالخارج
+    const update = await tx.user.updateMany({
+      where: { id: userId, credits: { gte: cost } },
+      data: { credits: { decrement: cost } },
+    });
+    if (update.count === 0) throw new Error("NOT_ENOUGH_CREDITS");
+
     const usage = await tx.usage.create({
       data: {
         userId,
         type,
-        cost, // حفظ التكلفة الفعلية المستهلكة في السجل برقمها الدقيق
+        cost,
         status: UsageStatus.PENDING,
         refunded: false,
         referenceId: reference,
       },
     });
 
-    //////////////////////////////////////////////////
-    // 🔍 UTILITY: GET EXACT BALANCE
-    //////////////////////////////////////////////////
-    // جلب الرصيد الدقيق المتبقي لحساب المستخدم بعد الخصم الآمن
-    const user = await tx.user.findUnique({
-      where: { id: userId },
-      select: { credits: true },
-    });
-
-    return {
-      usage,
-      credits: user?.credits ?? 0,
-    };
+    const balance = await tx.user.findUnique({ where: { id: userId }, select: { credits: true } });
+    return { usage, credits: balance?.credits ?? 0 };
   });
 
   return {
@@ -128,102 +80,38 @@ export async function useCredits(
   };
 }
 
-//////////////////////////////////////////////////
-// ✅ MARK SUCCESS (PROD COMPLETED)
-//////////////////////////////////////////////////
-
 export async function markUsageSuccess(reference: string) {
   if (!reference) return;
-
   await db.usage.updateMany({
-    where: {
-      referenceId: reference,
-      status: UsageStatus.PENDING,
-    },
-    data: {
-      status: UsageStatus.COMPLETED,
-    },
+    where: { referenceId: reference, status: UsageStatus.PENDING },
+    data: { status: UsageStatus.COMPLETED },
   });
 }
-
-//////////////////////////////////////////////////
-// 💸 REFUND SYSTEM (SECURED AGAINST DOUBLE REFUNDS)
-//////////////////////////////////////////////////
 
 export async function refundCredits(reference: string) {
-  if (!reference) {
-    throw new Error("Missing reference for refund");
-  }
-
-  return await db.$transaction(async (tx) => {
-    // جلب سجل الاستهلاك بناءً على المعرّف الفريد للعملية
-    const usage = await tx.usage.findFirst({
-      where: { referenceId: reference },
-    });
-
-    if (!usage) {
-      throw new Error("Usage not found");
+  if (!reference) throw new Error("Missing reference for refund");
+  return db.$transaction(async (tx) => {
+    const usage = await tx.usage.findUnique({ where: { referenceId: reference } });
+    if (!usage) throw new Error("Usage not found");
+    if (usage.refunded || usage.status === UsageStatus.FAILED || usage.status === UsageStatus.REFUNDED) {
+      return { skipped: true, message: "Credits already refunded" };
     }
-
-    // صمام أمان لمنع عمليات استرجاع النقاط المتكررة لنفس الـ API Call
-    if (usage.refunded || usage.status === UsageStatus.FAILED) {
-      return { skipped: true, message: "Credits already refunded or usage failed" };
-    }
-
-    //////////////////////////////////////////////////
-    // 🔒 LOCK USAGE STATE FIRST
-    //////////////////////////////////////////////////
-    // تغيير حالة السجل إلى فاشل ومسترجع أولاً لقطع الطريق على أي عملية تداخل برمجية متزامنة
     await tx.usage.update({
       where: { id: usage.id },
-      data: {
-        refunded: true,
-        status: UsageStatus.FAILED,
-      },
+      data: { refunded: true, status: UsageStatus.REFUNDED },
     });
-
-    //////////////////////////////////////////////////
-    // 💸 INCREMENT USER CREDITS
-    //////////////////////////////////////////////////
-    // إعادة النقاط الفعلية كاملةً إلى حساب المستخدم لتأمين حقوقه في حال فشل السيرفر الخارجي
-    await tx.user.update({
-      where: { id: usage.userId },
-      data: {
-        credits: {
-          increment: usage.cost,
-        },
-      },
-    });
-
-    return {
-      success: true,
-      refundedCredits: usage.cost,
-    };
+    await tx.user.update({ where: { id: usage.userId }, data: { credits: { increment: usage.cost } } });
+    return { success: true, refundedCredits: usage.cost };
   });
 }
 
-//////////////////////////////////////////////////
-// 🔍 UTILITY HELPERS
-//////////////////////////////////////////////////
-
 export async function getUserCredits(userId: string) {
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: { credits: true },
-  });
-
+  const user = await db.user.findUnique({ where: { id: userId }, select: { credits: true } });
   if (!user) throw new Error("User not found");
-
   return user.credits;
 }
 
 export async function addCredits(userId: string, amount: number) {
-  return await db.user.update({
-    where: { id: userId },
-    data: {
-      credits: {
-        increment: amount,
-      },
-    },
-  });
+  if (!Number.isInteger(amount) || amount <= 0) throw new Error("Invalid credit amount");
+  return db.user.update({ where: { id: userId }, data: { credits: { increment: amount } } });
 }

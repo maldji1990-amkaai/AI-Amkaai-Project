@@ -14,9 +14,10 @@ const PAYPAL_API_BASE =
 // ⚙️ خريطة عكسية: من PayPal Plan ID إلى اسم الخطة الداخلي في موقعك
 function getPlanFromPayPalPlanId(
   planId: string | undefined | null
-): "trial" | "quarterly" | "biannually" | "business" | null {
+): "trial" | "monthly" | "quarterly" | "biannually" | "business" | null {
   if (!planId) return null;
   if (planId === process.env.PAYPAL_PLAN_ID_TRIAL) return "trial";
+  if (planId === process.env.PAYPAL_PLAN_ID_MONTHLY) return "monthly";
   if (planId === process.env.PAYPAL_PLAN_ID_QUARTERLY) return "quarterly";
   if (planId === process.env.PAYPAL_PLAN_ID_BIANNUALLY) return "biannually";
   if (planId === process.env.PAYPAL_PLAN_ID_BUSINESS) return "business";
@@ -94,11 +95,13 @@ const PLAN_MAP_ON_ACTIVATE: Record<string, PlanType> = {
   quarterly: PlanType.QUARTERLY,
   biannually: PlanType.BIANNUALLY,
   business: PlanType.BUSINESS,
+  monthly: PlanType.MONTHLY,
 };
 
 // 🆕 خريطة حالة الدفع الفعلي: أول خصم حقيقي بعد انتهاء الـ 3 أيام يحوّل trial إلى monthly تلقائياً
 const PLAN_MAP_ON_PAYMENT: Record<string, PlanType> = {
-  trial: PlanType.MONTHLY, // 🔑 هذا هو التحويل التلقائي المطلوب بعد 3 أيام
+  trial: PlanType.MONTHLY,
+  monthly: PlanType.MONTHLY, // 🔑 هذا هو التحويل التلقائي المطلوب بعد 3 أيام
   quarterly: PlanType.QUARTERLY,
   biannually: PlanType.BIANNUALLY,
   business: PlanType.BUSINESS,
@@ -211,8 +214,8 @@ export async function POST(req: Request) {
                   trialStartedAt: null,
                   trialEndsAt: null,
                 }),
-            ...(paypalCustomerId ? { lemonCustomerId: paypalCustomerId } : {}),
-            ...(paypalSubscriptionId ? { lemonSubscriptionId: paypalSubscriptionId } : {}),
+            ...(paypalCustomerId ? { paypalCustomerId } : {}),
+            ...(paypalSubscriptionId ? { paypalSubscriptionId } : {}),
           },
         }),
         db.subscription.upsert({
@@ -227,8 +230,8 @@ export async function POST(req: Request) {
             userId: user.id,
             status: subscriptionStatus || "active",
             plan: dbPlan,
-            ...(paypalSubscriptionId ? { lemonSubscriptionId: paypalSubscriptionId } : {}),
-            ...(paypalCustomerId ? { lemonCustomerId: paypalCustomerId } : {}),
+            ...(paypalSubscriptionId ? { paypalSubscriptionId } : {}),
+            ...(paypalCustomerId ? { paypalCustomerId } : {}),
             ...(nextBillingTime ? { currentPeriodEnd: nextBillingTime } : {}),
           },
         }),
@@ -262,6 +265,19 @@ export async function POST(req: Request) {
             status: "active",
             plan: dbPlan,
             ...(nextBillingTime ? { currentPeriodEnd: nextBillingTime } : {}),
+            ...(paypalSubscriptionId ? { paypalSubscriptionId } : {}),
+            ...(paypalCustomerId ? { paypalCustomerId } : {}),
+          },
+        }),
+        db.payment.create({
+          data: {
+            userId: user.id,
+            amount: Number(resource?.amount?.total || 0),
+            currency: String(resource?.amount?.currency || "USD"),
+            paypalOrderId: resource?.id ? `sale_${resource.id}` : undefined,
+            paypalSubscriptionId: paypalSubscriptionId || undefined,
+            provider: "paypal",
+            status: "COMPLETED",
           },
         }),
         db.webhookEvent.create({ data: { eventId: idempotencyKey } }),
