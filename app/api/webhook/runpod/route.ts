@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { refundCredits, markUsageSuccess } from "@/lib/credits";
 import { startFinalComposition } from "@/lib/final-composer";
-import { normalizePostProductionStage, stageProgress } from "@/lib/post-production-stage";
-import { releaseCompletedVideoLease } from "@/lib/runpod-pod-manager";
+import { releaseVideoGpu } from "@/lib/runpod-pod-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -78,14 +77,8 @@ export async function POST(req: Request) {
 
     if (status === "COMPLETED" && body?.output?.video_url) {
       const videoUrl = String(body.output.video_url);
-      const providerMetrics = {
-        executionTime: typeof body?.executionTime === "number" ? body.executionTime : null,
-        cost: typeof body?.cost === "number" ? body.cost : null,
-        workerId: typeof body?.workerId === "string" ? body.workerId : null,
-        completedAt: new Date().toISOString(),
-      };
       await db.$transaction(async tx => {
-        await tx.videoJob.updateMany({ where: { id: jobId, status: { in: ["PENDING", "PROCESSING"] } }, data: { status: "COMPLETED", resultUrl: videoUrl, finishedAt: new Date(), progress: 100, error: null, input: { ...input, provider_metrics: providerMetrics } } });
+        await tx.videoJob.updateMany({ where: { id: jobId, status: { in: ["PENDING", "PROCESSING"] } }, data: { status: "COMPLETED", resultUrl: videoUrl, finishedAt: new Date(), progress: 100, error: null } });
         if (job.generationId) {
           await tx.generationStep.updateMany({ where: { generationId: job.generationId, name: "Video Render" }, data: { status: "COMPLETED", progress: 100, finishedAt: new Date(), output: { videoUrl } } });
         }
@@ -98,21 +91,15 @@ export async function POST(req: Request) {
         const usage = await db.usage.findUnique({ where: { id: job.usageId }, select: { referenceId: true } });
         if (usage?.referenceId) await markUsageSuccess(usage.referenceId);
       }
-      await releaseCompletedVideoLease(job.id).catch(() => undefined);
+      await releaseVideoGpu(job.id).catch(() => undefined);
       if (job.generationId) await refreshGeneration(job.generationId);
       return NextResponse.json({ success: true });
     }
 
     if (["FAILED", "CANCELLED"].includes(status) || body?.error || body?.output?.error) {
       const msg = String(body?.error || body?.output?.error || `RunPod status: ${status || "unknown"}`);
-      const providerMetrics = {
-        executionTime: typeof body?.executionTime === "number" ? body.executionTime : null,
-        cost: typeof body?.cost === "number" ? body.cost : null,
-        workerId: typeof body?.workerId === "string" ? body.workerId : null,
-        failedAt: new Date().toISOString(),
-      };
       await db.$transaction(async tx => {
-        await tx.videoJob.updateMany({ where: { id: jobId, status: { in: ["PENDING", "PROCESSING"] } }, data: { status: "FAILED", error: msg, finishedAt: new Date(), input: { ...input, provider_metrics: providerMetrics } } });
+        await tx.videoJob.updateMany({ where: { id: jobId, status: { in: ["PENDING", "PROCESSING"] } }, data: { status: "FAILED", error: msg, finishedAt: new Date() } });
         if (sceneId) await tx.scene.updateMany({ where: { id: sceneId }, data: { status: "FAILED" } });
         if (job.generationId) await tx.generationStep.updateMany({ where: { generationId: job.generationId, name: "Video Render" }, data: { status: "FAILED", error: msg, finishedAt: new Date() } });
       });
@@ -120,7 +107,7 @@ export async function POST(req: Request) {
         const usage = await db.usage.findUnique({ where: { id: job.usageId }, select: { referenceId: true } });
         if (usage?.referenceId) await refundCredits(usage.referenceId).catch(e => console.error("Webhook refund failed", e));
       }
-      await releaseCompletedVideoLease(job.id).catch(() => undefined);
+      await releaseVideoGpu(job.id).catch(() => undefined);
       if (job.generationId) await refreshGeneration(job.generationId);
       return NextResponse.json({ success: true });
     }

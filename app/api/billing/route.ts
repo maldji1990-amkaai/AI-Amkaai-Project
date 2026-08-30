@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function POST() {
   try {
     const { userId } = await auth();
@@ -15,6 +17,10 @@ export async function POST() {
 
     const user = await db.user.findUnique({
       where: { clerkId: userId },
+      select: {
+        id: true,
+        paypalSubscriptionId: true,
+      },
     });
 
     if (!user) {
@@ -24,13 +30,25 @@ export async function POST() {
       );
     }
 
-    // 🔍 جلب الاشتراك المرتبط بالمستخدم (نفس الحقول المستخدمة في webhook/route.ts)
     const subscription = await db.subscription.findFirst({
-      where: { userId: user.id },
+      where: {
+        userId: user.id,
+        paypalSubscriptionId: {
+          not: null,
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        paypalSubscriptionId: true,
+      },
     });
 
-    // ✅ PayPal: نستخدم lemonSubscriptionId كحقل مشترك (تم تسميته هكذا مسبقاً في قاعدة البيانات)
-    const paypalSubscriptionId = subscription?.lemonSubscriptionId;
+    const paypalSubscriptionId =
+      user.paypalSubscriptionId ??
+      subscription?.paypalSubscriptionId ??
+      null;
 
     if (!paypalSubscriptionId) {
       return NextResponse.json(
@@ -39,16 +57,15 @@ export async function POST() {
       );
     }
 
-    // 🎯 PayPal لا يوفر "customer portal" مثل Lemon Squeezy — التوجيه يكون
-    // إما إلى صفحة إدارة الاشتراكات في حساب PayPal الخاص بالمستخدم نفسه،
-    // أو إلى صفحة الداشبورد في موقعك حيث يمكنه إلغاء الاشتراك يدوياً عبر زر مخصص.
     return NextResponse.json({
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?manage_subscription=true`,
+      paypalSubscriptionId,
       paypalManageUrl: "https://www.paypal.com/myaccount/autopay/",
+      url: process.env.NEXT_PUBLIC_APP_URL
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?manage_subscription=true`
+        : "/dashboard?manage_subscription=true",
     });
-
   } catch (error) {
-    console.error("❌ Billing API error:", error);
+    console.error("[BILLING_API_ERROR]", error);
 
     return NextResponse.json(
       { error: "Internal Server Error" },

@@ -8,70 +8,54 @@ datasource db {
 }
 
 model User {
-  id                  String              @id @default(cuid())
-  clerkId             String              @unique
-  email               String?             @unique
-  /// ///////////////////////////////////////////////
-  /// ///////////////////////////////////////////////
-  plan                PlanType            @default(TRIAL)
-  credits             Int                 @default(0)
-  lemonCustomerId     String?
-  lemonSubscriptionId String?
-  paypalCustomerId    String?
-  paypalSubscriptionId String? @unique
-  trialStartedAt      DateTime?
-  trialEndsAt         DateTime?
-  /// ///////////////////////////////////////////////
-  /// ///////////////////////////////////////////////
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  abandonedCheckouts  AbandonedCheckout[]
-  images              Image[]
-  imageJobs           ImageJob[]
-  manualPayments      ManualPayment[]
-  notifications       Notification[]
-  payments            Payment[]
-  subscriptions       Subscription[]
-  usages              Usage[]
-  videoJobs           VideoJob[]
-  voices              Voice[]
-  voiceJobs           VoiceJob[]
-  projects            Project[]
-  characters          Character[]
-  voiceProfiles       VoiceProfile[]
-  assets              Asset[]
-  generations         Generation[]
-  templates           Template[]
+  id                   String              @id @default(cuid())
+  clerkId              String              @unique
+  email                String?             @unique
+  plan                 PlanType            @default(TRIAL)
+  credits              Int                 @default(0)
+  paypalCustomerId     String?
+  paypalSubscriptionId String?             @unique
+  trialStartedAt       DateTime?
+  trialEndsAt          DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  abandonedCheckouts   AbandonedCheckout[]
+  images               Image[]
+  imageJobs            ImageJob[]
+  manualPayments       ManualPayment[]
+  notifications        Notification[]
+  payments             Payment[]
+  subscriptions        Subscription[]
+  usages               Usage[]
+  videoJobs            VideoJob[]
+  voices               Voice[]
+  voiceJobs            VoiceJob[]
+  projects             Project[]
+  characters           Character[]
+  voiceProfiles        VoiceProfile[]
+  assets               Asset[]
+  generations          Generation[]
+  templates            Template[]
 
   @@index([clerkId])
   @@index([email])
 }
 
-// 🆕 جدول إعدادات الباقات الديناميكي — المصدر الوحيد للحقيقة الذي تتحكم به لوحة الإدارة
-// بدلاً من القيم المكتوبة يدوياً في lib/config.ts. كل صف يمثل باقة واحدة (trial/monthly/...)
-// ويمكن تعديل أي حقل من لوحة app/admin/plans بدون لمس الكود أو إعادة النشر.
 model PlanConfig {
   id                 String   @id @default(cuid())
-  planKey            String   @unique // "trial" | "monthly" | "quarterly" | "biannually" | "business"
+  planKey            String   @unique
   name               String
-  credits            Int // عدد النقاط الممنوحة عند الاشتراك/التجديد
-  price              Float // السعر بالدولار
-  isPro              Boolean  @default(true) // كل شيء عدا trial = true
-
-  // ⚙️ إعدادات توليد الفيديو
-  resolution         String // "720p" | "1080p"
-  maxDurationSeconds Int      @default(5) // مدة الفيديو بالثواني، تُستخدم لحساب النقاط المستهلكة (pay-per-second)
-  aiModel            String // معرّف موديل Replicate الكامل، مثال: "wan-video/wan-2.5-t2v-fast"
-  advancedSampling   Boolean  @default(false) // جودة sampling أعلى (للباقات 1080p فقط عادة)
-
-  // 💧 العلامة المائية
+  credits            Int
+  price              Float
+  isPro              Boolean  @default(true)
+  resolution         String
+  maxDurationSeconds Int      @default(5)
+  aiModel            String
+  advancedSampling   Boolean  @default(false)
   watermarkEnabled   Boolean  @default(false)
-  watermarkOpacity   Int      @default(40) // نسبة الشفافية 0-100
+  watermarkOpacity   Int      @default(40)
   watermarkText      String   @default("AMKAAI.NET")
-
-  // 🚀 أولوية الطابور (تُستخدم لاحقاً عند تفعيل نظام VideoJob + Queue الكامل)
   priority           Int      @default(0)
-
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -79,32 +63,34 @@ model PlanConfig {
 }
 
 model Subscription {
-  id                  String    @id @default(cuid())
-  userId              String
-  lemonSubscriptionId String?   @unique
-  lemonCustomerId     String?
-  status              String
-  plan                PlanType
-  currentPeriodEnd    DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(cuid())
+  userId               String
+  paypalSubscriptionId String?  @unique
+  paypalCustomerId     String?
+  status               String
+  plan                 PlanType
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
 }
 
 model Payment {
-  id           String        @id @default(cuid())
-  userId       String
-  amount       Float
-  currency     String
-  lemonOrderId String?       @unique
-  status       PaymentStatus @default(COMPLETED)
-  createdAt    DateTime      @default(now())
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String        @id @default(cuid())
+  userId               String
+  amount               Float
+  currency             String
+  paypalOrderId        String?       @unique
+  paypalSubscriptionId String?
+  status               PaymentStatus @default(COMPLETED)
+  createdAt            DateTime      @default(now())
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([paypalSubscriptionId])
 }
 
 model Usage {
@@ -114,7 +100,7 @@ model Usage {
   cost        Int
   status      UsageStatus @default(PENDING)
   refunded    Boolean     @default(false)
-  referenceId String? @unique
+  referenceId String?     @unique
   createdAt   DateTime    @default(now())
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   videoJobs   VideoJob[]
@@ -125,32 +111,31 @@ model Usage {
 }
 
 model VideoJob {
-  id            String    @id @default(cuid())
-  userId        String
-  prompt        String
-  status        JobStatus @default(PENDING)
-  priority      Int       @default(0)
-  resultUrl     String?
-  error         String?
-  attempts      Int       @default(0)
-  maxAttempts   Int       @default(3)
-  progress      Int       @default(0)
-  usageId       String?
-  startedAt     DateTime?
-  finishedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  imageUrl      String?
+  id              String       @id @default(cuid())
+  userId          String
+  prompt          String
+  status          JobStatus    @default(PENDING)
+  priority        Int          @default(0)
+  resultUrl       String?
+  error           String?
+  attempts        Int          @default(0)
+  maxAttempts     Int          @default(3)
+  progress        Int          @default(0)
+  usageId         String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  imageUrl        String?
   durationSeconds Int?
-  clipCount     Int?
-  model         String?
-  input         Json?
-  // 🆕 معرّف المهمة عند RunPod - يُستخدم لمطابقة الـ webhook القادم بالـ VideoJob الصحيح
-  externalJobId String?
-  generationId  String?
-  usage         Usage?    @relation(fields: [usageId], references: [id])
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  generation    Generation? @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  clipCount       Int?
+  model           String?
+  input           Json?
+  externalJobId   String?
+  generationId    String?
+  usage           Usage?       @relation(fields: [usageId], references: [id])
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generation      Generation?  @relation(fields: [generationId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([userId])
@@ -315,14 +300,13 @@ enum PaymentStatus {
   FAILED
 }
 
-
 model Project {
   id          String       @id @default(cuid())
   userId      String
   name        String
   description String?
   status      String       @default("DRAFT")
-  aspectRatio String      @default("16:9")
+  aspectRatio String       @default("16:9")
   metadata    Json?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -330,29 +314,31 @@ model Project {
   scenes      Scene[]
   assets      Asset[]
   generations Generation[]
+
   @@index([userId, updatedAt])
 }
 
 model Scene {
-  id          String      @id @default(cuid())
-  projectId   String
-  index       Int
-  title       String
-  prompt      String
-  duration    Int         @default(5)
-  status      JobStatus   @default(PENDING)
-  videoUrl    String?
-  imageUrl    String?
-  audioUrl    String?
-  metadata    Json?
-  characterId String?
+  id             String        @id @default(cuid())
+  projectId      String
+  index          Int
+  title          String
+  prompt         String
+  duration       Int           @default(5)
+  status         JobStatus     @default(PENDING)
+  videoUrl       String?
+  imageUrl       String?
+  audioUrl       String?
+  metadata       Json?
+  characterId    String?
   voiceProfileId String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  character   Character?  @relation(fields: [characterId], references: [id], onDelete: SetNull)
-  voiceProfile VoiceProfile? @relation(fields: [voiceProfileId], references: [id], onDelete: SetNull)
-  assets      Asset[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  character      Character?    @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  voiceProfile   VoiceProfile? @relation(fields: [voiceProfileId], references: [id], onDelete: SetNull)
+  assets         Asset[]
+
   @@unique([projectId, index])
   @@index([projectId, index])
 }
@@ -370,6 +356,7 @@ model Character {
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   scenes      Scene[]
+
   @@index([userId, updatedAt])
 }
 
@@ -387,6 +374,7 @@ model VoiceProfile {
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   scenes      Scene[]
+
   @@index([userId, updatedAt])
 }
 
@@ -407,6 +395,7 @@ model Asset {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   scene      Scene?    @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
   @@index([userId, createdAt])
   @@index([projectId, createdAt])
 }
@@ -426,23 +415,25 @@ model Generation {
   project     Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
   steps       GenerationStep[]
   videoJobs   VideoJob[]
+
   @@index([userId, createdAt])
   @@index([projectId, createdAt])
 }
 
 model GenerationStep {
-  id           String      @id @default(cuid())
+  id           String       @id @default(cuid())
   generationId String
   name         String
-  status       JobStatus   @default(PENDING)
-  progress     Int         @default(0)
+  status       JobStatus    @default(PENDING)
+  progress     Int          @default(0)
   input        Json?
   output       Json?
   error        String?
   startedAt    DateTime?
   finishedAt   DateTime?
-  createdAt    DateTime    @default(now())
-  generation   Generation  @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  generation   Generation   @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
   @@index([generationId, createdAt])
 }
 
@@ -457,6 +448,7 @@ model Template {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([category])
   @@index([userId])
 }

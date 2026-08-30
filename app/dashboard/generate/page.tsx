@@ -213,7 +213,6 @@ const [showDurationModal, setShowDurationModal] = useState(false);
       setCredits(data.remainingCredits ?? credits);
 
     } catch (e: any) {
-      clearInterval(interval);
       console.error(e);
       alert(e.message || "حدث خطأ أثناء التوليد");
     } finally {

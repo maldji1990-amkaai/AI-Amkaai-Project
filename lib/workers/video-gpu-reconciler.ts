@@ -3,6 +3,7 @@ import { reconcileVideoGpu } from "@/lib/runpod-pod-manager";
 import { createServer } from "node:http";
 
 if (!connection) throw new Error("REDIS_URL is missing in environment variables");
+const redisConnection = connection;
 const intervalMs = Math.max(10_000, Number(process.env.VIDEO_RECONCILE_INTERVAL_MS || 60_000));
 const healthPort = Number(process.env.VIDEO_RECONCILER_HEALTH_PORT || 0);
 let lastResult: unknown = null;
@@ -37,7 +38,7 @@ async function shutdown(signal: string) {
   console.log(`GPU reconciler shutting down (${signal})`);
   clearInterval(timer);
   server?.close();
-  await connection.quit().catch(() => undefined);
+  await redisConnection.quit().catch(() => undefined);
   process.exit(0);
 }
 process.on("SIGTERM", () => void shutdown("SIGTERM"));

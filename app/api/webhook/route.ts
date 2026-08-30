@@ -5,77 +5,182 @@ import { PLANS } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
-// 🌍 نفس القاعدة المستخدمة في checkout/route.ts
 const PAYPAL_API_BASE =
   process.env.PAYPAL_MODE === "live"
     ? "https://api-m.paypal.com"
     : "https://api-m.sandbox.paypal.com";
 
-// ⚙️ خريطة عكسية: من PayPal Plan ID إلى اسم الخطة الداخلي في موقعك
+type PayPalPlanName =
+  | "trial"
+  | "monthly"
+  | "quarterly"
+  | "biannually"
+  | "business";
+
 function getPlanFromPayPalPlanId(
   planId: string | undefined | null
-): "trial" | "monthly" | "quarterly" | "biannually" | "business" | null {
+): PayPalPlanName | null {
   if (!planId) return null;
-  if (planId === process.env.PAYPAL_PLAN_ID_TRIAL) return "trial";
-  if (planId === process.env.PAYPAL_PLAN_ID_MONTHLY) return "monthly";
-  if (planId === process.env.PAYPAL_PLAN_ID_QUARTERLY) return "quarterly";
-  if (planId === process.env.PAYPAL_PLAN_ID_BIANNUALLY) return "biannually";
-  if (planId === process.env.PAYPAL_PLAN_ID_BUSINESS) return "business";
+
+  if (planId === process.env.PAYPAL_PLAN_ID_TRIAL) {
+    return "trial";
+  }
+
+  if (planId === process.env.PAYPAL_PLAN_ID_MONTHLY) {
+    return "monthly";
+  }
+
+  if (planId === process.env.PAYPAL_PLAN_ID_QUARTERLY) {
+    return "quarterly";
+  }
+
+  if (planId === process.env.PAYPAL_PLAN_ID_BIANNUALLY) {
+    return "biannually";
+  }
+
+  if (planId === process.env.PAYPAL_PLAN_ID_BUSINESS) {
+    return "business";
+  }
+
   return null;
 }
 
-// 🔑 جلب access token من PayPal (نفس منطق checkout)
-async function getPayPalAccessToken() {
-  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!;
-  const secret = process.env.PAYPAL_SECRET_KEY!;
-  const basicAuth = Buffer.from(`${clientId}:${secret}`).toString("base64");
+async function getPayPalAccessToken(): Promise<string> {
+  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  const secret = process.env.PAYPAL_SECRET_KEY;
 
-  const res = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${basicAuth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`PayPal auth failed: ${errText}`);
+  if (!clientId || !secret) {
+    throw new Error(
+      "PayPal credentials are not configured"
+    );
   }
 
-  const data = await res.json();
+  const basicAuth = Buffer.from(
+    `${clientId}:${secret}`
+  ).toString("base64");
+
+  const response = await fetch(
+    `${PAYPAL_API_BASE}/v1/oauth2/token`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-Language": "en_US",
+        Authorization: `Basic ${basicAuth}`,
+        "Content-Type":
+          "application/x-www-form-urlencoded",
+      },
+      body: "grant_type=client_credentials",
+      cache: "no-store",
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+
+    console.error(
+      "[PAYPAL_ACCESS_TOKEN_FAILED]",
+      response.status,
+      errorBody
+    );
+
+    throw new Error(
+      `PayPal auth failed (${response.status})`
+    );
+  }
+
+  const data = await response.json();
+
+  if (!data?.access_token) {
+    throw new Error(
+      "PayPal access token missing"
+    );
+  }
+
   return data.access_token as string;
 }
 
-// 🔒 التحقق من صحة الـ Webhook باستخدام PayPal Verification API
-async function verifyPayPalWebhook(headers: Headers, rawBody: string): Promise<boolean> {
+async function verifyPayPalWebhook(
+  headers: Headers,
+  rawBody: string
+): Promise<boolean> {
   try {
-    const accessToken = await getPayPalAccessToken();
+    const webhookId =
+      process.env.PAYPAL_WEBHOOK_ID;
+
+    if (!webhookId) {
+      console.error(
+        "[PAYPAL_WEBHOOK] PAYPAL_WEBHOOK_ID is not configured"
+      );
+
+      return false;
+    }
+
+    const accessToken =
+      await getPayPalAccessToken();
 
     const verificationPayload = {
-      auth_algo: headers.get("paypal-auth-algo"),
-      cert_url: headers.get("paypal-cert-url"),
-      transmission_id: headers.get("paypal-transmission-id"),
-      transmission_sig: headers.get("paypal-transmission-sig"),
-      transmission_time: headers.get("paypal-transmission-time"),
-      webhook_id: process.env.PAYPAL_WEBHOOK_ID,
+      auth_algo: headers.get(
+        "paypal-auth-algo"
+      ),
+      cert_url: headers.get(
+        "paypal-cert-url"
+      ),
+      transmission_id: headers.get(
+        "paypal-transmission-id"
+      ),
+      transmission_sig: headers.get(
+        "paypal-transmission-sig"
+      ),
+      transmission_time: headers.get(
+        "paypal-transmission-time"
+      ),
+      webhook_id: webhookId,
       webhook_event: JSON.parse(rawBody),
     };
 
-    const res = await fetch(`${PAYPAL_API_BASE}/v1/notifications/verify-webhook-signature`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(verificationPayload),
-    });
+    const response = await fetch(
+      `${PAYPAL_API_BASE}/v1/notifications/verify-webhook-signature`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type":
+            "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(
+          verificationPayload
+        ),
+        cache: "no-store",
+      }
+    );
 
-    const data = await res.json();
-    return data?.verification_status === "SUCCESS";
-  } catch (e) {
-    console.error("❌ Webhook verification failed:", e);
+    if (!response.ok) {
+      const errorBody =
+        await response.text();
+
+      console.error(
+        "[PAYPAL_WEBHOOK_VERIFY_FAILED]",
+        response.status,
+        errorBody
+      );
+
+      return false;
+    }
+
+    const data = await response.json();
+
+    return (
+      data?.verification_status ===
+      "SUCCESS"
+    );
+  } catch (error) {
+    console.error(
+      "[PAYPAL_WEBHOOK_VERIFY_ERROR]",
+      error
+    );
+
     return false;
   }
 }
@@ -89,244 +194,709 @@ const ALLOWED_EVENTS = new Set([
   "PAYMENT.SALE.COMPLETED",
 ]);
 
-// 🆕 خريطة الحالة الأولى: عند أول تفعيل اشتراك (بداية Trial أو بداية باقة مدفوعة مباشرة)
-const PLAN_MAP_ON_ACTIVATE: Record<string, PlanType> = {
+const PLAN_MAP_ON_ACTIVATE: Record<
+  PayPalPlanName,
+  PlanType
+> = {
   trial: PlanType.TRIAL,
+  monthly: PlanType.MONTHLY,
   quarterly: PlanType.QUARTERLY,
   biannually: PlanType.BIANNUALLY,
   business: PlanType.BUSINESS,
-  monthly: PlanType.MONTHLY,
 };
 
-// 🆕 خريطة حالة الدفع الفعلي: أول خصم حقيقي بعد انتهاء الـ 3 أيام يحوّل trial إلى monthly تلقائياً
-const PLAN_MAP_ON_PAYMENT: Record<string, PlanType> = {
+const PLAN_MAP_ON_PAYMENT: Record<
+  PayPalPlanName,
+  PlanType
+> = {
   trial: PlanType.MONTHLY,
-  monthly: PlanType.MONTHLY, // 🔑 هذا هو التحويل التلقائي المطلوب بعد 3 أيام
+  monthly: PlanType.MONTHLY,
   quarterly: PlanType.QUARTERLY,
   biannually: PlanType.BIANNUALLY,
   business: PlanType.BUSINESS,
 };
+
+function creditsForPlan(
+  plan: PayPalPlanName | string
+): number {
+  return Number(
+    (
+      PLANS as Record<
+        string,
+        { credits?: number }
+      >
+    )[plan]?.credits ?? 0
+  );
+}
 
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
 
-    // 🔒 1. التحقق من صحة الإشعار القادم من PayPal
-    const isValid = await verifyPayPalWebhook(req.headers, rawBody);
+    const isValid =
+      await verifyPayPalWebhook(
+        req.headers,
+        rawBody
+      );
 
     if (!isValid) {
-      console.error("❌ Webhook unauthorized: Invalid PayPal signature");
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      return NextResponse.json(
+        {
+          error:
+            "Invalid signature",
+        },
+        { status: 401 }
+      );
     }
 
-    const body = JSON.parse(rawBody);
-    console.log("📩 Secure PayPal Webhook received:", body?.event_type);
+    let body: any;
 
-    const eventName: string | undefined = body?.event_type;
-    const eventId: string | undefined = body?.id;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid JSON payload",
+        },
+        { status: 400 }
+      );
+    }
+
+    const eventName =
+      body?.event_type as
+        | string
+        | undefined;
+
+    const eventId =
+      body?.id as
+        | string
+        | undefined;
 
     if (!eventName || !eventId) {
-      console.error("❌ Invalid payload — missing eventName or eventId", { eventName, eventId });
-      return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
+      return NextResponse.json(
+        {
+          error:
+            "Invalid webhook payload",
+        },
+        { status: 400 }
+      );
     }
 
-    if (!ALLOWED_EVENTS.has(eventName)) {
-      return NextResponse.json({ ignored: true }, { status: 200 });
+    if (
+      !ALLOWED_EVENTS.has(eventName)
+    ) {
+      return NextResponse.json({
+        ignored: true,
+      });
     }
 
-    // 🔒 2. فحص التكرار (Idempotency Check)
-    const idempotencyKey = `${eventName}:${eventId}`;
-    const existingEvent = await db.webhookEvent.findUnique({
-      where: { eventId: idempotencyKey },
-    });
+    const existingEvent =
+      await db.webhookEvent.findUnique({
+        where: {
+          eventId,
+        },
+      });
 
     if (existingEvent) {
-      console.log("⚠️ Duplicate webhook ignored:", idempotencyKey);
-      return NextResponse.json({ duplicate: true }, { status: 200 });
+      return NextResponse.json({
+        duplicate: true,
+      });
     }
 
-    const resource = body?.resource;
+    const resource =
+      body?.resource ?? {};
 
-    // 🆔 معرّف المستخدم أرسلناه كـ custom_id عند إنشاء الاشتراك في checkout/route.ts
-    const customDataUserId: string | undefined = resource?.custom_id;
-    const email: string | undefined =
-      resource?.subscriber?.email_address || resource?.payer?.email_address;
+    /*
+     * For subscription events, resource.id is
+     * the PayPal subscription ID.
+     *
+     * For PAYMENT.SALE.COMPLETED,
+     * resource.id is the sale ID and the
+     * subscription ID is usually in
+     * billing_agreement_id.
+     */
+    const resourceSubscriptionId =
+      eventName ===
+      "PAYMENT.SALE.COMPLETED"
+        ? resource?.billing_agreement_id
+        : resource?.id;
 
-    if (!email && !customDataUserId) {
-      return NextResponse.json({ error: "Missing user identifier" }, { status: 400 });
-    }
+    const paypalSubscriptionId =
+      resourceSubscriptionId
+        ? String(resourceSubscriptionId)
+        : undefined;
 
-    // 🔍 البحث عن المستخدم: أولوية لمعرف قاعدة البيانات ثم fallback للإيميل
-    const user = customDataUserId
-      ? (await db.user.findUnique({ where: { id: customDataUserId } }).catch(() => null)) ||
-        (await db.user.findUnique({ where: { clerkId: customDataUserId } }))
-      : await db.user.findUnique({ where: { email } });
+    const customDataUserId =
+      resource?.custom_id
+        ? String(resource.custom_id)
+        : undefined;
 
-    if (!user) {
-      console.error("❌ User not found", { customDataUserId, email });
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const email =
+      resource?.subscriber
+        ?.email_address ||
+      resource?.payer
+        ?.email_address ||
+      resource?.payer_info
+        ?.email;
 
-    ////////////////////////////////////////////////////////////////
-    // 🧠 هندسة أحداث الاشتراكات (Subscription Logic Handler)
-    ////////////////////////////////////////////////////////////////
-
-    const paypalPlanId: string | undefined = resource?.plan_id;
-    const planName = getPlanFromPayPalPlanId(paypalPlanId);
-
-    if (!planName) {
-      console.log("⚠️ Unknown PayPal plan ID:", paypalPlanId);
-      return NextResponse.json({ error: "Unknown plan" }, { status: 400 });
-    }
-
-    const paypalSubscriptionId: string | undefined = resource?.id;
-    const subscriptionStatus: string | undefined = resource?.status?.toLowerCase();
-    const paypalCustomerId: string | undefined =
-      resource?.subscriber?.payer_id || resource?.subscriber?.email_address;
-    const nextBillingTime = resource?.billing_info?.next_billing_time
-      ? new Date(resource.billing_info.next_billing_time)
+    let user = customDataUserId
+      ? await db.user.findUnique({
+          where: {
+            id: customDataUserId,
+          },
+        })
       : null;
 
-    const existingSubscription = await db.subscription.findFirst({
-      where: { userId: user.id },
-    });
-
-    // الحالة الأولى: تفعيل اشتراك جديد لأول مرة (شحن رصيد الباقة المشتراة)
-    if (eventName === "BILLING.SUBSCRIPTION.ACTIVATED") {
-      const dbPlan = PLAN_MAP_ON_ACTIVATE[planName] || PlanType.TRIAL;
-      const isTrial = planName === "trial";
-      const creditsToGrant = (PLANS[planName] as any)?.credits || 0;
-
-      await db.$transaction([
-        db.user.update({
-          where: { id: user.id },
-          data: {
-            plan: dbPlan,
-            credits: { increment: creditsToGrant },
-            // 🆕 عند بداية Trial: نضبط تاريخ البداية والنهاية (3 أيام بالضبط)
-            // عند بداية أي باقة مدفوعة مباشرة (بدون المرور بـ trial): لا يوجد تاريخ trial
-            ...(isTrial
-              ? {
-                  trialStartedAt: new Date(),
-                  trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-                }
-              : {
-                  trialStartedAt: null,
-                  trialEndsAt: null,
-                }),
-            ...(paypalCustomerId ? { paypalCustomerId } : {}),
-            ...(paypalSubscriptionId ? { paypalSubscriptionId } : {}),
-          },
-        }),
-        db.subscription.upsert({
-          where: {
-            id: existingSubscription?.id || "non_existent_id",
-          },
-          update: {
-            status: subscriptionStatus || "active",
-            ...(nextBillingTime ? { currentPeriodEnd: nextBillingTime } : {}),
-          },
-          create: {
-            userId: user.id,
-            status: subscriptionStatus || "active",
-            plan: dbPlan,
-            ...(paypalSubscriptionId ? { paypalSubscriptionId } : {}),
-            ...(paypalCustomerId ? { paypalCustomerId } : {}),
-            ...(nextBillingTime ? { currentPeriodEnd: nextBillingTime } : {}),
-          },
-        }),
-        db.webhookEvent.create({ data: { eventId: idempotencyKey } }),
-      ]);
-      console.log(`✅ ${user.email} Subscribed to ${dbPlan} (+${creditsToGrant} credits)`);
-    }
-
-    // الحالة الثانية: نجاح دفعة (أول دفعة حقيقية بعد trial، أو تجديد دوري لباقة مدفوعة)
-    else if (eventName === "PAYMENT.SALE.COMPLETED") {
-      const dbPlan = PLAN_MAP_ON_PAYMENT[planName] || PlanType.MONTHLY;
-      // 🔑 إذا كانت planName === "trial"، فهذه أول دفعة حقيقية (0$ لا تُرسل PAYMENT.SALE.COMPLETED من PayPal)
-      // لذلك نمنح نقاط باقة MONTHLY وليس نقاط trial
-      const creditsToGrant =
-        planName === "trial" ? (PLANS.monthly as any)?.credits || 0 : (PLANS[planName] as any)?.credits || 0;
-
-      await db.$transaction([
-        db.user.update({
-          where: { id: user.id },
-          data: {
-            plan: dbPlan,
-            credits: { increment: creditsToGrant },
-            // 🆕 إلغاء أي أثر لفترة التجربة نهائياً بعد أول خصم حقيقي
-            trialStartedAt: null,
-            trialEndsAt: null,
-          },
-        }),
-        db.subscription.updateMany({
-          where: { userId: user.id },
-          data: {
-            status: "active",
-            plan: dbPlan,
-            ...(nextBillingTime ? { currentPeriodEnd: nextBillingTime } : {}),
-            ...(paypalSubscriptionId ? { paypalSubscriptionId } : {}),
-            ...(paypalCustomerId ? { paypalCustomerId } : {}),
-          },
-        }),
-        db.payment.create({
-          data: {
-            userId: user.id,
-            amount: Number(resource?.amount?.total || 0),
-            currency: String(resource?.amount?.currency || "USD"),
-            paypalOrderId: resource?.id ? `sale_${resource.id}` : undefined,
-            paypalSubscriptionId: paypalSubscriptionId || undefined,
-            provider: "paypal",
-            status: "COMPLETED",
-          },
-        }),
-        db.webhookEvent.create({ data: { eventId: idempotencyKey } }),
-      ]);
-      console.log(`🔄 ${user.email} Subscription payment completed -> ${dbPlan} (+${creditsToGrant} credits)`);
-    }
-
-    // الحالة الثالثة: تحديث حالة الاشتراك أو إلغاؤه/انتهاؤه/تعليقه
-    else if (
-      eventName === "BILLING.SUBSCRIPTION.UPDATED" ||
-      eventName === "BILLING.SUBSCRIPTION.EXPIRED" ||
-      eventName === "BILLING.SUBSCRIPTION.CANCELLED" ||
-      eventName === "BILLING.SUBSCRIPTION.SUSPENDED"
+    if (
+      !user &&
+      customDataUserId
     ) {
-      const isEnded = ["expired", "cancelled", "suspended"].includes(subscriptionStatus || "");
-
-      await db.$transaction([
-        db.subscription.updateMany({
-          where: { userId: user.id },
-          data: {
-            status: subscriptionStatus || "cancelled",
-            ...(nextBillingTime ? { currentPeriodEnd: nextBillingTime } : {}),
+      user =
+        await db.user.findUnique({
+          where: {
+            clerkId:
+              customDataUserId,
           },
-        }),
-        // ✅ مصحح: لم تعد FREE موجودة في enum — عند انتهاء/إلغاء الاشتراك نعيد المستخدم إلى TRIAL
-        // (بدون منحه نقاط تجربة جديدة، فقط لضمان عدم بقائه على باقة مدفوعة وهمياً)
-        ...(isEnded
-          ? [
-              db.user.update({
-                where: { id: user.id },
-                data: {
-                  plan: PlanType.TRIAL,
-                  credits: 0,
-                  trialStartedAt: null,
-                  trialEndsAt: null,
-                },
-              }),
-            ]
-          : []),
-        db.webhookEvent.create({ data: { eventId: idempotencyKey } }),
-      ]);
-      console.log(`ℹ️ ${user.email} Subscription updated status to: ${subscriptionStatus}. Is Ended: ${isEnded}`);
+        });
     }
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("🔥 WEBHOOK ERROR:", error);
+    if (!user && email) {
+      user =
+        await db.user.findUnique({
+          where: {
+            email: String(email),
+          },
+        });
+    }
+
+    /*
+     * If this is a payment event and PayPal
+     * did not provide the user directly,
+     * try to locate the user through the
+     * existing subscription.
+     */
+    if (
+      !user &&
+      paypalSubscriptionId
+    ) {
+      const existingSub =
+        await db.subscription.findFirst({
+          where: {
+            paypalSubscriptionId,
+          },
+          include: {
+            user: true,
+          },
+        });
+
+      if (existingSub) {
+        user = existingSub.user;
+      }
+    }
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          error:
+            "User not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    const paypalPlanId =
+      resource?.plan_id as
+        | string
+        | undefined;
+
+    let planName =
+      getPlanFromPayPalPlanId(
+        paypalPlanId
+      );
+
+    /*
+     * PAYMENT.SALE.COMPLETED may not contain
+     * plan_id. In that case use the user's
+     * existing subscription plan.
+     */
+    if (
+      !planName &&
+      eventName ===
+        "PAYMENT.SALE.COMPLETED"
+    ) {
+      const existingSub =
+        paypalSubscriptionId
+          ? await db.subscription.findFirst({
+              where: {
+                paypalSubscriptionId,
+              },
+            })
+          : await db.subscription.findFirst({
+              where: {
+                userId: user.id,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            });
+
+      if (existingSub) {
+        const reversePlanMap: Record<
+          PlanType,
+          PayPalPlanName
+        > = {
+          [PlanType.TRIAL]: "trial",
+          [PlanType.MONTHLY]: "monthly",
+          [PlanType.QUARTERLY]:
+            "quarterly",
+          [PlanType.BIANNUALLY]:
+            "biannually",
+          [PlanType.BUSINESS]:
+            "business",
+        };
+
+        planName =
+          reversePlanMap[
+            existingSub.plan
+          ] ?? null;
+      }
+    }
+
+    if (!planName) {
+      return NextResponse.json(
+        {
+          error:
+            "Unknown PayPal plan",
+        },
+        { status: 400 }
+      );
+    }
+
+    const subscriptionStatus =
+      String(
+        resource?.status ?? ""
+      ).toLowerCase() ||
+      "active";
+
+    const paypalCustomerId =
+      resource?.subscriber
+        ?.payer_id ||
+      resource?.payer
+        ?.payer_id ||
+      resource?.payer_info
+        ?.payer_id ||
+      null;
+
+    const nextBillingTime =
+      resource?.billing_info
+        ?.next_billing_time
+        ? new Date(
+            resource.billing_info
+              .next_billing_time
+          )
+        : null;
+
+    const existingSubscription =
+      paypalSubscriptionId
+        ? await db.subscription.findFirst(
+            {
+              where: {
+                paypalSubscriptionId,
+              },
+            }
+          )
+        : await db.subscription.findFirst(
+            {
+              where: {
+                userId: user.id,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            }
+          );
+
+    /*
+     * =====================================================
+     * SUBSCRIPTION ACTIVATED
+     * =====================================================
+     */
+    if (
+      eventName ===
+      "BILLING.SUBSCRIPTION.ACTIVATED"
+    ) {
+      const dbPlan =
+        PLAN_MAP_ON_ACTIVATE[
+          planName
+        ];
+
+      const creditsToGrant =
+        creditsForPlan(planName);
+
+      const isTrial =
+        planName === "trial";
+
+      await db.$transaction(
+        async (tx) => {
+          await tx.user.update({
+            where: {
+              id: user.id,
+            },
+            data: {
+              plan: dbPlan,
+
+              credits: {
+                increment:
+                  creditsToGrant,
+              },
+
+              trialStartedAt:
+                isTrial
+                  ? new Date()
+                  : null,
+
+              trialEndsAt:
+                isTrial
+                  ? new Date(
+                      Date.now() +
+                        3 *
+                          24 *
+                          60 *
+                          60 *
+                          1000
+                    )
+                  : null,
+
+              ...(paypalCustomerId
+                ? {
+                    paypalCustomerId,
+                  }
+                : {}),
+
+              ...(paypalSubscriptionId
+                ? {
+                    paypalSubscriptionId,
+                  }
+                : {}),
+            },
+          });
+
+          if (existingSubscription) {
+            await tx.subscription.update({
+              where: {
+                id:
+                  existingSubscription.id,
+              },
+              data: {
+                status:
+                  subscriptionStatus,
+
+                plan: dbPlan,
+
+                ...(nextBillingTime
+                  ? {
+                      currentPeriodEnd:
+                        nextBillingTime,
+                    }
+                  : {}),
+
+                ...(paypalSubscriptionId
+                  ? {
+                      paypalSubscriptionId,
+                    }
+                  : {}),
+
+                ...(paypalCustomerId
+                  ? {
+                      paypalCustomerId,
+                    }
+                  : {}),
+              },
+            });
+          } else {
+            await tx.subscription.create({
+              data: {
+                userId: user.id,
+                status:
+                  subscriptionStatus,
+                plan: dbPlan,
+
+                ...(paypalSubscriptionId
+                  ? {
+                      paypalSubscriptionId,
+                    }
+                  : {}),
+
+                ...(paypalCustomerId
+                  ? {
+                      paypalCustomerId,
+                    }
+                  : {}),
+
+                ...(nextBillingTime
+                  ? {
+                      currentPeriodEnd:
+                        nextBillingTime,
+                    }
+                  : {}),
+              },
+            });
+          }
+
+          await tx.webhookEvent.create({
+            data: {
+              eventId,
+            },
+          });
+        }
+      );
+    }
+
+    /*
+     * =====================================================
+     * PAYMENT COMPLETED
+     * =====================================================
+     */
+    else if (
+      eventName ===
+      "PAYMENT.SALE.COMPLETED"
+    ) {
+      const dbPlan =
+        PLAN_MAP_ON_PAYMENT[
+          planName
+        ];
+
+      const creditsToGrant =
+        planName === "trial"
+          ? creditsForPlan("monthly")
+          : creditsForPlan(
+              planName
+            );
+
+      const saleId =
+        resource?.id
+          ? String(resource.id)
+          : undefined;
+
+      const saleKey = saleId
+        ? `sale_${saleId}`
+        : null;
+
+      const amount = Number(
+        resource?.amount?.total ??
+          resource?.amount?.value ??
+          0
+      );
+
+      const currency = String(
+        resource?.amount?.currency ??
+          resource?.amount
+            ?.currency_code ??
+          "USD"
+      );
+
+      /*
+       * Use an interactive transaction instead
+       * of pushing different Prisma promise types
+       * into one array.
+       */
+      await db.$transaction(
+        async (tx) => {
+          await tx.user.update({
+            where: {
+              id: user.id,
+            },
+            data: {
+              plan: dbPlan,
+
+              credits: {
+                increment:
+                  creditsToGrant,
+              },
+
+              trialStartedAt: null,
+              trialEndsAt: null,
+
+              ...(paypalCustomerId
+                ? {
+                    paypalCustomerId,
+                  }
+                : {}),
+
+              ...(paypalSubscriptionId
+                ? {
+                    paypalSubscriptionId,
+                  }
+                : {}),
+            },
+          });
+
+          await tx.subscription.updateMany({
+            where:
+              paypalSubscriptionId
+                ? {
+                    paypalSubscriptionId,
+                  }
+                : {
+                    userId: user.id,
+                  },
+            data: {
+              status: "active",
+              plan: dbPlan,
+
+              ...(nextBillingTime
+                ? {
+                    currentPeriodEnd:
+                      nextBillingTime,
+                  }
+                : {}),
+
+              ...(paypalSubscriptionId
+                ? {
+                    paypalSubscriptionId,
+                  }
+                : {}),
+
+              ...(paypalCustomerId
+                ? {
+                    paypalCustomerId,
+                  }
+                : {}),
+            },
+          });
+
+          /*
+           * Save the PayPal payment only when
+           * PayPal supplied a sale ID.
+           *
+           * IMPORTANT:
+           * Do not add "provider" here because
+           * the Payment model does not contain
+           * a provider field.
+           */
+          if (saleKey) {
+            await tx.payment.upsert({
+              where: {
+                paypalOrderId:
+                  saleKey,
+              },
+
+              update: {
+                status:
+                  "COMPLETED",
+                paypalSubscriptionId:
+                  paypalSubscriptionId ??
+                  undefined,
+              },
+
+              create: {
+                userId: user.id,
+                amount,
+                currency,
+                paypalOrderId:
+                  saleKey,
+                paypalSubscriptionId:
+                  paypalSubscriptionId ??
+                  undefined,
+                status:
+                  "COMPLETED",
+              },
+            });
+          }
+
+          await tx.webhookEvent.create({
+            data: {
+              eventId,
+            },
+          });
+        }
+      );
+    }
+
+    /*
+     * =====================================================
+     * SUBSCRIPTION UPDATED / CANCELLED /
+     * EXPIRED / SUSPENDED
+     * =====================================================
+     */
+    else {
+      const isEnded = [
+        "expired",
+        "cancelled",
+        "suspended",
+      ].includes(
+        subscriptionStatus
+      );
+
+      await db.$transaction(
+        async (tx) => {
+          await tx.subscription.updateMany({
+            where:
+              paypalSubscriptionId
+                ? {
+                    paypalSubscriptionId,
+                  }
+                : {
+                    userId: user.id,
+                  },
+            data: {
+              status:
+                subscriptionStatus,
+
+              ...(nextBillingTime
+                ? {
+                    currentPeriodEnd:
+                      nextBillingTime,
+                  }
+                : {}),
+            },
+          });
+
+          /*
+           * Only reset the account for a truly
+           * ended subscription.
+           */
+          if (isEnded) {
+            await tx.user.update({
+              where: {
+                id: user.id,
+              },
+              data: {
+                plan:
+                  PlanType.TRIAL,
+                credits: 0,
+                trialStartedAt:
+                  null,
+                trialEndsAt:
+                  null,
+              },
+            });
+          }
+
+          await tx.webhookEvent.create({
+            data: {
+              eventId,
+            },
+          });
+        }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error(
+      "[PAYPAL_WEBHOOK_ERROR]",
+      error
+    );
+
     return NextResponse.json(
-      { error: error?.message || "Internal webhook error" },
+      {
+        error:
+          "Internal webhook error",
+      },
       { status: 500 }
     );
   }

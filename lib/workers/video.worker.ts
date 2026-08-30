@@ -3,12 +3,13 @@ import { connection } from "@/lib/redis";
 import { db } from "@/lib/db";
 import { refundCredits } from "@/lib/credits";
 import { dispatchVideoJob } from "@/lib/video-dispatch";
-import { VIDEO_QUEUE_NAME } from "@/lib/queues/video.queue";
+import { VIDEO_QUEUE_NAME, getVideoQueue } from "@/lib/queues/video.queue";
 import { createServer } from "node:http";
 
 const concurrency = Math.max(1, Number(process.env.VIDEO_WORKER_CONCURRENCY || 1));
 const healthPort = Number(process.env.VIDEO_WORKER_HEALTH_PORT || 0);
 if (!connection) throw new Error("REDIS_URL is missing in environment variables");
+const redisConnection = connection;
 
 export const videoWorker = new Worker(
   VIDEO_QUEUE_NAME,
@@ -29,7 +30,7 @@ export const videoWorker = new Worker(
     }
   },
   {
-    connection,
+    connection: redisConnection,
     concurrency,
     lockDuration: Number(process.env.VIDEO_WORKER_LOCK_DURATION_MS || 120_000),
     stalledInterval: Number(process.env.VIDEO_WORKER_STALLED_INTERVAL_MS || 30_000),
@@ -45,7 +46,7 @@ let healthServer: ReturnType<typeof createServer> | null = null;
 if (healthPort > 0) {
   healthServer = createServer(async (_req, res) => {
     try {
-      const counts = await videoWorker.getJobCounts();
+      const counts = await getVideoQueue().getJobCounts();
       res.writeHead(videoWorker.isRunning() ? 200 : 503, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: videoWorker.isRunning(), worker: "video", counts, pid: process.pid, uptime: process.uptime() }));
     } catch (error) {
@@ -63,7 +64,7 @@ async function shutdown(signal: string) {
   console.log(`VIDEO_WORKER shutting down (${signal})`);
   healthServer?.close();
   await videoWorker.close();
-  await connection.quit().catch(() => undefined);
+  await redisConnection.quit().catch(() => undefined);
   process.exit(0);
 }
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
