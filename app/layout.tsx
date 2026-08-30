@@ -175,7 +175,7 @@ export default function RootLayout({
             playsInline
             className="pointer-events-none fixed inset-0 -z-[45] h-full w-full object-cover opacity-[0.12]"
           >
-            <source src="/bg-video.mp4" type="video/mp4" />
+            <source src="/demo/videos/demo.mp4" type="video/mp4" />
           </video>
 
           {/* ✨ CYAN GLOW */}
