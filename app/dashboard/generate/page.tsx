@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { VIDEO_CREDITS_PER_SECOND } from "@/lib/config";
 import { 
   Video, ImageIcon, Wand2, Sparkles, ArrowLeft, Loader2, Play, Film,
   Plus, LifeBuoy, X, PanelLeft, Mic, SlidersHorizontal, Tv, Flame, Upload, 
@@ -133,14 +134,6 @@ const [showDurationModal, setShowDurationModal] = useState(false);
     const clientJobId = crypto.randomUUID();
     setRenderQueue(prev => [{ id: clientJobId, prompt: currentPrompt, progress: 5, status: "rendering", type: activeType }, ...prev]);
 
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        const nextProgress = prev + Math.floor(Math.random() * 12) + 4;
-        const currentProgress = nextProgress >= 95 ? 95 : nextProgress;
-        setRenderQueue(q => q.map(j => j.id === clientJobId ? { ...j, progress: currentProgress } : j));
-        return currentProgress;
-      });
-    }, 500);
 
     try {
       let targetEndpoint = "/api/generate-video";
@@ -168,7 +161,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
 
       const response = await fetch(targetEndpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": clientJobId },
         body: JSON.stringify(requestBody)
       });
 
@@ -183,11 +176,26 @@ const [showDurationModal, setShowDurationModal] = useState(false);
         throw new Error(data.error || "حدث خطأ غير متوقع");
       }
 
-      const data = await response.json();
-      clearInterval(interval);
+      let data = await response.json();
+      if (activeType === "ai-video" && data.jobId) {
+        let finished = false;
+        for (let attempt = 0; attempt < 180; attempt++) {
+          const check = await fetch(`/api/generate-video/status?jobId=${encodeURIComponent(data.jobId)}`, { cache: "no-store" });
+          const state = await check.json();
+          if (typeof state.progress === "number") {
+            setProgress(state.progress);
+            setRenderQueue(q => q.map(j => j.id === clientJobId ? { ...j, progress: state.progress } : j));
+          }
+          if (state.status === "done") { data = { ...data, videoUrl: state.videoUrl || state.video }; finished = true; break; }
+          if (state.status === "failed" || state.status === "cancelled") throw new Error(state.error || "Video generation failed");
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        if (!finished) throw new Error("Video generation timed out");
+      }
       setProgress(100);
 
-      const outputUrl = data.videoUrl || data.avatar || data.outputUrl || "https://assets.mixkit.co/videos/preview/mixkit-abstract-laser-lights-background-32124-large.mp4";
+      const outputUrl = data.videoUrl || data.avatar || data.outputUrl || null;
+      if (!outputUrl) throw new Error("No output was returned by the generation pipeline");
 
       if (activeType === "ai-avatar" && outputUrl) {
         setLastGeneratedAvatarUrl(outputUrl);
@@ -195,14 +203,14 @@ const [showDurationModal, setShowDurationModal] = useState(false);
 
       const reply: Message = { 
         role: "assistant", 
-        content: `⚡ تم الانتهاء من معالجة روتينات الإخراج بنجاح.\n• الرصيد المتبقي: ${data.remainingCredits || (credits - 10)}`, 
+        content: `⚡ تم الانتهاء من معالجة روتينات الإخراج بنجاح.\n• الرصيد المتبقي: ${data.remainingCredits ?? credits}`, 
         outputUrl: outputUrl,
         meta: { type: (activeType === "voice-clone" && isLipSyncActive) ? "ai-video" : activeType }
       };
 
       setChats((prev) => prev.map((c) => c.id === activeChatId ? { ...c, messages: [...c.messages, reply] } : c));
       setRenderQueue(prev => prev.map(j => j.id === clientJobId ? { ...j, progress: 100, status: "completed" } : j));
-      setCredits(data.remainingCredits || (credits - 10));
+      setCredits(data.remainingCredits ?? credits);
 
     } catch (e: any) {
       clearInterval(interval);
@@ -525,7 +533,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
 </button>
               </div>
               <div className="text-[10px] text-zinc-500 text-center font-mono">
-                Output Engine: AMKAAI-Video-v2.6 • Resolution up to 4K Ultra
+                Wan 2.2 TI2V-5B • RTX 4090 on demand • 5 credits/second • 5s clips
               </div>
             </div>
 
@@ -575,7 +583,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                 onClick={() => { setShowDurationModal(false); handleGenerateVideo(); }}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 font-bold text-white transition hover:opacity-90"
               >
-                Confirm ({Math.ceil(selectedDuration / 5) * 3} credits)
+                Confirm ({selectedDuration * VIDEO_CREDITS_PER_SECOND} credits)
               </button>
             </div>
           </div>

@@ -1,0 +1,60 @@
+AMKAAI FINAL PATCH — VIDEO INFRASTRUCTURE + CREATIVE STUDIO
+
+This patch supersedes all previous AMKAAI patches. Use this ZIP only.
+
+MAIN VIDEO STACK
+- Wan2.2-TI2V-5B as the default video model.
+- RTX 4090 Pod rented on demand through the RunPod REST API.
+- Redis + BullMQ queue.
+- 5-second video clips.
+- 5 Credits per second for the user.
+- 30 seconds = 6 clips = 150 Credits.
+- GPU is reused while there is active/queued work.
+- GPU is terminated after the configured idle grace period.
+- Failed/cancelled scenes are retried/cancelled individually; completed scenes are not regenerated.
+- Actual GPU time is intentionally tracked/observable before changing pricing.
+
+CREATIVE STUDIO
+- AI Director / continuity bible.
+- Storyboard and scenes.
+- Character and voice selection per scene.
+- Scene cost preview.
+- Generation pipeline and final composition hooks.
+- Project/assets/history structure.
+
+PAYMENTS
+- PayPal remains the payment gateway.
+- No Stripe migration is included.
+
+RUNPOD DIRECT POD REQUIREMENT
+The patch manages Pod lifecycle, but the Pod itself must contain a tested Wan 2.2 TI2V-5B HTTP server.
+Configure either RUNPOD_POD_TEMPLATE_ID or RUNPOD_POD_IMAGE.
+The service contract is documented in RUNPOD-4090-AUTO-MANAGER.md.
+
+REQUIRED ENVIRONMENT
+RUNPOD_DIRECT_POD_ENABLED=true
+RUNPOD_API_KEY=...
+RUNPOD_WEBHOOK_SECRET=...
+NEXT_PUBLIC_APP_URL=https://amkaai.net
+RUNPOD_POD_TEMPLATE_ID=...
+RUNPOD_GPU_TYPE=NVIDIA GeForce RTX 4090
+RUNPOD_CLOUD_TYPE=COMMUNITY
+RUNPOD_POD_HTTP_PORT=8000
+RUNPOD_POD_GENERATE_PATH=/generate
+RUNPOD_POD_HEALTH_PATH=/health
+RUNPOD_POD_CANCEL_PATH=/cancel
+RUNPOD_GPU_IDLE_GRACE_MS=300000
+RUNPOD_POD_READY_TIMEOUT_MS=1200000
+RUNPOD_POD_REQUEST_TIMEOUT_MS=30000
+DEFAULT_VIDEO_MODEL=Wan2.2-TI2V-5B
+
+DO NOT overwrite .env or .env.local with a patch file.
+Backup the project before replacing files.
+
+POST-INSTALL
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npm run typecheck
+npm run build
+npm run worker

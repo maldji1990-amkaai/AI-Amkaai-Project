@@ -126,8 +126,7 @@ export default function HomePage() {
   const [renderETA, setRenderETA] = useState<number | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [videosGenerated, setVideosGenerated] = useState(12847);
-  useEffect(() => { setVideosGenerated(12847 + Math.floor(Math.random() * 200)); }, []);
+  const [videosGenerated, setVideosGenerated] = useState(0);
   const [locale, setLocale] = useState<'ar' | 'en'>('en');
 
   // DETECT LOCALE BY BROWSER LANGUAGE (no CORS issues)
@@ -139,13 +138,7 @@ export default function HomePage() {
     }
   }, []);
 
-  // LIVE COUNT — يتغير كل ثانية
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLiveCount(v => v + Math.floor(Math.random() * 3) - 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   // PROMPT QUALITY
   const promptQuality = (() => {
@@ -156,12 +149,20 @@ export default function HomePage() {
     return "excellent" as const;
   })();
 
-  // LIVE STATS TICKER
+  // LIVE STATS — values come from the backend, never simulated in the UI.
   useEffect(() => {
-    const interval = setInterval(() => {
-      setVisitors((v) => v + Math.floor(Math.random() * 2));
-      setOnline(25 + Math.floor(Math.random() * 15));
-    }, 4000);
+    const loadStats = async () => {
+      try {
+        const res = await fetch("/api/visitors", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.visitors === "number") setVisitors(data.visitors);
+        if (typeof data.online === "number") setOnline(data.online);
+        if (typeof data.videosGenerated === "number") setVideosGenerated(data.videosGenerated);
+      } catch { /* stats are non-critical */ }
+    };
+    loadStats();
+    const interval = setInterval(loadStats, 30000);
     return () => clearInterval(interval);
   }, []);
 

@@ -55,14 +55,14 @@ export default function AIVideoPage() {
 
       const finalPrompt = `${prompt}, ${style}`;
 
-      const res = await fetch("/api/video", {
+      const res = await fetch("/api/generate-video", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ prompt: finalPrompt, quality }),
       });
 
-      if (res.status === 403) {
-        alert("❌ Not enough credits");
+      if (res.status === 402 || res.status === 403) {
+        alert(res.status === 402 ? "Not enough credits" : "Subscription expired");
         setLoading(false);
         return;
       }
@@ -82,19 +82,11 @@ export default function AIVideoPage() {
         try {
           attempts++;
 
-          const check = await fetch("/api/video/status", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ jobId: data.jobId }),
-          });
+          const check = await fetch(`/api/generate-video/status?jobId=${encodeURIComponent(data.jobId)}`);
 
           const resData = await check.json();
 
-          // 🎯 progress ذكي
-          setProgress((prev) => {
-            const next = prev + Math.random() * 5;
-            return next > 95 ? 95 : next;
-          });
+          if (typeof resData.progress === "number") setProgress(Math.max(0, Math.min(100, resData.progress)));
 
           if (resData.position !== undefined) {
             setPosition(resData.position);
@@ -150,7 +142,7 @@ export default function AIVideoPage() {
   const cancelJob = async () => {
     if (!jobId) return;
 
-    await fetch("/api/video/cancel", {
+    await fetch("/api/generate-video/cancel", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({ jobId }),

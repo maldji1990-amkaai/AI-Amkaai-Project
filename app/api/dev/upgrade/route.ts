@@ -1,22 +1,8 @@
-import { prisma } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  const { userId } = await await auth();
-
-  if (!userId) {
-    return new NextResponse("Unauthorized", { status: 401 });
+  if (process.env.NODE_ENV === "production" || process.env.ALLOW_DEV_UPGRADE !== "true") {
+    return NextResponse.json({ error: "Not available" }, { status: 404 });
   }
-
-  await prisma.user.upsert({
-    where: { clerkId: userId },
-    update: { plan: "PRO" },
-    create: {
-      clerkId: userId,
-      plan: "PRO",
-    },
-  });
-
-  return NextResponse.json({ message: "Upgraded to PRO" });
+  return NextResponse.json({ error: "Dev upgrade is disabled in this build." }, { status: 410 });
 }
