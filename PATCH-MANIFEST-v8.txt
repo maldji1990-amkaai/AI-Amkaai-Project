@@ -1,0 +1,31 @@
+AMKAAI FINAL PRODUCTION PATCH v8
+
+This ZIP is a superseding patch, not the complete application source.
+Apply it over the current AMKAAI codebase that already contains the previous video/creative-studio patches.
+
+REPLACED / UPDATED
+- lib/runpod-pod-manager.ts
+- lib/video-dispatch.ts
+- lib/queues/video.queue.ts
+- lib/workers/video.worker.ts
+- app/api/webhook/runpod/route.ts
+- app/api/generate-video/cancel/route.ts
+- package.json
+
+ADDED
+- lib/workers/video-gpu-reconciler.ts
+- ecosystem.config.cjs
+- .env.worker.example
+- VIDEO-WORKER-PRODUCTION.md
+- FINAL-PATCH-v8-NOTES.txt
+- PATCH-MANIFEST-v8.txt
+
+UNCHANGED FROM v7 / INCLUDED FOR SUPERSCRIPT PATCH COMPLETENESS
+All other files in this ZIP are the v7 patch files so v8 can supersede v7 as one patch archive.
+
+IMPORTANT
+1. Do not replace the full project with this ZIP; it is a patch.
+2. Do not overwrite .env or .env.local.
+3. The persistent worker service must run both PM2 apps from ecosystem.config.cjs.
+4. The worker service needs the same REDIS_URL and DATABASE_URL as the Vercel app.
+5. RunPod must contain a real Wan 2.2 TI2V-5B server exposing the documented HTTP contract.

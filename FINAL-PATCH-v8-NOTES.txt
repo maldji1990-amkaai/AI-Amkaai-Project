@@ -1,0 +1,30 @@
+AMKAAI v8 — PRODUCTION WORKER HARDENING
+
+This patch supersedes v7 for the production video infrastructure layer.
+
+CHANGED
+- Long-running video worker is explicitly deployable outside Vercel.
+- Added independent video-gpu-reconciler process so GPU cleanup does not depend on the video worker staying alive.
+- Added PM2 ecosystem configuration for both processes.
+- Added production worker environment example.
+- Added graceful SIGTERM/SIGINT shutdown and worker health endpoint.
+- Added GPU lease tracking by VideoJob ID using a Redis set; release is idempotent and the previous double-release bug is removed.
+- Reconciler repairs Redis GPU leases from PROCESSING VideoJob rows.
+- Added recovery for old PENDING video jobs whose queue entry disappeared.
+- BullMQ video queue now uses VideoJob.id as jobId to collapse duplicate queue entries.
+- Added Redis dispatch lease around provider submission to protect the crash window before externalJobId is persisted.
+- Provider payload continues to use job_id/custom_id = VideoJob.id; the Wan server should deduplicate by that key.
+- Added optional RunPod /status/:providerJobId contract for advanced recovery.
+- Completion/failure/cancel webhooks release the exact job lease once and remain safe on duplicate callbacks.
+- Worker concurrency defaults to 1 for a single 24GB RTX 4090; increase only after a real VRAM benchmark.
+- User pricing remains 5 Credits/second.
+- Video clip length remains 5 seconds.
+- PayPal and the UI are unchanged.
+
+IMPORTANT
+The persistent worker host can be a small VPS/Railway/Render/Fly worker. It does NOT need a GPU.
+RunPod remains the only GPU provider.
+
+REQUIRED PRODUCTION TEST
+Do not launch commercially until this path passes:
+request -> Redis -> worker -> create RTX 4090 -> Wan 2.2 -> webhook -> DB completed -> exact lease released -> idle grace -> Pod terminated.

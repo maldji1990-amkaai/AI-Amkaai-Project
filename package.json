@@ -17,7 +17,10 @@
     "worker": "tsx --env-file=.env.local lib/workers/video.worker.ts",
     "worker:dev": "tsx watch --env-file=.env.local lib/workers/video.worker.ts",
     "clean": "rm -rf node_modules .next package-lock.json",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "worker:prod": "tsx lib/workers/video.worker.ts",
+    "gpu:reconciler": "tsx lib/workers/video-gpu-reconciler.ts",
+    "gpu:reconciler:dev": "tsx watch --env-file=.env.local lib/workers/video-gpu-reconciler.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

@@ -1,0 +1,28 @@
+AMKAAI FINAL PRODUCTION PATCH v9
+
+Supersedes v8 for the production infrastructure layer.
+Includes all v8 files plus an independent Vercel Cron GPU safety net.
+
+ADDED
+- app/api/cron/video-gpu/route.ts
+- .env.vercel-cron.example
+- vercel.cron.snippet.json
+- VERCEL-CRON-SAFETY-NET-v9.md
+
+SAFETY MODEL
+- VPS video worker processes BullMQ jobs.
+- VPS GPU reconciler performs continuous cleanup while VPS is alive.
+- Vercel Cron independently reconciles GPU state so a complete VPS outage does not
+  remove the only cleanup path.
+- Cron endpoint requires CRON_SECRET and fails closed if it is missing.
+
+IMPORTANT
+Merge the cron entry into the project's existing vercel.json; do not blindly replace
+an existing vercel.json because the patch archive intentionally does not overwrite
+project-specific Vercel settings.
+
+Business/UI behavior unchanged:
+- 5 Credits / second
+- 5-second video clips
+- PayPal unchanged
+- UI unchanged

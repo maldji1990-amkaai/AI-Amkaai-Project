@@ -4,10 +4,10 @@ import { db } from "@/lib/db";
 import { refundCredits } from "@/lib/credits";
 import { dispatchVideoJob } from "@/lib/video-dispatch";
 import { VIDEO_QUEUE_NAME } from "@/lib/queues/video.queue";
-import { releaseVideoGpu, reconcileVideoGpu } from "@/lib/runpod-pod-manager";
+import { createServer } from "node:http";
 
-const concurrency = Math.max(1, Number(process.env.VIDEO_WORKER_CONCURRENCY || 2));
-
+const concurrency = Math.max(1, Number(process.env.VIDEO_WORKER_CONCURRENCY || 1));
+const healthPort = Number(process.env.VIDEO_WORKER_HEALTH_PORT || 0);
 if (!connection) throw new Error("REDIS_URL is missing in environment variables");
 
 export const videoWorker = new Worker(
@@ -18,12 +18,8 @@ export const videoWorker = new Worker(
       return await dispatchVideoJob(videoJobId);
     } catch (error) {
       const record = await db.videoJob.findUnique({ where: { id: videoJobId } });
-      if (!record?.externalJobId) await releaseVideoGpu().catch(() => undefined);
       if (record && !record.externalJobId && job.attemptsMade + 1 >= (record.maxAttempts || 3)) {
-        await db.videoJob.update({
-          where: { id: videoJobId },
-          data: { status: "FAILED", error: String(error), finishedAt: new Date() },
-        });
+        await db.videoJob.updateMany({ where: { id: videoJobId, status: { in: ["PENDING", "PROCESSING"] } }, data: { status: "FAILED", error: String(error), finishedAt: new Date() } });
         if (record.usageId) {
           const usage = await db.usage.findUnique({ where: { id: record.usageId }, select: { referenceId: true } });
           if (usage?.referenceId) await refundCredits(usage.referenceId).catch(() => undefined);
@@ -32,15 +28,47 @@ export const videoWorker = new Worker(
       throw error;
     }
   },
-  { connection, concurrency }
+  {
+    connection,
+    concurrency,
+    lockDuration: Number(process.env.VIDEO_WORKER_LOCK_DURATION_MS || 120_000),
+    stalledInterval: Number(process.env.VIDEO_WORKER_STALLED_INTERVAL_MS || 30_000),
+    maxStalledCount: 2,
+  }
 );
 
-videoWorker.on("completed", (job) => console.log(`✅ Video dispatch queued: ${job.id}`));
-videoWorker.on("failed", (job, error) => console.error(`❌ Video worker failed: ${job?.id}`, error));
+videoWorker.on("completed", job => console.log(`VIDEO_WORKER completed dispatch job=${job.id}`));
+videoWorker.on("failed", (job, error) => console.error(`VIDEO_WORKER failed job=${job?.id}`, error));
+videoWorker.on("error", error => console.error("VIDEO_WORKER error", error));
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log(`🎬 AmkaAI video worker started (concurrency=${concurrency})`);
+let healthServer: ReturnType<typeof createServer> | null = null;
+if (healthPort > 0) {
+  healthServer = createServer(async (_req, res) => {
+    try {
+      const counts = await videoWorker.getJobCounts();
+      res.writeHead(videoWorker.isRunning() ? 200 : 503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: videoWorker.isRunning(), worker: "video", counts, pid: process.pid, uptime: process.uptime() }));
+    } catch (error) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: String(error) }));
+    }
+  });
+  healthServer.listen(healthPort, "0.0.0.0", () => console.log(`VIDEO_WORKER health listening on :${healthPort}`));
 }
 
-const gpuReconciler = setInterval(() => { reconcileVideoGpu().catch((error) => console.error("GPU reconciler failed", error)); }, 60_000);
-if (typeof gpuReconciler.unref === "function") gpuReconciler.unref();
+let shuttingDown = false;
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`VIDEO_WORKER shutting down (${signal})`);
+  healthServer?.close();
+  await videoWorker.close();
+  await connection.quit().catch(() => undefined);
+  process.exit(0);
+}
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("uncaughtException", error => { console.error("VIDEO_WORKER uncaughtException", error); void shutdown("uncaughtException"); });
+process.on("unhandledRejection", error => console.error("VIDEO_WORKER unhandledRejection", error));
+
+console.log(`AmkaAI video worker started concurrency=${concurrency}`);

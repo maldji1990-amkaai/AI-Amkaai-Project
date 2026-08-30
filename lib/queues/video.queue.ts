@@ -24,6 +24,9 @@ export async function enqueueVideoJob(videoJobId: string, priority = 0) {
   return getVideoQueue().add(
     "dispatch-video",
     { videoJobId },
-    { priority: Math.max(0, 100 - Math.min(100, Math.max(0, priority))) }
+    {
+      jobId: videoJobId,
+      priority: Math.max(0, 100 - Math.min(100, Math.max(0, priority))),
+    }
   );
 }

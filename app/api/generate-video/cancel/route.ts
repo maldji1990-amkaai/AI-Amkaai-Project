@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { refundCredits } from "@/lib/credits";
-import { cancelVideoOnPod } from "@/lib/runpod-pod-manager";
+import { cancelVideoOnPod, releaseCompletedVideoLease } from "@/lib/runpod-pod-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -30,11 +30,13 @@ export async function POST(req: Request) {
     if (job.externalJobId) {
       try {
         const input = job.input && typeof job.input === "object" ? job.input as Record<string, unknown> : {};
-        await cancelVideoOnPod(typeof input.runpod_pod_id === "string" ? input.runpod_pod_id : null, job.externalJobId);
+        await cancelVideoOnPod(typeof input.runpod_pod_id === "string" ? input.runpod_pod_id : null, job.externalJobId, job.id);
       } catch (error) {
         console.error("RunPod cancellation failed", error);
       }
     }
+
+    await releaseCompletedVideoLease(job.id).catch(() => undefined);
 
     if (job.usageId) {
       const usage = await db.usage.findUnique({ where: { id: job.usageId }, select: { referenceId: true } });
