@@ -13,7 +13,7 @@ const replicate = new Replicate({
 
 export async function POST(request: Request) {
   // 🎯 إنشاء معرّف فريد للعملية لربط حجز النقاط وإرجاعها في حال الفشل
-  const referenceId = `avt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const referenceId = `avt_${crypto.randomUUID()}`;
 
   try {
     console.log("🚀 REAL AI AVATAR API HIT");
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         data: {
           clerkId: userId,
           credits: 10,
-          plan: PlanType.FREE,
+          plan: PlanType.TRIAL,
         },
       });
       console.log("✅ New user created on the fly:", user.id);
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     //////////////////////////////////////////////////
     // 🧠 DEMO MODE (FREE USERS)
     //////////////////////////////////////////////////
-    if (user.plan === PlanType.FREE) {
+    if (user.plan === PlanType.TRIAL) {
       const avatar = demoAvatars[Math.floor(Math.random() * demoAvatars.length)];
 
       // علم العملية كـ COMPLETED لأن الخدمة سلمت النتيجة الفورية للمستخدم

@@ -12,7 +12,7 @@ const replicate = new Replicate({
 
 export async function POST(request: Request) {
   // 🎯 إنشاء معرف فريد للعملية لمتابعة حجز النقاط وإرجاعها تلقائياً في حال الفشل
-  const referenceId = `voc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const referenceId = `voc_${crypto.randomUUID()}`;
 
   try {
     console.log("🚀 HEYGEN-STYLE VOICE CLONE & LIP-SYNC API HIT");
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
         data: {
           clerkId: userId,
           credits: 10,
-          plan: PlanType.FREE,
+          plan: PlanType.TRIAL,
         },
       });
     }
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     //////////////////////////////////////////////////
     // 🧠 DEMO MODE (FREE USERS)
     //////////////////////////////////////////////////
-    if (user.plan === PlanType.FREE) {
+    if (user.plan === PlanType.TRIAL) {
       // إرسال ملف صوتي تجريبي سريع لتوفير موارد السيرفر الحقيقية
       const demoAudio = "https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg";
       

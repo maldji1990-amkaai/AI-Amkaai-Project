@@ -11,7 +11,7 @@ const replicate = new Replicate({
 });
 
 export async function POST(request: Request) {
-  const referenceId = `img2vid_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const referenceId = `img2vid_${crypto.randomUUID()}`;
 
   try {
     console.log("🚀 HEYGEN-STYLE IMAGE-TO-VIDEO API HIT");
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         data: {
           clerkId: userId,
           credits: 10,
-          plan: PlanType.FREE,
+          plan: PlanType.TRIAL,
         },
       });
     }
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     }
 
     // 4️⃣ وضع المحاكاة للمستخدمين المجانيين (FREE DEMO MODE)
-    if (user.plan === PlanType.FREE) {
+    if (user.plan === PlanType.TRIAL) {
       // إرجاع فيديو ديمو عشوائي جاهز لعدم استهلاك سيرفرات الـ GPU الحقيقية مجاناً
       const fallbackVideo = demoVideos ? demoVideos[Math.floor(Math.random() * demoVideos.length)] : "https://replicate.delivery/pbxt/IJ9ZJ6cOsnwUuH1F6gA8G...";
       

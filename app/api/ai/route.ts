@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -122,6 +123,10 @@ if (isDemo) {
         { status: 400 }
       );
     }
+
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (prompt.length > 2000) return NextResponse.json({ error: "Prompt too long" }, { status: 400 });
 
     // =========================
     // 🖼️ IMAGE
