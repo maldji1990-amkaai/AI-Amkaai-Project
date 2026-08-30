@@ -1,184 +1,39 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { JobStatus } from "@prisma/client";
 
-//////////////////////////////////////////////////
-// 🧠 STATUS MAPPER (FIX TS + CLEAN UX)
-//////////////////////////////////////////////////
+export const dynamic = "force-dynamic";
 
-function mapStatus(status: JobStatus): string {
-  switch (status) {
-    case "PENDING":
-      return "pending";
-    case "PROCESSING":
-      return "processing";
-    case "COMPLETED":
-      return "done";
-    case "FAILED":
-      return "failed";
-    case "CANCELLED":
-      return "cancelled";
-    default:
-      return "unknown";
-  }
-}
-
-//////////////////////////////////////////////////
-// 🚀 VIDEO JOB STATUS API (PRODUCTION READY)
-//////////////////////////////////////////////////
-
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
-    //////////////////////////////////////////////////
-    // 📥 INPUT SAFE PARSING
-    //////////////////////////////////////////////////
-    let body;
+    const { userId: clerkId } = await auth();
+    if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const jobId = new URL(req.url).searchParams.get("jobId");
+    if (!jobId) return NextResponse.json({ error: "jobId is required" }, { status: 400 });
+    const user = await db.user.findUnique({ where: { clerkId }, select: { id: true } });
+    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    const job = await db.videoJob.findUnique({ where: { id: jobId } });
+    if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    if (job.userId !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json(
-        { error: "invalid_json" },
-        { status: 400 }
-      );
-    }
-
-    const jobId = body?.jobId;
-
-    if (!jobId) {
-      return NextResponse.json(
-        { error: "jobId_required" },
-        { status: 400 }
-      );
-    }
-
-    //////////////////////////////////////////////////
-    // 🔎 FETCH JOB (optimized)
-    //////////////////////////////////////////////////
-    const job = await db.videoJob.findUnique({
-      where: { id: jobId },
-      select: {
-        id: true,
-        status: true,
-        priority: true,
-        createdAt: true,
-        resultUrl: true,
-        error: true,
-      },
-    });
-
-    if (!job) {
-      return NextResponse.json(
-        { error: "job_not_found" },
-        { status: 404 }
-      );
-    }
-
-    //////////////////////////////////////////////////
-    // ⚡ FAST EXIT STATES
-    //////////////////////////////////////////////////
-
-    if (job.status === "CANCELLED") {
-      return NextResponse.json({
-        status: "cancelled",
-        video: null,
-        position: null,
-        estimatedTime: 0,
-      });
-    }
-
-    if (job.status === "COMPLETED") {
-      return NextResponse.json({
-        status: "done",
-        video: job.resultUrl,
-        position: 0,
-        estimatedTime: 0,
-      });
-    }
-
-    if (job.status === "FAILED") {
-      return NextResponse.json({
-        status: "failed",
-        video: null,
-        position: null,
-        estimatedTime: 0,
-        error: job.error ?? "Generation failed",
-      });
-    }
-
-    //////////////////////////////////////////////////
-    // 📊 QUEUE POSITION (efficient ranking)
-    //////////////////////////////////////////////////
-
-    const position = await db.videoJob.count({
-      where: {
-        status: {
-          in: ["PENDING", "PROCESSING"],
-        },
-        OR: [
-          {
-            priority: { gt: job.priority },
-          },
-          {
-            priority: job.priority,
-            createdAt: { lt: job.createdAt },
-          },
-        ],
-      },
-    });
-
-    //////////////////////////////////////////////////
-    // ⏱ ESTIMATION ENGINE
-    //////////////////////////////////////////////////
-
-    const baseTimePerJob =
-      job.priority >= 8
-        ? 12
-        : job.priority >= 4
-        ? 20
-        : 30;
-
-    const estimatedTime = position * baseTimePerJob;
-
-    //////////////////////////////////////////////////
-    // 🔄 ACTIVE STATES
-    //////////////////////////////////////////////////
-
-    if (job.status === "PENDING") {
-      return NextResponse.json({
-        status: "pending",
-        video: null,
-        position,
-        estimatedTime,
-      });
-    }
-
-    if (job.status === "PROCESSING") {
-      return NextResponse.json({
-        status: "processing",
-        video: null,
-        position,
-        estimatedTime: Math.max(estimatedTime, 5),
-      });
-    }
-
-    //////////////////////////////////////////////////
-    // 🧠 FALLBACK (FIXED ❌ toLowerCase ERROR)
-    //////////////////////////////////////////////////
-
+    const position = job.status === "PENDING"
+      ? await db.videoJob.count({ where: { userId: user.id, status: "PENDING", OR: [{ priority: { gt: job.priority } }, { priority: job.priority, createdAt: { lt: job.createdAt } }] } })
+      : 0;
+    const status = job.status.toLowerCase() === "completed" ? "done" : job.status.toLowerCase();
     return NextResponse.json({
-      status: mapStatus(job.status), // ✅ FIX
-      video: job.resultUrl ?? null,
+      jobId: job.id,
+      status,
+      progress: job.status === "COMPLETED" ? 100 : job.progress,
+      videoUrl: job.resultUrl,
+      video: job.resultUrl,
+      error: job.error,
       position,
-      estimatedTime,
+      estimatedTime: job.status === "PENDING" ? position * 30 : job.status === "PROCESSING" ? 5 : 0,
+      createdAt: job.createdAt,
+      finishedAt: job.finishedAt,
     });
-
   } catch (error) {
-    console.error("STATUS API ERROR:", error);
-
-    return NextResponse.json(
-      { error: "internal_server_error" },
-      { status: 500 }
-    );
+    console.error("VIDEO STATUS ROUTE ERROR", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
