@@ -27,6 +27,7 @@ export async function POST(req: Request) {
       characterIds: Array.isArray(body?.characterIds) ? body.characterIds.map(String) : [],
       voiceProfileId: body?.voiceProfileId || null,
       referenceId: req.headers.get("Idempotency-Key")?.trim() || undefined,
+      imageUrl: typeof body?.imageUrl === "string" ? body.imageUrl : null,
     });
     return NextResponse.json({ success: true, ...result, status: "queued" });
   } catch (error: any) {

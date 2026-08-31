@@ -17,6 +17,7 @@ export async function createQueuedVideoJob(args: {
   voiceProfileId?: string | null;
   generationId?: string | null;
   referenceId?: string;
+  imageUrl?: string | null;
 }) {
   const durationSeconds = normalizeVideoDuration(args.duration);
   const plan = args.clerkId ? await getUserPlan(args.clerkId) : "trial";
@@ -91,6 +92,7 @@ export async function createQueuedVideoJob(args: {
         durationSeconds,
         clipCount,
         model,
+        imageUrl: args.imageUrl || null,
         input: {
           project_id: args.projectId || null,
           scene_id: args.sceneId || null,

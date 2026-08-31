@@ -94,15 +94,18 @@ async function createPod() {
     gpuTypeIds: [process.env.RUNPOD_GPU_TYPE || DEFAULT_GPU],
     gpuCount: 1,
     containerDiskInGb: Math.trunc(envNumber("RUNPOD_POD_CONTAINER_DISK_GB", 50)),
-    volumeInGb: Math.trunc(envNumber("RUNPOD_POD_VOLUME_GB", 40)),
+    volumeInGb: Math.trunc(envNumber("RUNPOD_POD_VOLUME_GB", 80)),
+    volumeMountPath: process.env.RUNPOD_POD_VOLUME_MOUNT_PATH || "/workspace",
     ports: [`${port}/http`],
     cloudType: process.env.RUNPOD_CLOUD_TYPE || "COMMUNITY",
     computeType: "GPU",
   };
+  if (process.env.RUNPOD_NETWORK_VOLUME_ID) {
+    body.networkVolumeId = process.env.RUNPOD_NETWORK_VOLUME_ID;
+  }
   if (templateId) body.templateId = templateId; else body.imageName = imageName;
   if (process.env.RUNPOD_POD_DOCKER_START_CMD) body.dockerStartCmd = process.env.RUNPOD_POD_DOCKER_START_CMD.split(" ").filter(Boolean);
   if (process.env.RUNPOD_POD_DOCKER_ENTRYPOINT) body.dockerEntrypoint = process.env.RUNPOD_POD_DOCKER_ENTRYPOINT.split(" ").filter(Boolean);
-  if (process.env.RUNPOD_POD_VOLUME_MOUNT_PATH) body.volumeMountPath = process.env.RUNPOD_POD_VOLUME_MOUNT_PATH;
   if (process.env.RUNPOD_POD_ENV_JSON) {
     try { body.env = JSON.parse(process.env.RUNPOD_POD_ENV_JSON); } catch { throw new Error("RUNPOD_POD_ENV_JSON_INVALID"); }
   }

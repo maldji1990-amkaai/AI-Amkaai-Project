@@ -36,6 +36,7 @@ export async function dispatchVideoJob(videoJobId: string) {
     clip_count: clipCount,
     model,
     user_id: job.userId,
+    ...(job.imageUrl ? { image_url: job.imageUrl } : {}),
     ...(input.project_id ? { project_id: input.project_id } : {}),
     ...(input.scene_id ? { scene_id: input.scene_id } : {}),
     ...(Array.isArray(input.character_ids) ? { character_ids: input.character_ids, character_references: characterReferences } : {}),

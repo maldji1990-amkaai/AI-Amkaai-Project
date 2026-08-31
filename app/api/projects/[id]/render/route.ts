@@ -53,6 +53,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         voiceProfileId: scene.voiceProfileId || voiceProfileId || (typeof metadata.voiceProfileId === "string" ? metadata.voiceProfileId : null),
         generationId: generation.id,
         referenceId: `film_${generation.id}_${scene.id}`,
+        imageUrl: scene.imageUrl || null,
       });
       queued.push({ sceneId: scene.id, ...result });
       await db.scene.update({ where: { id: scene.id }, data: { status: "PROCESSING" } });
