@@ -35,7 +35,7 @@ RUN python -m pip install \
       "numpy>=1.23.5,<2" \
       fastapi "uvicorn[standard]" httpx pillow huggingface_hub cloudinary
 
-RUN python -m pip install -e /opt/Wan2.2
+RUN python -m pip install --no-deps -e /opt/Wan2.2
 
 COPY server.py /opt/amkaai-server/server.py
 COPY requirements.txt /opt/amkaai-server/requirements.txt
