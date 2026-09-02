@@ -20,20 +20,24 @@ RUN git clone --depth 1 https://github.com/Wan-Video/Wan2.2.git /opt/Wan2.2
 
 RUN python -m pip install --upgrade pip setuptools wheel && \
     python -m pip install \
-      torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 \
-      --index-url https://download.pytorch.org/whl/cu124
+    torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 \
+    --index-url https://download.pytorch.org/whl/cu124
+
+# Install Wan2.2's own requirements first, so nothing is missing
+RUN python -m pip install -r /opt/Wan2.2/requirements.txt
 
 # Install the official Wan dependencies except flash-attn.
 # Wan2.2 has an SDPA fallback when flash-attn is unavailable.
 RUN python -m pip install \
-      "opencv-python>=4.9.0.80" \
-      "diffusers>=0.31.0" \
-      "transformers>=4.49.0,<=4.51.3" \
-      "tokenizers>=0.20.3" \
-      "accelerate>=1.1.1" \
-      tqdm "imageio[ffmpeg]" easydict ftfy dashscope imageio-ffmpeg \
-      "numpy>=1.23.5,<2" \
-      fastapi "uvicorn[standard]" httpx pillow huggingface_hub cloudinary
+    "opencv-python>=4.9.0.80" \
+    "diffusers>=0.31.0" \
+    "transformers>=4.49.0,<=4.51.3" \
+    "tokenizers>=0.20.3" \
+    "accelerate>=1.1.1" \
+    tqdm "imageio[ffmpeg]" easydict ftfy dashscope imageio-ffmpeg \
+    "numpy>=1.23.5,<2" \
+    einops \
+    fastapi "uvicorn[standard]" httpx pillow huggingface_hub cloudinary
 
 RUN python -m pip install --no-deps -e /opt/Wan2.2
 
