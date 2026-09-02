@@ -23,8 +23,10 @@ RUN python -m pip install --upgrade pip setuptools wheel && \
     torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 \
     --index-url https://download.pytorch.org/whl/cu124
 
-# Install Wan2.2's own requirements first, so nothing is missing
-RUN python -m pip install -r /opt/Wan2.2/requirements.txt
+# Install Wan2.2's own requirements (excluding flash-attn, which needs
+# a GPU + prebuilt torch to compile — not required thanks to the SDPA fallback)
+RUN grep -vi "flash.attn" /opt/Wan2.2/requirements.txt > /tmp/wan-reqs.txt && \
+    python -m pip install -r /tmp/wan-reqs.txt
 
 # Install the official Wan dependencies except flash-attn.
 # Wan2.2 has an SDPA fallback when flash-attn is unavailable.
