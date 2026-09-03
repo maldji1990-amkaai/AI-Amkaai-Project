@@ -37,8 +37,9 @@ RUN python -m pip install \
     "tokenizers>=0.20.3" \
     "accelerate>=1.1.1" \
     tqdm "imageio[ffmpeg]" easydict ftfy dashscope imageio-ffmpeg \
-    "numpy>=1.23.5,<2" \
+        "numpy>=1.23.5,<2" \
     einops \
+    decord \
     fastapi "uvicorn[standard]" httpx pillow huggingface_hub cloudinary
 
 RUN python -m pip install --no-deps -e /opt/Wan2.2
