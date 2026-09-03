@@ -6,7 +6,15 @@ const STATE_KEY = "amkaai:runpod:video-gpu:v2";
 const LOCK_KEY = "amkaai:runpod:video-gpu:lock:v2";
 const ACTIVE_SET_KEY = "amkaai:runpod:video-gpu:active-jobs:v2";
 const DISPATCH_SET_KEY = "amkaai:runpod:video-gpu:dispatch-leases:v2";
-const DEFAULT_GPU = "NVIDIA GeForce RTX 4090";
+const DEFAULT_GPUS = [
+  "NVIDIA GeForce RTX 4090",
+  "NVIDIA GeForce RTX 3090",
+  "NVIDIA L40S",
+  "NVIDIA RTX 6000 Ada Generation",
+  "NVIDIA RTX A6000",
+  "NVIDIA RTX A5000",
+  "NVIDIA L4",
+];
 const DEFAULT_PORT = 8000;
 const DEFAULT_GENERATE_PATH = "/generate";
 const DEFAULT_HEALTH_PATH = "/health";
@@ -91,7 +99,9 @@ async function createPod() {
   const port = podPort();
   const body: Record<string, unknown> = {
     name: process.env.RUNPOD_POD_NAME || "amkaai-video-4090",
-    gpuTypeIds: [process.env.RUNPOD_GPU_TYPE || DEFAULT_GPU],
+    gpuTypeIds: process.env.RUNPOD_GPU_TYPES
+      ? process.env.RUNPOD_GPU_TYPES.split(",").map(s => s.trim()).filter(Boolean)
+      : DEFAULT_GPUS,
     gpuCount: 1,
     containerDiskInGb: Math.trunc(envNumber("RUNPOD_POD_CONTAINER_DISK_GB", 50)),
     volumeInGb: Math.trunc(envNumber("RUNPOD_POD_VOLUME_GB", 80)),
