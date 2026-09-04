@@ -38,11 +38,12 @@ RUN python -m pip install \
     "accelerate>=1.1.1" \
     tqdm "imageio[ffmpeg]" easydict ftfy dashscope imageio-ffmpeg \
     "numpy>=1.23.5,<2" \
-    einops \
+        einops \
     decord \
     librosa \
     soundfile \
     av \
+    peft \
     fastapi "uvicorn[standard]" httpx pillow huggingface_hub cloudinary
 
 RUN python -m pip install --no-deps -e /opt/Wan2.2
