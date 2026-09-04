@@ -10,8 +10,8 @@ export function getVideoQueue() {
     queue = new Queue(VIDEO_QUEUE_NAME, {
       connection,
       defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 3000 },
+        attempts: 120,
+        backoff: { type: "exponential", delay: 5000, maxDelay: 60_000 },
         removeOnComplete: 100,
         removeOnFail: 500,
       },

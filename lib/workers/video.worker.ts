@@ -18,12 +18,27 @@ export const videoWorker = new Worker(
     try {
       return await dispatchVideoJob(videoJobId);
     } catch (error) {
-      const record = await db.videoJob.findUnique({ where: { id: videoJobId } });
-      if (record && !record.externalJobId && job.attemptsMade + 1 >= (record.maxAttempts || 3)) {
-        await db.videoJob.updateMany({ where: { id: videoJobId, status: { in: ["PENDING", "PROCESSING"] } }, data: { status: "FAILED", error: String(error), finishedAt: new Date() } });
-        if (record.usageId) {
-          const usage = await db.usage.findUnique({ where: { id: record.usageId }, select: { referenceId: true } });
-          if (usage?.referenceId) await refundCredits(usage.referenceId).catch(() => undefined);
+      const errorMessage = String(error);
+      const gpuCapacityUnavailable =
+        error instanceof Error &&
+        error.message.startsWith("RUNPOD_GPU_CAPACITY_UNAVAILABLE:");
+
+      // GPU capacity is transient: keep the video retryable and do not refund
+      // credits just because RunPod has no compatible GPU at this moment.
+      if (!gpuCapacityUnavailable) {
+        const record = await db.videoJob.findUnique({ where: { id: videoJobId } });
+        if (record && !record.externalJobId && job.attemptsMade + 1 >= (record.maxAttempts || 3)) {
+          await db.videoJob.updateMany({
+            where: { id: videoJobId, status: { in: ["PENDING", "PROCESSING"] } },
+            data: { status: "FAILED", error: errorMessage, finishedAt: new Date() },
+          });
+          if (record.usageId) {
+            const usage = await db.usage.findUnique({
+              where: { id: record.usageId },
+              select: { referenceId: true },
+            });
+            if (usage?.referenceId) await refundCredits(usage.referenceId).catch(() => undefined);
+          }
         }
       }
       throw error;

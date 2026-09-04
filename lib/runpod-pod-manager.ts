@@ -102,6 +102,7 @@ async function createPod() {
     gpuTypeIds: process.env.RUNPOD_GPU_TYPES
       ? process.env.RUNPOD_GPU_TYPES.split(",").map(s => s.trim()).filter(Boolean)
       : DEFAULT_GPUS,
+    gpuTypePriority: "custom",
     gpuCount: 1,
     containerDiskInGb: Math.trunc(envNumber("RUNPOD_POD_CONTAINER_DISK_GB", 50)),
     volumeInGb: Math.trunc(envNumber("RUNPOD_POD_VOLUME_GB", 80)),
@@ -119,7 +120,18 @@ async function createPod() {
   if (process.env.RUNPOD_POD_ENV_JSON) {
     try { body.env = JSON.parse(process.env.RUNPOD_POD_ENV_JSON); } catch { throw new Error("RUNPOD_POD_ENV_JSON_INVALID"); }
   }
-  return runpodFetch<any>("/pods", { method: "POST", body: JSON.stringify(body) });
+  try {
+    return await runpodFetch<any>("/pods", { method: "POST", body: JSON.stringify(body) });
+  } catch (error) {
+    const message = String(error);
+    if (
+      /RUNPOD_API_(400|409|422|429|500|502|503|504)/.test(message) &&
+      /(capacity|available|availability|insufficient|no instances|out of stock|resources|gpu)/i.test(message)
+    ) {
+      throw new Error(`RUNPOD_GPU_CAPACITY_UNAVAILABLE:${message}`);
+    }
+    throw error;
+  }
 }
 
 async function waitForReady(podId: string) {
