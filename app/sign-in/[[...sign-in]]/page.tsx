@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { SignIn } from "@clerk/nextjs";
 import Link from "next/link";
@@ -40,7 +40,7 @@ export default function SignInPage() {
 
         <div className="w-full">
           <SignIn
-            fallbackRedirectUrl="/dashboard"
+            fallbackRedirectUrl="/"
             signUpUrl="/sign-up"
             appearance={{
               variables: {
@@ -97,3 +97,4 @@ export default function SignInPage() {
     </main>
   );
 }
+
