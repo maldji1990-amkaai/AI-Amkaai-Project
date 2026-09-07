@@ -11,7 +11,7 @@ export function getVideoQueue() {
       connection,
       defaultJobOptions: {
         attempts: 120,
-        backoff: { type: "exponential", delay: 5000, maxDelay: 60_000 },
+        backoff: { type: "exponential", delay: 5000 },
         removeOnComplete: 100,
         removeOnFail: 500,
       },

@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { PlanType } from "@prisma/client";
 import { PLANS } from "@/lib/config";
+import {
+  ACTIVE_SUBSCRIPTION_STATUSES,
+  shouldBlockPaymentForSubscription,
+} from "@/lib/subscription-guards";
+import { grantCreditsTx } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -473,6 +478,16 @@ export async function POST(req: Request) {
       );
     }
 
+    // Business remains disabled until its real commercial configuration is
+    // finalized. This protects the webhook path even if a stale PayPal plan ID
+    // is accidentally configured.
+    if (planName === "business") {
+      return NextResponse.json(
+        { error: "Business plan is not available yet." },
+        { status: 403 }
+      );
+    }
+
     const subscriptionStatus =
       String(
         resource?.status ?? ""
@@ -497,25 +512,29 @@ export async function POST(req: Request) {
           )
         : null;
 
-    const existingSubscription =
-      paypalSubscriptionId
-        ? await db.subscription.findFirst(
-            {
-              where: {
-                paypalSubscriptionId,
-              },
-            }
-          )
-        : await db.subscription.findFirst(
-            {
-              where: {
-                userId: user.id,
-              },
-              orderBy: {
-                createdAt: "desc",
-              },
-            }
-          );
+    const existingSubscription = paypalSubscriptionId
+      ? await db.subscription.findFirst({
+          where: { paypalSubscriptionId },
+        })
+      : await db.subscription.findFirst({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+        });
+
+    // Never activate a second PayPal subscription for the same user.
+    // The subscription ID lookup above only finds the incoming subscription;
+    // this separate conflict query checks for another active/pending one.
+    const conflictingSubscription =
+      eventName === "BILLING.SUBSCRIPTION.ACTIVATED" && paypalSubscriptionId
+        ? await db.subscription.findFirst({
+            where: {
+              userId: user.id,
+              status: { in: [...ACTIVE_SUBSCRIPTION_STATUSES] },
+              NOT: { paypalSubscriptionId },
+            },
+            orderBy: { updatedAt: "desc" },
+          })
+        : null;
 
     /*
      * =====================================================
@@ -526,13 +545,45 @@ export async function POST(req: Request) {
       eventName ===
       "BILLING.SUBSCRIPTION.ACTIVATED"
     ) {
+      // A user may have reached PayPal with a stale checkout tab, or two
+      // checkout requests may have raced. Do not replace the existing active
+      // subscription or grant credits for the newcomer.
+      if (conflictingSubscription) {
+        await db.$transaction(async (tx) => {
+          if (existingSubscription) {
+            await tx.subscription.update({
+              where: { id: existingSubscription.id },
+              data: { status: "REJECTED_DUPLICATE" },
+            });
+          } else {
+            await tx.subscription.create({
+              data: {
+                userId: user.id,
+                paypalSubscriptionId,
+                status: "REJECTED_DUPLICATE",
+                plan: PLAN_MAP_ON_ACTIVATE[planName],
+                ...(paypalCustomerId ? { paypalCustomerId } : {}),
+              },
+            });
+          }
+          await tx.webhookEvent.create({ data: { eventId } });
+        });
+
+        console.warn("[PAYPAL_DUPLICATE_SUBSCRIPTION_BLOCKED]", {
+          userId: user.id,
+          incomingSubscriptionId: paypalSubscriptionId,
+          existingSubscriptionId: conflictingSubscription.paypalSubscriptionId,
+        });
+        return NextResponse.json({ ok: true, blocked: true, reason: "active_subscription_exists" });
+      }
+
       const dbPlan =
         PLAN_MAP_ON_ACTIVATE[
           planName
         ];
 
       const creditsToGrant =
-        creditsForPlan(planName);
+        planName === "trial" ? creditsForPlan(planName) : 0;
 
       const isTrial =
         planName === "trial";
@@ -545,11 +596,6 @@ export async function POST(req: Request) {
             },
             data: {
               plan: dbPlan,
-
-              credits: {
-                increment:
-                  creditsToGrant,
-              },
 
               trialStartedAt:
                 isTrial
@@ -581,6 +627,10 @@ export async function POST(req: Request) {
                 : {}),
             },
           });
+
+          if (creditsToGrant > 0) {
+            await grantCreditsTx(tx, user.id, creditsToGrant, `paypal:subscription:${paypalSubscriptionId ?? eventId}:trial`, "TRIAL_GRANT", { plan: dbPlan, eventId });
+          }
 
           if (existingSubscription) {
             await tx.subscription.update({
@@ -694,7 +744,75 @@ export async function POST(req: Request) {
           resource?.amount
             ?.currency_code ??
           "USD"
+      ).toUpperCase();
+
+      // A free trial must be activated by BILLING.SUBSCRIPTION.ACTIVATED.
+      // A zero-value PAYMENT.SALE.COMPLETED must never grant the monthly paid
+      // credits accidentally. A real recurring sale must match the canonical
+      // server-side price before any plan/credit mutation occurs.
+      if (planName === "trial" && amount <= 0) {
+        return NextResponse.json({ ok: true, ignored: true, reason: "zero_value_trial_sale" });
+      }
+
+      const expectedAmount = creditsForPlan(planName) > 0
+        ? PLANS[dbPlan.toLowerCase() as keyof typeof PLANS]?.price
+        : 0;
+      if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(expectedAmount) || expectedAmount <= 0) {
+        return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
+      }
+      if (currency !== "USD" || Math.abs(amount - expectedAmount) > 0.01) {
+        return NextResponse.json({ error: "Payment amount does not match the canonical plan price" }, { status: 400 });
+      }
+
+      /*
+       * A subscription rejected as a duplicate at ACTIVATED time remains
+       * active on PayPal unless the user cancels it there. PayPal can therefore
+       * continue sending PAYMENT.SALE.COMPLETED for that subscription.
+       * Never let such a sale reactivate the local row or grant credits.
+       * Also block a sale when another active/pending subscription exists for
+       * the same user. This is the second webhook-level billing defense.
+       */
+      const paymentConflictingSubscription = paypalSubscriptionId
+        ? await db.subscription.findFirst({
+            where: {
+              userId: user.id,
+              status: { in: [...ACTIVE_SUBSCRIPTION_STATUSES] },
+              NOT: { paypalSubscriptionId },
+            },
+            orderBy: { updatedAt: "desc" },
+          })
+        : await db.subscription.findFirst({
+            where: {
+              userId: user.id,
+              status: { in: [...ACTIVE_SUBSCRIPTION_STATUSES] },
+            },
+            orderBy: { updatedAt: "desc" },
+          });
+
+      const blockRecurringPayment = shouldBlockPaymentForSubscription(
+        existingSubscription?.status,
+        Boolean(paymentConflictingSubscription),
       );
+
+      if (blockRecurringPayment) {
+        await db.webhookEvent.create({
+          data: { eventId },
+        });
+
+        console.warn("[PAYPAL_DUPLICATE_PAYMENT_BLOCKED]", {
+          userId: user.id,
+          incomingSubscriptionId: paypalSubscriptionId,
+          incomingSubscriptionStatus: existingSubscription?.status ?? null,
+          existingSubscriptionId: paymentConflictingSubscription?.paypalSubscriptionId ?? null,
+          saleId: saleId ?? null,
+        });
+
+        return NextResponse.json({
+          ok: true,
+          blocked: true,
+          reason: "subscription_conflict",
+        });
+      }
 
       /*
        * Use an interactive transaction instead
@@ -703,6 +821,13 @@ export async function POST(req: Request) {
        */
       await db.$transaction(
         async (tx) => {
+          if (saleKey) {
+            const existingPayment = await tx.payment.findFirst({
+              where: { OR: [{ providerPaymentId: saleKey }, { paypalOrderId: saleKey }] },
+            });
+            if (existingPayment) return;
+          }
+
           await tx.user.update({
             where: {
               id: user.id,
@@ -710,10 +835,7 @@ export async function POST(req: Request) {
             data: {
               plan: dbPlan,
 
-              credits: {
-                increment:
-                  creditsToGrant,
-              },
+              // Credits are granted exactly once below via the credit ledger.
 
               trialStartedAt: null,
               trialEndsAt: null,
@@ -731,6 +853,10 @@ export async function POST(req: Request) {
                 : {}),
             },
           });
+
+          if (creditsToGrant > 0 && saleKey) {
+            await grantCreditsTx(tx, user.id, creditsToGrant, `paypal:${saleKey}:credits`, "SUBSCRIPTION_GRANT", { plan: dbPlan, saleId: saleKey });
+          }
 
           await tx.subscription.updateMany({
             where:
@@ -770,10 +896,9 @@ export async function POST(req: Request) {
            * Save the PayPal payment only when
            * PayPal supplied a sale ID.
            *
-           * IMPORTANT:
-           * Do not add "provider" here because
-           * the Payment model does not contain
-           * a provider field.
+           * Payment records are stored with explicit provider
+           * metadata so billing history and refund tooling
+           * can distinguish PayPal from other providers.
            */
           if (saleKey) {
             await tx.payment.upsert({
@@ -799,6 +924,9 @@ export async function POST(req: Request) {
                 paypalSubscriptionId:
                   paypalSubscriptionId ??
                   undefined,
+                provider: "paypal",
+                providerPaymentId: saleKey,
+                plan: dbPlan,
                 status:
                   "COMPLETED",
               },
@@ -821,13 +949,8 @@ export async function POST(req: Request) {
      * =====================================================
      */
     else {
-      const isEnded = [
-        "expired",
-        "cancelled",
-        "suspended",
-      ].includes(
-        subscriptionStatus
-      );
+      const isEnded = ["expired", "suspended"].includes(subscriptionStatus) ||
+        (subscriptionStatus === "cancelled" && (!nextBillingTime || nextBillingTime <= new Date()));
 
       await db.$transaction(
         async (tx) => {
@@ -841,8 +964,8 @@ export async function POST(req: Request) {
                     userId: user.id,
                   },
             data: {
-              status:
-                subscriptionStatus,
+              status: subscriptionStatus === "cancelled" && nextBillingTime && nextBillingTime > new Date() ? "active" : subscriptionStatus,
+              cancelAtPeriodEnd: subscriptionStatus === "cancelled" && !!nextBillingTime && nextBillingTime > new Date(),
 
               ...(nextBillingTime
                 ? {

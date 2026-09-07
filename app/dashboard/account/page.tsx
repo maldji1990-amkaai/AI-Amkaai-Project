@@ -30,6 +30,7 @@ interface SubscriptionInfo {
   currentPeriodEnd: string | null;
   createdAt: string | null;
   paypalSubscriptionId: string | null;
+  cancelAtPeriodEnd: boolean;
 }
 
 const PLAN_CONFIG: Record<
@@ -221,7 +222,8 @@ export default function MyAccountPage() {
         prev
           ? {
               ...prev,
-              status: "cancelled",
+              status: "active",
+              cancelAtPeriodEnd: true,
               currentPeriodEnd:
                 data?.currentPeriodEnd ??
                 prev.currentPeriodEnd,
@@ -263,7 +265,7 @@ export default function MyAccountPage() {
     sub?.status === "active";
 
   const isCancelled =
-    sub?.status === "cancelled";
+    sub?.cancelAtPeriodEnd === true;
 
   const isTrialNotStarted =
     plan === "TRIAL" &&

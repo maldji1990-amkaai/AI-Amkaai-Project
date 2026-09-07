@@ -13,7 +13,7 @@ import {
 ////////////////////////////////////////////////////////////
 // TYPES & SCHEMAS
 ////////////////////////////////////////////////////////////
-type MediaType = "ai-video" | "ai-avatar" | "image-to-avatar" | "voice-clone";
+type MediaType = "ai-video" | "ai-avatar" | "image-to-video" | "voice-clone";
 type AspectRatioType = "16:9" | "9:16" | "1:1";
 type CameraMotionType = "static" | "zoom-in" | "zoom-out" | "pan-left" | "pan-right";
 type PresetStyle = { id: string; name: string; promptSuffix: string; bgClass: string };
@@ -45,7 +45,7 @@ export default function AIChangeConsole() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [credits, setCredits] = useState(240);
+  const [credits, setCredits] = useState(0);
 const [selectedDuration, setSelectedDuration] = useState(30);
 const [showDurationModal, setShowDurationModal] = useState(false);
 
@@ -74,6 +74,13 @@ const [showDurationModal, setShowDurationModal] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const voiceInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/api/user", { cache: "no-store" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (typeof data?.credits === "number") setCredits(data.credits); })
+      .catch(() => {});
+  }, []);
 
   const createChat = useCallback(() => {
     const chat: Chat = { id: crypto.randomUUID(), title: "New Production Desktop", createdAt: Date.now(), messages: [] };
@@ -115,7 +122,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
   const handleGenerateVideo = async () => {
     if (!prompt.trim() || !activeChat) return alert("الرجاء كتابة الوصف النصي أولاً!");
 
-    if ((activeType === "ai-avatar" || activeType === "image-to-avatar") && !uploadedImage) {
+    if ((activeType === "ai-avatar" || activeType === "image-to-video") && !uploadedImage) {
       alert("الرجاء رفع صورة الأفاتار أو المشهد أولاً من لوحة التحكم الجانبية.");
       return;
     }
@@ -138,7 +145,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
     try {
       let targetEndpoint = "/api/generate-video";
       if (activeType === "ai-avatar") targetEndpoint = "/api/generate-avatar";
-      if (activeType === "image-to-avatar") targetEndpoint = "/api/generate-image";
+      if (activeType === "image-to-video") targetEndpoint = "/api/generate-image";
       if (activeType === "voice-clone") targetEndpoint = "/api/generate-voice";
 
      const requestBody: any = { 
@@ -149,7 +156,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
         requestBody.aspectRatio = aspectRatio;
         requestBody.cameraMotion = cameraMotion;
         requestBody.creativity = creativity;
-      } else if (activeType === "ai-avatar" || activeType === "image-to-avatar") {
+      } else if (activeType === "ai-avatar" || activeType === "image-to-video") {
         requestBody.uploadedImage = uploadedImage;
         requestBody.aspectRatio = aspectRatio;
       } else if (activeType === "voice-clone") {
@@ -327,8 +334,8 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                   </div>
                 </button>
 
-                <button onClick={() => setActiveType("image-to-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "image-to-avatar" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                  <ImageIcon size={14} className={activeType === "image-to-avatar" ? "text-emerald-400" : "text-gray-500"} />
+                <button onClick={() => setActiveType("image-to-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "image-to-video" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
+                  <ImageIcon size={14} className={activeType === "image-to-video" ? "text-emerald-400" : "text-gray-500"} />
                   <div>
                     <p className="text-[11px] font-black tracking-tight">Image To Video</p>
                     <span className="text-[9px] text-gray-500 font-mono">HeyGen Engine Mode</span>
@@ -346,7 +353,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
             </div>
 
             {/* Asset Seed Uploader for Images */}
-            {(activeType === "ai-avatar" || activeType === "image-to-avatar") && (
+            {(activeType === "ai-avatar" || activeType === "image-to-video") && (
               <div className="space-y-1.5 border-t border-white/5 pt-3">
                 <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Upload size={11} /> Source Face/Scene Image</label>
                 <div onClick={() => imageInputRef.current?.click()} className="border border-dashed border-white/10 hover:border-purple-500/30 bg-white/5 rounded-xl p-3 text-center cursor-pointer transition min-h-[90px] flex items-center justify-center">

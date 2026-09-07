@@ -18,13 +18,26 @@ const PLANS = {
     comingSoon: false,
     terms: "Get a 3-day trial for free with 30 credits and 720p access. A payment card is required to start — after the trial, you'll be automatically charged $17.99/month unless you cancel through your account settings.",
   },
+  monthly: {
+    id: "monthly",
+    name: "Monthly Creator",
+    priceMain: "$17.99",
+    priceSub: "per month",
+    dueNowText: "$17.99",
+    usd: 17.99, usdt: 17.99, dzd: null,
+    quality: "720p HD Quality",
+    badge: "Flexible",
+    isPremium: false,
+    comingSoon: false,
+    terms: "You will be charged $17.99 every month. Cancel anytime.",
+  },
   quarterly: {
     id: "quarterly",
     name: "🎬 Creator Pro",
     priceMain: "$14.99",
     priceSub: "per month",
     dueNowText: "$44.97",
-    usd: 44.97, usdt: 44.97, dzd: 9000,
+    usd: 44.97, usdt: 44.97, dzd: null,
     quality: "720p HD Quality",
     badge: "Most Popular",
     isPremium: false,
@@ -37,7 +50,7 @@ const PLANS = {
     priceMain: "$12.99",
     priceSub: "per month",
     dueNowText: "$77.94",
-    usd: 77.94, usdt: 77.94, dzd: 15500,
+    usd: 77.94, usdt: 77.94, dzd: null,
     quality: "1080p Full HD Cinematic",
     badge: "Ultra Quality",
     isPremium: true,
@@ -62,11 +75,15 @@ const PLANS = {
   },
 };
 
-type PlanKey = "trial" | "quarterly" | "biannually" | "business";
+type PlanKey = "trial" | "monthly" | "quarterly" | "biannually" | "business";
 
 export default function PricingPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("trial");
-  const [paymentInfo, setPaymentInfo] = useState({ rip: "", usdt: "" });
+  const [paymentInfo, setPaymentInfo] = useState({
+    rip: "",
+    usdt: "",
+    dzd: { monthly: null as number | null, quarterly: null as number | null, biannually: null as number | null },
+  });
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showManualTransfer, setShowManualTransfer] = useState(false);
@@ -79,10 +96,15 @@ export default function PricingPage() {
         setPaymentInfo({
           rip: data?.rip || "N/A",
           usdt: data?.usdt || "N/A",
+          dzd: {
+            monthly: data?.dzd?.monthly ?? null,
+            quarterly: data?.dzd?.quarterly ?? null,
+            biannually: data?.dzd?.biannually ?? null,
+          },
         });
       })
       .catch(() => {
-        setPaymentInfo({ rip: "N/A", usdt: "N/A" });
+        setPaymentInfo({ rip: "N/A", usdt: "N/A", dzd: { monthly: null, quarterly: null, biannually: null } });
       });
   }, []);
 
@@ -253,7 +275,10 @@ export default function PricingPage() {
         {showManualTransfer && !currentPlanData.comingSoon && (
           <div className="mt-4 p-4 rounded-2xl bg-[#141416] border border-[#232326] flex flex-col gap-4 animate-fade-in">
             <p className="text-[11px] font-bold text-amber-400 uppercase tracking-widest text-center">
-              Equivalent Local Total: {(currentPlanData.dzd).toLocaleString()} DZD
+              Equivalent Local Total: {(() => {
+                const value = paymentInfo.dzd[selectedPlan as "monthly" | "quarterly" | "biannually"];
+                return value ? `${value.toLocaleString()} DZD` : "Not configured yet";
+              })()}
             </p>
             <div className="grid grid-cols-1 gap-3">
               <PaymentBox title="USDT Wallet Address" value={paymentInfo.usdt} />

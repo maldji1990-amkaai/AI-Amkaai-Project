@@ -3,39 +3,42 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id                   String              @id @default(cuid())
-  clerkId              String              @unique
-  email                String?             @unique
-  plan                 PlanType            @default(TRIAL)
-  credits              Int                 @default(0)
-  paypalCustomerId     String?
-  paypalSubscriptionId String?             @unique
-  trialStartedAt       DateTime?
-  trialEndsAt          DateTime?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
-  abandonedCheckouts   AbandonedCheckout[]
-  images               Image[]
-  imageJobs            ImageJob[]
-  manualPayments       ManualPayment[]
-  notifications        Notification[]
-  payments             Payment[]
-  subscriptions        Subscription[]
-  usages               Usage[]
-  videoJobs            VideoJob[]
-  voices               Voice[]
-  voiceJobs            VoiceJob[]
-  projects             Project[]
-  characters           Character[]
-  voiceProfiles        VoiceProfile[]
-  assets               Asset[]
-  generations          Generation[]
-  templates            Template[]
+  id                            String              @id @default(cuid())
+  clerkId                       String              @unique
+  email                         String?             @unique
+  plan                          PlanType            @default(TRIAL)
+  credits                       Int                 @default(0)
+  paypalCustomerId              String?
+  paypalSubscriptionId          String?             @unique
+  subscriptionCheckoutLockUntil DateTime?
+  trialStartedAt                DateTime?
+  trialEndsAt                   DateTime?
+  createdAt                     DateTime            @default(now())
+  updatedAt                     DateTime            @updatedAt
+  abandonedCheckouts            AbandonedCheckout[]
+  assets                        Asset[]
+  characters                    Character[]
+  creditTransactions            CreditTransaction[]
+  generations                   Generation[]
+  images                        Image[]
+  imageJobs                     ImageJob[]
+  manualPayments                ManualPayment[]
+  notifications                 Notification[]
+  payments                      Payment[]
+  projects                      Project[]
+  subscriptions                 Subscription[]
+  templates                     Template[]
+  usages                        Usage[]
+  videoJobs                     VideoJob[]
+  voices                        Voice[]
+  voiceJobs                     VoiceJob[]
+  voiceProfiles                 VoiceProfile[]
 
   @@index([clerkId])
   @@index([email])
@@ -63,16 +66,17 @@ model PlanConfig {
 }
 
 model Subscription {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   userId               String
-  paypalSubscriptionId String?  @unique
+  paypalSubscriptionId String?   @unique
   paypalCustomerId     String?
   status               String
   plan                 PlanType
   currentPeriodEnd     DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -83,14 +87,39 @@ model Payment {
   userId               String
   amount               Float
   currency             String
+  provider             String        @default("paypal")
   paypalOrderId        String?       @unique
   paypalSubscriptionId String?
-  status               PaymentStatus @default(COMPLETED)
+  providerPaymentId    String?       @unique
+  plan                 PlanType?
+  status               PaymentStatus @default(PENDING)
+  refundedAmount       Float?
+  refundId             String?       @unique
+  refundStatus         String?
+  refundedAt           DateTime?
+  refundReason         String?
   createdAt            DateTime      @default(now())
   user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([paypalSubscriptionId])
+  @@index([provider])
+}
+
+model CreditTransaction {
+  id           String   @id @default(cuid())
+  userId       String
+  amount       Int
+  balanceAfter Int
+  type         String
+  reference    String   @unique
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
 }
 
 model Usage {
@@ -111,21 +140,21 @@ model Usage {
 }
 
 model VideoJob {
-  id              String       @id @default(cuid())
+  id              String      @id @default(cuid())
   userId          String
   prompt          String
-  status          JobStatus    @default(PENDING)
-  priority        Int          @default(0)
+  status          JobStatus   @default(PENDING)
+  priority        Int         @default(0)
   resultUrl       String?
   error           String?
-  attempts        Int          @default(0)
-  maxAttempts     Int          @default(3)
-  progress        Int          @default(0)
+  attempts        Int         @default(0)
+  maxAttempts     Int         @default(3)
+  progress        Int         @default(0)
   usageId         String?
   startedAt       DateTime?
   finishedAt      DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
   imageUrl        String?
   durationSeconds Int?
   clipCount       Int?
@@ -133,9 +162,9 @@ model VideoJob {
   input           Json?
   externalJobId   String?
   generationId    String?
-  usage           Usage?       @relation(fields: [usageId], references: [id])
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  generation      Generation?  @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  generation      Generation? @relation(fields: [generationId], references: [id])
+  usage           Usage?      @relation(fields: [usageId], references: [id])
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([userId])
@@ -271,35 +300,6 @@ model WebhookEvent {
   @@index([eventId])
 }
 
-enum PlanType {
-  TRIAL
-  MONTHLY
-  QUARTERLY
-  BIANNUALLY
-  BUSINESS
-}
-
-enum JobStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  CANCELLED
-}
-
-enum UsageStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
-}
-
-enum PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
-}
-
 model Project {
   id          String       @id @default(cuid())
   userId      String
@@ -310,10 +310,10 @@ model Project {
   metadata    Json?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scenes      Scene[]
   assets      Asset[]
   generations Generation[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenes      Scene[]
 
   @@index([userId, updatedAt])
 }
@@ -334,10 +334,10 @@ model Scene {
   voiceProfileId String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
-  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  character      Character?    @relation(fields: [characterId], references: [id], onDelete: SetNull)
-  voiceProfile   VoiceProfile? @relation(fields: [voiceProfileId], references: [id], onDelete: SetNull)
   assets         Asset[]
+  character      Character?    @relation(fields: [characterId], references: [id])
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  voiceProfile   VoiceProfile? @relation(fields: [voiceProfileId], references: [id])
 
   @@unique([projectId, index])
   @@index([projectId, index])
@@ -372,83 +372,112 @@ model VoiceProfile {
   metadata    Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   scenes      Scene[]
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, updatedAt])
 }
 
 model Asset {
-  id         String    @id @default(cuid())
-  userId     String
-  projectId  String?
-  sceneId    String?
-  name       String
-  type       String
-  url        String
-  mimeType   String?
-  size       Int?
-  duration   Int?
-  metadata   Json?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  scene      Scene?    @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  sceneId   String?
+  name      String
+  type      String
+  url       String
+  mimeType  String?
+  size      Int?
+  duration  Int?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scene     Scene?   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([projectId, createdAt])
 }
 
 model Generation {
-  id          String            @id @default(cuid())
-  userId      String
-  projectId   String?
-  type        String
-  prompt      String?
-  status      JobStatus         @default(PENDING)
-  error       String?
-  metadata    Json?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project     Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  steps       GenerationStep[]
-  videoJobs   VideoJob[]
+  id        String           @id @default(cuid())
+  userId    String
+  projectId String?
+  type      String
+  prompt    String?
+  status    JobStatus        @default(PENDING)
+  error     String?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  project   Project?         @relation(fields: [projectId], references: [id])
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps     GenerationStep[]
+  videoJobs VideoJob[]
 
   @@index([userId, createdAt])
   @@index([projectId, createdAt])
 }
 
 model GenerationStep {
-  id           String       @id @default(cuid())
+  id           String     @id @default(cuid())
   generationId String
   name         String
-  status       JobStatus    @default(PENDING)
-  progress     Int          @default(0)
+  status       JobStatus  @default(PENDING)
+  progress     Int        @default(0)
   input        Json?
   output       Json?
   error        String?
   startedAt    DateTime?
   finishedAt   DateTime?
-  createdAt    DateTime     @default(now())
-  generation   Generation   @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  generation   Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
 
   @@index([generationId, createdAt])
 }
 
 model Template {
-  id          String   @id @default(cuid())
-  userId      String?
-  name        String
-  category    String
-  prompt      String
-  sceneCount  Int      @default(6)
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String?
+  name       String
+  category   String
+  prompt     String
+  sceneCount Int      @default(6)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([category])
   @@index([userId])
+}
+
+enum PlanType {
+  TRIAL
+  MONTHLY
+  QUARTERLY
+  BIANNUALLY
+  BUSINESS
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum UsageStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }

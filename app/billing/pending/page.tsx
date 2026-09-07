@@ -12,7 +12,7 @@ export default function PendingPage() {
       const res = await fetch("/api/payment-status");
       const data = await res.json();
 
-      if (data.status === "APPROVED") {
+      if (data.status === "COMPLETED") {
         router.push("/dashboard");
       }
 

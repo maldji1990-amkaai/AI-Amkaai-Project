@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { AI_COSTS, AIType } from "@/lib/config";
-import { UsageStatus } from "@prisma/client";
+import { UsageStatus } from "@prisma/client"
+import { effectiveSubscriptionActive, grantCreditsTx, grantCredits } from "@/lib/billing";
 
 type UseCreditsOptions = { reference?: string; duration?: number };
 
@@ -18,8 +19,19 @@ export async function useCredits(userId: string, type: AIType, options?: UseCred
       const existing = await tx.usage.findUnique({ where: { referenceId: reference } });
       if (existing) {
         if (existing.userId !== userId) throw new Error("IDEMPOTENCY_KEY_REUSED");
-        const existingUser = await tx.user.findUnique({ where: { id: userId }, select: { credits: true } });
-        return { usage: existing, credits: existingUser?.credits ?? 0 };
+        // A generation reference is a one-shot reservation key. Reusing it after
+        // completion/refund must never silently run the provider again without
+        // a fresh credit reservation.
+        if (existing.status === UsageStatus.PENDING) {
+          throw new Error("USAGE_ALREADY_PENDING");
+        }
+        if (existing.status === UsageStatus.COMPLETED) {
+          throw new Error("USAGE_ALREADY_COMPLETED");
+        }
+        if (existing.status === UsageStatus.REFUNDED || existing.refunded) {
+          throw new Error("USAGE_ALREADY_REFUNDED");
+        }
+        throw new Error("USAGE_REFERENCE_ALREADY_USED");
       }
     }
 
@@ -32,20 +44,16 @@ export async function useCredits(userId: string, type: AIType, options?: UseCred
     const subscription = await tx.subscription.findFirst({
       where: { userId },
       orderBy: { updatedAt: "desc" },
-      select: { status: true, currentPeriodEnd: true },
+      select: { status: true, currentPeriodEnd: true, plan: true },
     });
 
-    const now = Date.now();
-    const isTrial = user.plan === "TRIAL";
-    if (isTrial) {
-      if (user.trialEndsAt && now > user.trialEndsAt.getTime()) {
+    const now = new Date();
+    if (user.plan === "TRIAL") {
+      if (!user.trialEndsAt || user.trialEndsAt < now) {
         throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
       }
-    } else if (subscription) {
-      if (subscription.status.toLowerCase() !== "active") {
-        throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
-      }
-      if (subscription.currentPeriodEnd && now > subscription.currentPeriodEnd.getTime()) {
+    } else {
+      if (!subscription || subscription.plan !== user.plan || !effectiveSubscriptionActive(subscription, now)) {
         throw new Error("SUBSCRIPTION_EXPIRED_OR_INACTIVE");
       }
     }
@@ -64,6 +72,17 @@ export async function useCredits(userId: string, type: AIType, options?: UseCred
         status: UsageStatus.PENDING,
         refunded: false,
         referenceId: reference,
+      },
+    });
+
+    await tx.creditTransaction.create({
+      data: {
+        userId,
+        amount: -cost,
+        balanceAfter: update.count ? (await tx.user.findUnique({ where: { id: userId }, select: { credits: true } }))?.credits ?? 0 : 0,
+        type: "USAGE",
+        reference: `usage:${usage.id}`,
+        metadata: { usageId: usage.id, aiType: type },
       },
     });
 
@@ -100,7 +119,7 @@ export async function refundCredits(reference: string) {
       where: { id: usage.id },
       data: { refunded: true, status: UsageStatus.REFUNDED },
     });
-    await tx.user.update({ where: { id: usage.userId }, data: { credits: { increment: usage.cost } } });
+    await grantCreditsTx(tx, usage.userId, usage.cost, `usage-refund:${usage.id}`, "USAGE_REFUND", { usageId: usage.id });
     return { success: true, refundedCredits: usage.cost };
   });
 }
@@ -111,7 +130,7 @@ export async function getUserCredits(userId: string) {
   return user.credits;
 }
 
-export async function addCredits(userId: string, amount: number) {
-  if (!Number.isInteger(amount) || amount <= 0) throw new Error("Invalid credit amount");
-  return db.user.update({ where: { id: userId }, data: { credits: { increment: amount } } });
+export async function addCredits(userId: string, amount: number, reference?: string, type = "ADMIN_ADJUSTMENT") {
+  const ref = reference || `admin:${userId}:${Date.now()}`;
+  return grantCredits(userId, amount, ref, type);
 }

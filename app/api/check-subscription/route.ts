@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db"; 
+import { db } from "@/lib/db";
+import { getEffectiveEntitlement } from "@/lib/subscription";
 
 export async function GET() {
   try {
@@ -19,22 +20,11 @@ export async function GET() {
       return new NextResponse("User not found", { status: 404 });
     }
 
-    // 2. نستخدم findFirst للبحث عن أول اشتراك مرتبط بهذا المستخدم
-    const userSubscription = await db.subscription.findFirst({
-      where: {
-        userId: user.id, // نستخدم الـ id الخاص بجدول User
-      },
-      orderBy: {
-        createdAt: 'desc' // نأخذ أحدث اشتراك
-      }
-    });
-
-    // 3. نتحقق من الحالة
-    const isSubscribed = !!userSubscription && userSubscription.status === "active";
+    const entitlement = await getEffectiveEntitlement(user.id);
 
     return NextResponse.json({ 
-      isSubscribed,
-      plan: userSubscription?.plan || null 
+      isSubscribed: entitlement.active,
+      plan: entitlement.active ? entitlement.plan.toUpperCase() : null
     });
 
   } catch (error) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { getOrCreateUser } from "@/lib/getUser";
 import { createQueuedVideoJob } from "@/lib/create-video-job";
 import { LIMITS, FEATURES } from "@/lib/config";
 
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   if (prompt.length < LIMITS.minPromptLength) return NextResponse.json({ error: `Prompt too short. Minimum ${LIMITS.minPromptLength} characters.` }, { status: 400 });
   if (prompt.length > LIMITS.maxPromptLength) return NextResponse.json({ error: `Prompt too long. Maximum ${LIMITS.maxPromptLength} characters.` }, { status: 400 });
-  const user = await db.user.findUnique({ where: { clerkId }, select: { id: true } });
+  const user = await getOrCreateUser(clerkId);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   try {
     const result = await createQueuedVideoJob({
@@ -38,6 +38,9 @@ export async function POST(req: Request) {
     if (message === "QUEUE_UNAVAILABLE") return NextResponse.json({ error: "Video queue unavailable. Credits refunded." }, { status: 503 });
     if (message.startsWith("VIDEO_DURATION_LIMIT:")) return NextResponse.json({ error: `Maximum video duration is ${message.split(":")[1]} seconds.` }, { status: 400 });
     if (message === "IDEMPOTENCY_KEY_REUSED") return NextResponse.json({ error: "Idempotency-Key belongs to another user." }, { status: 409 });
+    if (message === "USAGE_ALREADY_PENDING") return NextResponse.json({ error: "This generation request is already being processed." }, { status: 409 });
+    if (message === "USAGE_ALREADY_COMPLETED") return NextResponse.json({ error: "This generation request has already completed." }, { status: 409 });
+    if (message === "USAGE_ALREADY_REFUNDED" || message === "USAGE_REFERENCE_ALREADY_USED") return NextResponse.json({ error: "This generation request can no longer be reused." }, { status: 409 });
     return NextResponse.json({ error: "Failed to start video generation" }, { status: 500 });
   }
 }

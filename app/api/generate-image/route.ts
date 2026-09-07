@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { getOrCreateUser } from "@/lib/getUser";
 import { useCredits, refundCredits, markUsageSuccess } from "@/lib/credits";
 import { demoVideos } from "@/lib/demo"; // يفضل استخدام روابط فيديو ديمو هنا للمشترك المجاني
-import { PlanType } from "@prisma/client";
 import Replicate from "replicate";
+import { requireOutputUrl } from "@/lib/ai-output";
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
@@ -30,19 +30,8 @@ export async function POST(request: Request) {
     }
 
     // 2️⃣ جلب بيانات المستخدم من قاعدة البيانات
-    let user = await db.user.findUnique({
-      where: { clerkId: userId },
-    });
-
-    if (!user) {
-      user = await db.user.create({
-        data: {
-          clerkId: userId,
-          credits: 10,
-          plan: PlanType.TRIAL,
-        },
-      });
-    }
+    const user = await getOrCreateUser(userId);
+    if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
 
     // 3️⃣ سحب وخصم النقاط بشكل آمن وصارم
     let creditResult;
@@ -56,9 +45,15 @@ export async function POST(request: Request) {
     }
 
     // 4️⃣ وضع المحاكاة للمستخدمين المجانيين (FREE DEMO MODE)
-    if (user.plan === PlanType.TRIAL) {
+    if (user.plan === "TRIAL") {
       // إرجاع فيديو ديمو عشوائي جاهز لعدم استهلاك سيرفرات الـ GPU الحقيقية مجاناً
-      const fallbackVideo = demoVideos ? demoVideos[Math.floor(Math.random() * demoVideos.length)] : "https://replicate.delivery/pbxt/IJ9ZJ6cOsnwUuH1F6gA8G...";
+      const fallbackVideo = Array.isArray(demoVideos) && demoVideos.length > 0
+        ? demoVideos[Math.floor(Math.random() * demoVideos.length)]
+        : null;
+      if (!fallbackVideo) {
+        await refundCredits(referenceId);
+        return NextResponse.json({ error: "Demo video is temporarily unavailable. Your credits were refunded." }, { status: 503 });
+      }
       
       await markUsageSuccess(referenceId);
 
@@ -70,7 +65,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // 5️⃣ تشغيل الـ Real AI الفعلي للمشتركين المدفوعين (PRO / PREMIUM)
+    // 5️⃣ تشغيل الـ Real AI الفعلي للمشتركين المدفوعين (paid plans)
     try {
       /*
         توليد HeyGen-Style حقيقي: نرسل الصورة كـ Seed Image ومعه الـ Prompt لتوجيه الحركة
@@ -97,7 +92,7 @@ export async function POST(request: Request) {
       }
 
       // استخراج رابط الفيديو النهائي المولّد بنجاح
-      const finalVideoUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+      const finalVideoUrl = requireOutputUrl(result.output, "Generated video");
 
       // تثبيت عملية الخصم بنجاح
       await markUsageSuccess(referenceId);

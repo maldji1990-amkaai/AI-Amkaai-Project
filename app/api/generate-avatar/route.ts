@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { getOrCreateUser } from "@/lib/getUser";
 import { useCredits, refundCredits, markUsageSuccess } from "@/lib/credits";
 import { demoAvatars } from "@/lib/demo";
-import { PlanType } from "@prisma/client";
 import Replicate from "replicate";
+import { requireOutputUrl } from "@/lib/ai-output";
 
 // تهيئة حزمة Replicate باستخدام مفتاح البيئة السري
 const replicate = new Replicate({
@@ -28,22 +28,9 @@ export async function POST(request: Request) {
     // القراءة الديناميكية للبيانات المرفوعة من واجهة المستخدم
     const { prompt, uploadedImage } = await request.json();
 
-    // 👤 GET USER
-    let user = await db.user.findUnique({
-      where: { clerkId: userId },
-    });
-
-    // ✅ إنشاء المستخدم تلقائياً إذا لم يكن مسجلاً في قاعدة البيانات
-    if (!user) {
-      user = await db.user.create({
-        data: {
-          clerkId: userId,
-          credits: 10,
-          plan: PlanType.TRIAL,
-        },
-      });
-      console.log("✅ New user created on the fly:", user.id);
-    }
+    // 👤 Single canonical user provisioning path
+    const user = await getOrCreateUser(userId);
+    if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
 
     //////////////////////////////////////////////////
     // 💸 USE CREDITS & SUBSCRIPTION CHECK (آمن وصارم)
@@ -61,8 +48,14 @@ export async function POST(request: Request) {
     //////////////////////////////////////////////////
     // 🧠 DEMO MODE (FREE USERS)
     //////////////////////////////////////////////////
-    if (user.plan === PlanType.TRIAL) {
-      const avatar = demoAvatars[Math.floor(Math.random() * demoAvatars.length)];
+    if (user.plan === "TRIAL") {
+      const avatar = Array.isArray(demoAvatars) && demoAvatars.length > 0
+        ? demoAvatars[Math.floor(Math.random() * demoAvatars.length)]
+        : null;
+      if (!avatar) {
+        await refundCredits(referenceId);
+        return NextResponse.json({ error: "Demo avatar is temporarily unavailable. Your credits were refunded." }, { status: 503 });
+      }
 
       // علم العملية كـ COMPLETED لأن الخدمة سلمت النتيجة الفورية للمستخدم
       await markUsageSuccess(referenceId);
@@ -76,7 +69,7 @@ export async function POST(request: Request) {
     }
 
     //////////////////////////////////////////////////
-    // 💎 PRO / PREMIUM (REAL AI ACTIVE)
+    // 💎 paid plans (REAL AI ACTIVE)
     //////////////////////////////////////////////////
     try {
       if (!uploadedImage) {
@@ -107,7 +100,7 @@ export async function POST(request: Request) {
       }
 
       // استخراج الرابط الحقيقي النهائي للفيديو التوليدي الناتج عن الذكاء الاصطناعي
-      const avatarUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+      const avatarUrl = requireOutputUrl(result.output, "Generated avatar");
 
       // علم العملية كـ COMPLETED لنجاح توليد الأفاتار الحقيقي للمشتركين وترسيخ خصم النقاط
       await markUsageSuccess(referenceId);

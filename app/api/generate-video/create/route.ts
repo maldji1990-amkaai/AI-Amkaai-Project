@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { getOrCreateUser } from "@/lib/getUser";
 import { createQueuedVideoJob } from "@/lib/create-video-job";
 import { LIMITS } from "@/lib/config";
 
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   if (prompt.length < LIMITS.minPromptLength || prompt.length > LIMITS.maxPromptLength) return NextResponse.json({ error: "Invalid prompt length" }, { status: 400 });
-  const user = await db.user.findUnique({ where: { clerkId }, select: { id: true } });
+  const user = await getOrCreateUser(clerkId);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   try {
     const result = await createQueuedVideoJob({

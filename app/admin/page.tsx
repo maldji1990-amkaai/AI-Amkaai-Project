@@ -93,7 +93,7 @@ export default function AdminPage() {
 
       {/* HEADER */}
       <div className="flex justify-between items-center border-b border-white/10 pb-4">
-        <h1 className="text-3xl font-bold tracking-tight text-yellow-400">Admin PRO Dashboard 🧠</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-yellow-400">Admin Dashboard 🧠</h1>
         <div className="flex items-center gap-4">
           <span className="text-xs text-gray-400 hidden sm:inline">لوحة الإشراف والتفعيل الفوري</span>
           <UserButton />
@@ -123,7 +123,7 @@ export default function AdminPage() {
                 <div className="space-y-2 text-sm mb-4 text-right">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
                     <span className="text-xs text-gray-500 font-mono select-all">ID: {p.id}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${p.plan === "PREMIUM" ? "bg-purple-900 text-purple-200" : "bg-blue-900 text-blue-200"}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${p.plan === "BUSINESS" ? "bg-purple-900 text-purple-200" : "bg-blue-900 text-blue-200"}`}>
                       {p.plan}
                     </span>
                   </div>

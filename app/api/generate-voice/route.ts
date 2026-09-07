@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { getOrCreateUser } from "@/lib/getUser";
 import { useCredits, refundCredits, markUsageSuccess } from "@/lib/credits";
-import { PlanType } from "@prisma/client";
 import Replicate from "replicate";
+import { requireOutputUrl } from "@/lib/ai-output";
 
 // تهيئة محرك اتصال Replicate للذكاء الاصطناعي
 const replicate = new Replicate({
@@ -32,19 +32,8 @@ export async function POST(request: Request) {
     }
 
     // 👤 جلب بيانات المستخدم التحقق من وجوده في قاعدة البيانات
-    let user = await db.user.findUnique({
-      where: { clerkId: userId },
-    });
-
-    if (!user) {
-      user = await db.user.create({
-        data: {
-          clerkId: userId,
-          credits: 10,
-          plan: PlanType.TRIAL,
-        },
-      });
-    }
+    const user = await getOrCreateUser(userId);
+    if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
 
     //////////////////////////////////////////////////
     // 💸 USE CREDITS & SUBSCRIPTION CHECK (آمن وصارم)
@@ -62,7 +51,7 @@ export async function POST(request: Request) {
     //////////////////////////////////////////////////
     // 🧠 DEMO MODE (FREE USERS)
     //////////////////////////////////////////////////
-    if (user.plan === PlanType.TRIAL) {
+    if (user.plan === "TRIAL") {
       // إرسال ملف صوتي تجريبي سريع لتوفير موارد السيرفر الحقيقية
       const demoAudio = "https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg";
       
@@ -77,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     //////////////////////////////////////////////////
-    // 💎 PRO / PREMIUM (REAL HEYGEN-STYLE AI ACTIVE)
+    // 💎 paid plans (REAL HEYGEN-STYLE AI ACTIVE)
     //////////////////////////////////////////////////
     try {
       let finalOutputUrl = "";
@@ -102,7 +91,7 @@ export async function POST(request: Request) {
         }
 
         if (result.status === "failed") throw new Error("VOICE_CLONING_PIPELINE_FAILED");
-        finalOutputUrl = result.output; // رابط ملف الـ WAV المستنسخ الحقيقي
+        finalOutputUrl = requireOutputUrl(result.output, "Generated voice"); // رابط ملف الصوت
       } 
       // 🗣️ المسار الثاني: توليد نطق بشري احترافي قياسي من نصوص (Text-to-Speech) في حال عدم رفع عينة
       else {
@@ -121,7 +110,7 @@ export async function POST(request: Request) {
         }
 
         if (result.status === "failed") throw new Error("TTS_ENGINE_FAILED");
-        finalOutputUrl = result.output;
+        finalOutputUrl = requireOutputUrl(result.output, "Generated voice");
       }
 
       //////////////////////////////////////////////////////////////////
@@ -149,7 +138,7 @@ export async function POST(request: Request) {
 
         // إذا نجحت عملية المزامنة الحركية، يتحول المخرج النهائي ليكون فيديو ناطق فخم بدلاً من مجرد صوت
         if (syncResult.status === "succeeded") {
-          finalOutputUrl = syncResult.output;
+          finalOutputUrl = requireOutputUrl(syncResult.output, "Lip-sync output");
         }
       }
 

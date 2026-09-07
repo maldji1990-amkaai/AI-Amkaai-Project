@@ -15,11 +15,11 @@ import {
 } from "lucide-react";
 
 /* ================= TYPES ================= */
-type PlanType = "trial" | "quarterly" | "biannually";
+type PlanType = "trial" | "monthly" | "quarterly" | "biannually";
 type MediaType = "video" | "avatar" | "voice"; 
 type AspectRatioType = "16:9" | "9:16" | "1:1";
 type CameraMoveType = "zoom-in" | "pan-left" | "orbit-360" | "tilt-up";
-type DashMediaType = "ai-video" | "ai-avatar" | "image-to-avatar" | "voice-clone";
+type DashMediaType = "ai-video" | "ai-avatar" | "image-to-video" | "voice-clone";
 
 const PRESET_STYLES = [
   { id: "cyberpunk", name: "Cyberpunk neon", suffix: ", cyberpunk neon style, blade runner aesthetics, high contrast, 8k" },
@@ -108,6 +108,10 @@ export default function HomePage() {
   const [activeStudioTool, setActiveStudioTool] = useState<DashMediaType | null>(null);
 
   const openStudio = (tool: DashMediaType) => {
+    if (tool === "ai-video") {
+      router.push("/dashboard/generate");
+      return;
+    }
     setActiveStudioTool(tool);
     setDashType(tool);
     setStudioVisible(true);
@@ -277,7 +281,7 @@ export default function HomePage() {
     try {
       let endpoint = "/api/generate-video";
       if (dashType === "ai-avatar") endpoint = "/api/generate-avatar";
-      if (dashType === "image-to-avatar") endpoint = "/api/generate-image";
+      if (dashType === "image-to-video") endpoint = "/api/generate-image";
       if (dashType === "voice-clone") endpoint = "/api/generate-voice";
       const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -558,7 +562,7 @@ export default function HomePage() {
             <motion.button
               whileHover={{ y: -4, scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => openStudio("image-to-avatar")}
+              onClick={() => openStudio("image-to-video")}
               className="group relative flex flex-col items-center gap-3 rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent px-4 py-6 transition-all hover:border-emerald-500/50 hover:shadow-[0_0_30px_rgba(16,185,129,0.2)] text-center"
             >
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/25 transition">
@@ -730,7 +734,7 @@ export default function HomePage() {
               <Sparkles size={11} className="animate-pulse" />
               {activeStudioTool === "ai-video" && "AI Video Generator"}
               {activeStudioTool === "ai-avatar" && "Create an Avatar"}
-              {activeStudioTool === "image-to-avatar" && "Image to Video"}
+              {activeStudioTool === "image-to-video" && "Image to Video"}
               {activeStudioTool === "voice-clone" && "AI Voice Generator & Lip-Sync"}
             </span>
             <button
@@ -868,8 +872,8 @@ export default function HomePage() {
                     </div>
                   </button>
 
-                  <button onClick={() => setDashType("image-to-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "image-to-avatar" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                    <ImageIcon size={14} className={dashType === "image-to-avatar" ? "text-emerald-400" : "text-gray-500"} />
+                  <button onClick={() => setDashType("image-to-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "image-to-video" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
+                    <ImageIcon size={14} className={dashType === "image-to-video" ? "text-emerald-400" : "text-gray-500"} />
                     <div>
                       <p className="text-[11px] font-black tracking-tight">Image To Video</p>
                       <span className="text-[9px] text-gray-500 font-mono">HeyGen Engine Mode</span>
@@ -1352,6 +1356,15 @@ export default function HomePage() {
                   <span className="text-sm font-black text-white">$0</span>
                 </button>
 
+                {/* Monthly */}
+                <button
+                  onClick={() => setSelectedPlan("monthly")}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition ${selectedPlan === "monthly" ? "border-blue-500 bg-blue-500/10" : "border-white/10 bg-white/[0.02]"}`}
+                >
+                  <div className="flex items-center gap-3"><div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedPlan === "monthly" ? "border-blue-500" : "border-gray-600"}`}>{selectedPlan === "monthly" && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}</div><span className="text-sm font-bold text-white">Monthly</span></div>
+                  <span className="text-sm font-black text-white">$17.99</span>
+                </button>
+
                 {/* Quarterly */}
                 <button
                   onClick={() => setSelectedPlan("quarterly")}
@@ -1393,7 +1406,9 @@ export default function HomePage() {
               <div className="px-6 mb-5">
                 <p className="text-[10px] text-gray-500 leading-relaxed">
                   {selectedPlan === "trial"
-                    ? "Get a 3-day trial for just $0. After the trial, you'll be charged $17.99/month unless you cancel through your account settings."
+                    ? "Get a 3-day trial for $0. After the trial, you'll be charged $17.99/month unless you cancel through your account settings."
+                    : selectedPlan === "monthly"
+                    ? "Billed as $17.99 every month. Cancel anytime through your account settings."
                     : selectedPlan === "quarterly"
                     ? "Billed as $44.97 every 3 months. Cancel anytime through your account settings."
                     : "Billed as $77.94 every 6 months. Cancel anytime through your account settings."
@@ -1409,7 +1424,7 @@ export default function HomePage() {
               <div className="px-6 flex items-center justify-between mb-4">
                 <span className="text-base font-black text-white">Due now</span>
                 <span className="text-base font-black text-white">
-                  {selectedPlan === "trial" ? "$0" : selectedPlan === "quarterly" ? "$44.97" : "$77.94"}
+                  {selectedPlan === "trial" ? "$0" : selectedPlan === "monthly" ? "$17.99" : selectedPlan === "quarterly" ? "$44.97" : "$77.94"}
                 </span>
               </div>
 

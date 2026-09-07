@@ -11,9 +11,9 @@ const PAYPAL_SECRET_KEY =
   process.env.PAYPAL_SECRET_KEY;
 
 const PAYPAL_API_BASE =
-  process.env.PAYPAL_MODE === "sandbox"
-    ? "https://api-m.sandbox.paypal.com"
-    : "https://api-m.paypal.com";
+  process.env.PAYPAL_MODE === "live"
+    ? "https://api-m.paypal.com"
+    : "https://api-m.sandbox.paypal.com";
 
 async function getPayPalAccessToken(): Promise<string> {
   if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET_KEY) {
@@ -76,20 +76,6 @@ export async function POST() {
       );
     }
 
-    if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET_KEY) {
-      console.error(
-        "[SUBSCRIPTION_CANCEL] Missing PayPal credentials."
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "PayPal payment provider is not configured.",
-        },
-        { status: 500 }
-      );
-    }
-
     const user = await db.user.findUnique({
       where: {
         clerkId,
@@ -108,13 +94,15 @@ export async function POST() {
     }
 
     if (!user.paypalSubscriptionId) {
-      return NextResponse.json(
-        {
-          error:
-            "No active PayPal subscription found for this account.",
-        },
-        { status: 400 }
-      );
+      const manualSub = await db.subscription.findFirst({ where: { userId: user.id, status: { in: ["active", "activated"] }, paypalSubscriptionId: null }, orderBy: { updatedAt: "desc" } });
+      if (!manualSub) return NextResponse.json({ error: "No active subscription found for this account." }, { status: 400 });
+      if (manualSub.cancelAtPeriodEnd) return NextResponse.json({ error: "Subscription cancellation is already scheduled.", status: "active", cancelAtPeriodEnd: true, currentPeriodEnd: manualSub.currentPeriodEnd }, { status: 400 });
+      const updated = await db.subscription.update({ where: { id: manualSub.id }, data: { cancelAtPeriodEnd: true } });
+      return NextResponse.json({ success: true, status: "active", cancelAtPeriodEnd: true, currentPeriodEnd: updated.currentPeriodEnd, message: "Cancellation scheduled. Access remains available until the end of the paid period." });
+    }
+
+    if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET_KEY) {
+      return NextResponse.json({ error: "PayPal payment provider is not configured." }, { status: 500 });
     }
 
     const latestSub =
@@ -139,13 +127,13 @@ export async function POST() {
       );
     }
 
-    if (latestSub.status === "cancelled") {
+    if (latestSub.cancelAtPeriodEnd) {
       return NextResponse.json(
         {
-          error: "Subscription is already cancelled.",
-          status: "cancelled",
-          currentPeriodEnd:
-            latestSub.currentPeriodEnd,
+          error: "Subscription cancellation is already scheduled.",
+          status: "active",
+          cancelAtPeriodEnd: true,
+          currentPeriodEnd: latestSub.currentPeriodEnd,
         },
         { status: 400 }
       );
@@ -198,7 +186,8 @@ export async function POST() {
           id: latestSub.id,
         },
         data: {
-          status: "cancelled",
+          cancelAtPeriodEnd: true,
+          status: "active",
         },
       });
 
@@ -206,10 +195,10 @@ export async function POST() {
       await db.notification.create({
         data: {
           userId: user.id,
-          title: "Subscription Cancelled",
+          title: "Subscription Cancellation Scheduled",
           message:
             cancelledSub.currentPeriodEnd
-              ? `Your subscription has been cancelled. You'll keep full access until ${new Date(
+              ? `Your subscription cancellation is scheduled. You'll keep full access until ${new Date(
                   cancelledSub.currentPeriodEnd
                 ).toLocaleDateString("en-US", {
                   year: "numeric",
@@ -228,11 +217,12 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      status: "cancelled",
+      status: "active",
+      cancelAtPeriodEnd: true,
       currentPeriodEnd:
         cancelledSub.currentPeriodEnd,
       message:
-        "Subscription cancelled successfully. You'll retain access until the end of your billing period.",
+        "Cancellation scheduled successfully. You'll retain access until the end of your billing period.",
     });
   } catch (error) {
     console.error(

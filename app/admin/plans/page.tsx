@@ -71,8 +71,6 @@ export default function AdminPlansPage() {
         body: JSON.stringify({
           planKey: plan.planKey,
           name: plan.name,
-          credits: Number(plan.credits),
-          price: Number(plan.price),
           isPro: plan.isPro,
           resolution: plan.resolution,
           maxDurationSeconds: Number(plan.maxDurationSeconds),
@@ -103,16 +101,18 @@ export default function AdminPlansPage() {
     <div className="min-h-screen bg-black text-white p-8 space-y-8 font-sans" dir="rtl">
       {/* HEADER */}
       <div className="flex justify-between items-center border-b border-white/10 pb-4">
-        <h1 className="text-3xl font-bold tracking-tight text-yellow-400">
+      <h1 className="text-3xl font-bold tracking-tight text-yellow-400">
           إدارة الباقات ⚙️
         </h1>
         <div className="flex items-center gap-4">
           <span className="text-xs text-gray-400 hidden sm:inline">
-            تعديل النقاط، الجودة، الموديل، والعلامة المائية لكل باقة مباشرة
+            تعديل الجودة، الموديل، والمدة والأولوية لكل باقة مباشرة
           </span>
           <UserButton />
         </div>
       </div>
+
+      <p className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3 text-xs text-yellow-200">السعر وعدد النقاط موحّدان من كتالوج الفوترة الرئيسي ولا يمكن تعديلهما من هذه الصفحة. تعديلات هذه الصفحة تخص إعدادات التشغيل مثل الموديل والمدة والأولوية.</p>
 
       {loading && (
         <p className="text-center text-gray-400 animate-pulse">جاري تحميل الباقات...</p>
@@ -150,7 +150,7 @@ export default function AdminPlansPage() {
                       plan.isPro ? "bg-purple-900 text-purple-200" : "bg-gray-700 text-gray-300"
                     }`}
                   >
-                    {plan.isPro ? "PRO" : "FREE TRIAL"}
+                    {plan.isPro ? "PAID" : "FREE TRIAL"}
                   </span>
                 </div>
 
@@ -171,7 +171,8 @@ export default function AdminPlansPage() {
                       type="number"
                       min={0}
                       value={plan.credits}
-                      onChange={(e) => updateField(plan.planKey, "credits", e.target.value)}
+                      disabled
+                      title="يتم ضبط النقاط من كتالوج الفوترة الرئيسي"
                       className="input"
                     />
                   </Field>
@@ -181,7 +182,8 @@ export default function AdminPlansPage() {
                       min={0}
                       step="0.01"
                       value={plan.price}
-                      onChange={(e) => updateField(plan.planKey, "price", e.target.value)}
+                      disabled
+                      title="يتم ضبط السعر من كتالوج الفوترة الرئيسي"
                       className="input"
                     />
                   </Field>

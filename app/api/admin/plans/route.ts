@@ -27,7 +27,7 @@ export async function GET() {
 
 //////////////////////////////////////////////////
 // ✏️ PATCH - تعديل باقة موجودة (جزئي - أي حقل تريده فقط)
-// Body: { planKey: "monthly", credits: 150, price: 19.99, ... }
+// Body: { planKey: "monthly", resolution: "1080p", maxDurationSeconds: 10, ... }
 //////////////////////////////////////////////////
 export async function PATCH(req: Request) {
   const adminCheck = await requireAdmin();
@@ -49,8 +49,9 @@ export async function PATCH(req: Request) {
     //////////////////////////////////////////////////
     const ALLOWED_FIELDS = [
       "name",
-      "credits",
-      "price",
+      // Billing price/credit amounts are intentionally NOT admin-editable here.
+      // The public checkout, PayPal, crypto, and manual approval flows must share
+      // one audited billing catalog instead of silently diverging from this UI.
       "isPro",
       "resolution",
       "maxDurationSeconds",
@@ -81,12 +82,6 @@ export async function PATCH(req: Request) {
       (safeUpdates.watermarkOpacity < 0 || safeUpdates.watermarkOpacity > 100)
     ) {
       return NextResponse.json({ error: "watermarkOpacity must be between 0 and 100" }, { status: 400 });
-    }
-    if ("credits" in safeUpdates && safeUpdates.credits < 0) {
-      return NextResponse.json({ error: "credits cannot be negative" }, { status: 400 });
-    }
-    if ("price" in safeUpdates && safeUpdates.price < 0) {
-      return NextResponse.json({ error: "price cannot be negative" }, { status: 400 });
     }
 
     const updated = await db.planConfig.update({

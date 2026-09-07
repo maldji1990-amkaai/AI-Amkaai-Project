@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
+import { getCurrentSubscription } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +28,7 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const latestSub = await db.subscription.findFirst({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-    });
+    const latestSub = await getCurrentSubscription(user.id);
 
     return NextResponse.json({
       plan: user.plan,
@@ -39,6 +37,7 @@ export async function GET() {
       status: latestSub?.status ?? null,
       currentPeriodEnd: latestSub?.currentPeriodEnd ?? null,
       paypalSubscriptionId: user.paypalSubscriptionId,
+      cancelAtPeriodEnd: latestSub?.cancelAtPeriodEnd ?? false,
     });
   } catch (error) {
     console.error("[MY_SUBSCRIPTION]", error);

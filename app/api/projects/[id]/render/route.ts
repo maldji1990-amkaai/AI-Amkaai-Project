@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireStudioUser } from "@/app/api/_studio-auth";
 import { createQueuedVideoJob } from "@/lib/create-video-job";
 import { startFinalComposition } from "@/lib/final-composer";
+import { getVideoCreditCost } from "@/lib/video-cost";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -18,7 +19,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const existing = await db.generation.findFirst({ where: { projectId: id, userId: user.id, status: { in: ["PENDING", "PROCESSING"] } }, orderBy: { createdAt: "desc" } });
     if (existing) return NextResponse.json({ generationId: existing.id, status: "already_processing" });
 
+    const renderableScenes = project.scenes.filter((scene) => !(scene.status === "COMPLETED" && scene.videoUrl));
     const totalSeconds = project.scenes.reduce((sum, s) => sum + Math.max(1, s.duration), 0);
+    const estimatedCost = renderableScenes.reduce((sum, scene) => sum + getVideoCreditCost(Math.max(1, scene.duration)), 0);
+
+    // Preflight the whole production before queueing the first scene. Without
+    // this check, a multi-scene render could consume credits for early scenes
+    // and fail halfway through when a later scene has insufficient balance.
+    const balanceUser = await db.user.findUnique({ where: { id: user.id }, select: { credits: true, plan: true, trialEndsAt: true } });
+    if (!balanceUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (balanceUser.plan === "TRIAL" && (!balanceUser.trialEndsAt || balanceUser.trialEndsAt <= new Date())) {
+      return NextResponse.json({ error: "Your trial has expired." }, { status: 403 });
+    }
+    if (balanceUser.credits < estimatedCost) {
+      return NextResponse.json({ error: `Not enough credits. This production requires ${estimatedCost} credits.` }, { status: 402 });
+    }
+
     const generation = await db.generation.create({
       data: {
         userId: user.id,

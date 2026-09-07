@@ -8,7 +8,8 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhook(.*)", // الـ Webhook يجب أن يظل عاماً دائماً لكي تستقبله المنصات الخارجية
-  "/api/crypto-webhook(.*)" // 🔧 [إصلاح] NOWPayments يرسل POST بدون جلسة Clerk — كان محجوباً بخطأ 401
+  "/api/crypto-webhook(.*)",
+  "/api/payment-info(.*)" // public payment destinations only
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

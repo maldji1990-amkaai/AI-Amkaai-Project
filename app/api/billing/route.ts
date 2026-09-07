@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
+import { getCurrentSubscription } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -30,20 +31,7 @@ export async function POST() {
       );
     }
 
-    const subscription = await db.subscription.findFirst({
-      where: {
-        userId: user.id,
-        paypalSubscriptionId: {
-          not: null,
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      select: {
-        paypalSubscriptionId: true,
-      },
-    });
+    const subscription = await getCurrentSubscription(user.id);
 
     const paypalSubscriptionId =
       user.paypalSubscriptionId ??

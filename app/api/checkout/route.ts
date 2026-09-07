@@ -87,6 +87,16 @@ export async function POST(req: Request) {
       );
     }
 
+    // Business is intentionally not purchasable until its real price, credits,
+    // limits and PayPal plan are finalized. Never allow a $0 placeholder to
+    // become a live subscription through a direct API call.
+    if (plan === "business") {
+      return NextResponse.json(
+        { error: "This plan is not available yet." },
+        { status: 403 }
+      );
+    }
+
     const paypalPlanId = PAYPAL_PLAN_IDS[plan];
 
     if (!paypalPlanId) {
@@ -106,6 +116,7 @@ export async function POST(req: Request) {
         email: true,
         plan: true,
         paypalSubscriptionId: true,
+        subscriptionCheckoutLockUntil: true,
       },
     });
 
@@ -116,7 +127,53 @@ export async function POST(req: Request) {
       );
     }
 
-    const accessToken = await getPayPalAccessToken();
+    const existingSubscription = await db.subscription.findFirst({
+      where: {
+        userId: user.id,
+        status: { in: ["active", "activated", "APPROVAL_PENDING"] },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (existingSubscription) {
+      return NextResponse.json({
+        error: "An active or pending subscription already exists.",
+        subscriptionId: existingSubscription.paypalSubscriptionId,
+        plan: existingSubscription.plan,
+      }, { status: 409 });
+    }
+
+    // Serialize checkout creation per user. This closes the race where two
+    // browser tabs pass the subscription check at the same time and both ask
+    // PayPal to create a subscription. The lock expires automatically after
+    // 10 minutes so a crashed request cannot block the account forever.
+    const lockUntil = new Date(Date.now() + 10 * 60 * 1000);
+    const lockResult = await db.user.updateMany({
+      where: {
+        id: user.id,
+        OR: [
+          { subscriptionCheckoutLockUntil: null },
+          { subscriptionCheckoutLockUntil: { lt: new Date() } },
+        ],
+      },
+      data: { subscriptionCheckoutLockUntil: lockUntil },
+    });
+    if (lockResult.count !== 1) {
+      return NextResponse.json(
+        { error: "A subscription checkout is already in progress. Please finish or wait a few minutes before trying again." },
+        { status: 409 },
+      );
+    }
+
+    const clearCheckoutLock = async () => {
+      await db.user.updateMany({
+        where: { id: user.id },
+        data: { subscriptionCheckoutLockUntil: null },
+      });
+    };
+
+    let checkoutSucceeded = false;
+    try {
+      const accessToken = await getPayPalAccessToken();
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://www.amkaai.net").replace(/\/$/, "");
 
     const requestBody: Record<string, unknown> = {
@@ -202,23 +259,21 @@ export async function POST(req: Request) {
       },
     });
 
-    if (user.email) {
-      await db.abandonedCheckout.create({
-        data: {
-          userId: user.id,
-          email: user.email,
-          checkoutUrl: approvalLink,
-          plan,
-        },
-      });
-    }
+    // Do not record an abandoned checkout here: reaching the PayPal approval
+    // page is not abandonment. Abandonment tracking, if enabled, must happen
+    // only from an explicit client-side abandonment signal or a reconciliation job.
 
-    return NextResponse.json({
-      success: true,
-      url: approvalLink,
-      subscriptionId,
-      plan,
-    });
+      checkoutSucceeded = true;
+      await clearCheckoutLock();
+      return NextResponse.json({
+        success: true,
+        url: approvalLink,
+        subscriptionId,
+        plan,
+      });
+    } finally {
+      if (!checkoutSucceeded) await clearCheckoutLock();
+    }
   } catch (error) {
     console.error("[PAYPAL_CHECKOUT_ERROR]", error);
 
