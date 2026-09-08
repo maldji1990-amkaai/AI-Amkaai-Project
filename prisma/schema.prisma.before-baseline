@@ -1,0 +1,455 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                   String              @id @default(cuid())
+  clerkId              String              @unique
+  email                String?             @unique
+  plan                 PlanType            @default(TRIAL)
+  credits              Int                 @default(0)
+  paypalCustomerId     String?
+  paypalSubscriptionId String?             @unique
+  trialStartedAt       DateTime?
+  trialEndsAt          DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  abandonedCheckouts   AbandonedCheckout[]
+  assets               Asset[]
+  characters           Character[]
+  generations          Generation[]
+  images               Image[]
+  imageJobs            ImageJob[]
+  manualPayments       ManualPayment[]
+  notifications        Notification[]
+  payments             Payment[]
+  projects             Project[]
+  subscriptions        Subscription[]
+  templates            Template[]
+  usages               Usage[]
+  videoJobs            VideoJob[]
+  voices               Voice[]
+  voiceJobs            VoiceJob[]
+  voiceProfiles        VoiceProfile[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+model PlanConfig {
+  id                 String   @id @default(cuid())
+  planKey            String   @unique
+  name               String
+  credits            Int
+  price              Float
+  isPro              Boolean  @default(true)
+  resolution         String
+  maxDurationSeconds Int      @default(5)
+  aiModel            String
+  advancedSampling   Boolean  @default(false)
+  watermarkEnabled   Boolean  @default(false)
+  watermarkOpacity   Int      @default(40)
+  watermarkText      String   @default("AMKAAI.NET")
+  priority           Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([planKey])
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String
+  paypalSubscriptionId String?   @unique
+  paypalCustomerId     String?
+  status               String
+  plan                 PlanType
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Payment {
+  id                   String        @id @default(cuid())
+  userId               String
+  amount               Float
+  currency             String
+  paypalOrderId        String?       @unique
+  paypalSubscriptionId String?
+  status               PaymentStatus @default(COMPLETED)
+  createdAt            DateTime      @default(now())
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([paypalSubscriptionId])
+}
+
+model Usage {
+  id          String      @id @default(cuid())
+  userId      String
+  type        String
+  cost        Int
+  status      UsageStatus @default(PENDING)
+  refunded    Boolean     @default(false)
+  referenceId String?     @unique
+  createdAt   DateTime    @default(now())
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoJobs   VideoJob[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([referenceId])
+}
+
+model VideoJob {
+  id              String      @id @default(cuid())
+  userId          String
+  prompt          String
+  status          JobStatus   @default(PENDING)
+  priority        Int         @default(0)
+  resultUrl       String?
+  error           String?
+  attempts        Int         @default(0)
+  maxAttempts     Int         @default(3)
+  progress        Int         @default(0)
+  usageId         String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  imageUrl        String?
+  durationSeconds Int?
+  clipCount       Int?
+  model           String?
+  input           Json?
+  externalJobId   String?
+  generationId    String?
+  generation      Generation? @relation(fields: [generationId], references: [id])
+  usage           Usage?      @relation(fields: [usageId], references: [id])
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+  @@index([priority, createdAt])
+  @@index([externalJobId])
+}
+
+model ImageJob {
+  id          String    @id @default(cuid())
+  userId      String
+  prompt      String
+  status      JobStatus @default(PENDING)
+  priority    Int       @default(0)
+  resultUrl   String?
+  error       String?
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  progress    Int       @default(0)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+  @@index([priority, createdAt])
+}
+
+model VoiceJob {
+  id          String    @id @default(cuid())
+  userId      String
+  text        String
+  status      JobStatus @default(PENDING)
+  priority    Int       @default(0)
+  resultUrl   String?
+  error       String?
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  progress    Int       @default(0)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+  @@index([priority, createdAt])
+}
+
+model Image {
+  id        String   @id @default(cuid())
+  url       String
+  prompt    String
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Voice {
+  id        String   @id @default(cuid())
+  url       String
+  text      String
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ManualPayment {
+  id            String   @id @default(cuid())
+  userId        String
+  plan          String
+  method        String
+  amount        Float
+  currency      String   @default("USD")
+  screenshotUrl String?
+  transactionId String?
+  aiScore       Float?
+  aiRawText     String?
+  riskLevel     String?
+  status        String   @default("PENDING")
+  verified      Boolean  @default(false)
+  rejectedBy    String?
+  rejectReason  String?
+  ipAddress     String?
+  device        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model AbandonedCheckout {
+  id          String   @id @default(cuid())
+  userId      String?
+  email       String?
+  plan        String
+  checkoutUrl String
+  orderId     String?  @unique
+  recovered   Boolean  @default(false)
+  step        String   @default("checkout_started")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+}
+
+model Project {
+  id          String       @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  status      String       @default("DRAFT")
+  aspectRatio String       @default("16:9")
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  assets      Asset[]
+  generations Generation[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenes      Scene[]
+
+  @@index([userId, updatedAt])
+}
+
+model Scene {
+  id             String        @id @default(cuid())
+  projectId      String
+  index          Int
+  title          String
+  prompt         String
+  duration       Int           @default(5)
+  status         JobStatus     @default(PENDING)
+  videoUrl       String?
+  imageUrl       String?
+  audioUrl       String?
+  metadata       Json?
+  characterId    String?
+  voiceProfileId String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  assets         Asset[]
+  character      Character?    @relation(fields: [characterId], references: [id])
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  voiceProfile   VoiceProfile? @relation(fields: [voiceProfileId], references: [id])
+
+  @@unique([projectId, index])
+  @@index([projectId, index])
+}
+
+model Character {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  imageUrl    String?
+  style       String?
+  referenceId String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenes      Scene[]
+
+  @@index([userId, updatedAt])
+}
+
+model VoiceProfile {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  language    String?
+  audioUrl    String?
+  provider    String?
+  providerId  String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  scenes      Scene[]
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  sceneId   String?
+  name      String
+  type      String
+  url       String
+  mimeType  String?
+  size      Int?
+  duration  Int?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scene     Scene?   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([projectId, createdAt])
+}
+
+model Generation {
+  id        String           @id @default(cuid())
+  userId    String
+  projectId String?
+  type      String
+  prompt    String?
+  status    JobStatus        @default(PENDING)
+  error     String?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  project   Project?         @relation(fields: [projectId], references: [id])
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps     GenerationStep[]
+  videoJobs VideoJob[]
+
+  @@index([userId, createdAt])
+  @@index([projectId, createdAt])
+}
+
+model GenerationStep {
+  id           String     @id @default(cuid())
+  generationId String
+  name         String
+  status       JobStatus  @default(PENDING)
+  progress     Int        @default(0)
+  input        Json?
+  output       Json?
+  error        String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime   @default(now())
+  generation   Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@index([generationId, createdAt])
+}
+
+model Template {
+  id         String   @id @default(cuid())
+  userId     String?
+  name       String
+  category   String
+  prompt     String
+  sceneCount Int      @default(6)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([category])
+  @@index([userId])
+}
+
+enum PlanType {
+  TRIAL
+  MONTHLY
+  QUARTERLY
+  BIANNUALLY
+  BUSINESS
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum UsageStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}

@@ -509,14 +509,41 @@ const [showDurationModal, setShowDurationModal] = useState(false);
             </div>
 
             {/* Input Desk Area */}
-            <div className="p-4 border-t border-white/5 bg-[#070709]/90 backdrop-blur-md space-y-3">
-              <div className="grid grid-cols-4 gap-2">
-                {PRESET_STYLES.map(style => (
-                  <button key={style.id} onClick={() => handlePresetApply(style)} className="relative h-8 rounded-xl overflow-hidden border border-white/5 bg-neutral-900 flex items-center justify-center p-1 hover:border-white/20 transition">
-                    <span className="text-[10px] font-bold text-gray-400">{style.name}</span>
-                  </button>
-                ))}
-              </div>
+<div className="p-5 border-t border-white/5 bg-[#070709]/90 backdrop-blur-md space-y-3">
+  <div className="flex items-center gap-2 text-[10px] font-bold text-purple-400 uppercase tracking-wide">
+    <Sparkles size={12} /> Describe Your Vision
+  </div>
+
+  <div className="flex items-end gap-3 bg-[#030304] border border-white/10 rounded-2xl p-3 transition-all duration-300 focus-within:border-purple-500/60 focus-within:shadow-[0_0_0_1px_rgba(168,85,247,0.3),0_0_20px_rgba(168,85,247,0.15)] focus-within:bg-[#0a0810]">
+    <textarea
+      value={prompt}
+      onChange={(e) => setPrompt(e.target.value)}
+      placeholder={activeType === "voice-clone" ? "اكتب هنا النص المراد تحويله لبصمتك الصوتية المستنسخة أو الصوت الجاهز..." : "Describe your cinematic vision here... e.g. A futuristic city at night with neon lights, slow camera pan, 8K ultra-realistic..."}
+      rows={3}
+      className="max-h-40 min-h-[72px] flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none text-white placeholder:text-gray-700 font-mono"
+      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerateVideo(); } }}
+    />
+    <button 
+      onClick={() => setShowDurationModal(true)}
+      disabled={isGenerating || !prompt.trim()} 
+      className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-600 text-white disabled:opacity-20 transition shadow-md hover:bg-purple-500 shrink-0"
+    >
+      {isGenerating ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+    </button>
+  </div>
+
+  <div className="flex items-center gap-2 flex-wrap">
+    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Quick Style:</span>
+    {PRESET_STYLES.map(style => (
+      <button key={style.id} onClick={() => handlePresetApply(style)} className="px-3 py-1.5 rounded-full border border-white/10 bg-neutral-900 hover:border-purple-500/40 hover:text-white transition text-[10px] font-bold text-gray-400">
+        {style.name}
+      </button>
+    ))}
+  </div>
+
+  <div className="text-[10px] text-zinc-500 text-center font-mono">
+    Wan 2.2 TI2V-5B • RTX 4090 on demand • 5 credits/second • 5s clips
+  </div>
 
               <div className="flex items-end gap-3 bg-[#030304] border border-white/5 rounded-2xl p-2.5 focus-within:border-purple-500/30 transition">
                 <textarea
