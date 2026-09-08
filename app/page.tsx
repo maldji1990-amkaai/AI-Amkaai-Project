@@ -856,7 +856,7 @@ export default function HomePage() {
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">AI Generation Engine</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setDashType("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-video" ? "bg-purple-600/10 border-purple-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
+                 <button onClick={() => openStudio("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-video" ? "bg-purple-600/10 border-purple-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
                     <Video size={14} className={dashType === "ai-video" ? "text-purple-400" : "text-gray-500"} />
                     <div>
                       <p className="text-[11px] font-black tracking-tight">AI Video Generator</p>
