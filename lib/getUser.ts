@@ -13,6 +13,17 @@ export async function getOrCreateUser(clerkId: string, email?: string | null) {
     return existing;
   }
 
+  // A row with this email may already exist under a different (stale) clerkId
+  // — e.g. the person recreated their Clerk account with the same email.
+  // Re-link it instead of attempting a duplicate insert that would violate
+  // the unique constraint on email.
+  if (email) {
+    const byEmail = await db.user.findUnique({ where: { email } });
+    if (byEmail) {
+      return db.user.update({ where: { id: byEmail.id }, data: { clerkId } });
+    }
+  }
+
   try {
     return await db.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -33,7 +44,13 @@ export async function getOrCreateUser(clerkId: string, email?: string | null) {
     });
   } catch (error) {
     const raced = await db.user.findUnique({ where: { clerkId } });
-    if (!raced) throw error;
-    return raced;
+    if (raced) return raced;
+    if (email) {
+      const racedByEmail = await db.user.findUnique({ where: { email } });
+      if (racedByEmail) {
+        return db.user.update({ where: { id: racedByEmail.id }, data: { clerkId } });
+      }
+    }
+    throw error;
   }
 }

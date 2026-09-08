@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { VIDEO_CREDITS_PER_SECOND } from "@/lib/config";
-import { useAuth } from "@clerk/nextjs";
 import { 
   Video, ImageIcon, Wand2, Sparkles, ArrowLeft, Loader2, Play, Film,
   Plus, LifeBuoy, X, PanelLeft, Mic, SlidersHorizontal, Tv, Flame, Upload, 
@@ -14,7 +13,7 @@ import {
 ////////////////////////////////////////////////////////////
 // TYPES & SCHEMAS
 ////////////////////////////////////////////////////////////
-type MediaType = "ai-video" | "ai-avatar" | "image-to-video" | "voice-clone";
+type MediaType = "ai-video" | "ai-avatar" | "image-to-avatar" | "voice-clone";
 type AspectRatioType = "16:9" | "9:16" | "1:1";
 type CameraMotionType = "static" | "zoom-in" | "zoom-out" | "pan-left" | "pan-right";
 type PresetStyle = { id: string; name: string; promptSuffix: string; bgClass: string };
@@ -46,17 +45,17 @@ export default function AIChangeConsole() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [credits, setCredits] = useState(0);
+  const [credits, setCredits] = useState(240);
 const [selectedDuration, setSelectedDuration] = useState(30);
 const [showDurationModal, setShowDurationModal] = useState(false);
 
-  // ðŸŽ›ï¸ Ø®ÙŠØ§Ø±Ø§Øª Ø§Ù„ØªØ­ÙƒÙ… Ø§Ù„Ø£Ø³Ø§Ø³ÙŠØ© Ù„Ù€ Generation Pipeline
+  // 🎛️ خيارات التحكم الأساسية لـ Generation Pipeline
   const [activeType, setActiveType] = useState<MediaType>("ai-video");
   const [aspectRatio, setAspectRatio] = useState<AspectRatioType>("16:9");
   const [creativity, setCreativity] = useState<number>(0.75);
   const [cameraMotion, setCameraMotion] = useState<CameraMotionType>("static");
   
-  // âš™ï¸ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù€ AI Voice Cloning & Lip-Sync Ø§Ù„Ø®Ø§ØµØ© ÙˆØ§Ù„Ù€ Face Assets
+  // ⚙️ إعدادات الـ AI Voice Cloning & Lip-Sync الخاصة والـ Face Assets
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [voiceSampleUrl, setVoiceSampleUrl] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>("ar");
@@ -75,13 +74,6 @@ const [showDurationModal, setShowDurationModal] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const voiceInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    fetch("/api/user", { cache: "no-store" })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (typeof data?.credits === "number") setCredits(data.credits); })
-      .catch(() => {});
-  }, []);
 
   const createChat = useCallback(() => {
     const chat: Chat = { id: crypto.randomUUID(), title: "New Production Desktop", createdAt: Date.now(), messages: [] };
@@ -118,13 +110,13 @@ const [showDurationModal, setShowDurationModal] = useState(false);
     }
   };
 
-  // ðŸ”¥ Ø¯Ø§Ù„Ø© ØªÙˆÙ„ÙŠØ¯ Ø§Ù„ÙÙŠØ¯ÙŠÙˆ Ø§Ù„Ø­ÙŠØ© ÙˆØªØ­Ø¯ÙŠØ« Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø± (Queue) ÙˆØ§Ù„Ø³Ø¬Ù„Ø§Øª
-  // ðŸ”¥ Ø¯Ø§Ù„Ø© ØªÙˆÙ„ÙŠØ¯ Ø§Ù„ÙÙŠØ¯ÙŠÙˆ Ø§Ù„Ø­ÙŠØ© ÙˆØªØ­Ø¯ÙŠØ« Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø± (Queue) ÙˆØ§Ù„Ø³Ø¬Ù„Ø§Øª
+  // 🔥 دالة توليد الفيديو الحية وتحديث قائمة الانتظار (Queue) والسجلات
+  // 🔥 دالة توليد الفيديو الحية وتحديث قائمة الانتظار (Queue) والسجلات
   const handleGenerateVideo = async () => {
-    if (!prompt.trim() || !activeChat) return alert("Ø§Ù„Ø±Ø¬Ø§Ø¡ ÙƒØªØ§Ø¨Ø© Ø§Ù„ÙˆØµÙ Ø§Ù„Ù†ØµÙŠ Ø£ÙˆÙ„Ø§Ù‹!");
+    if (!prompt.trim() || !activeChat) return alert("الرجاء كتابة الوصف النصي أولاً!");
 
-    if ((activeType === "ai-avatar" || activeType === "image-to-video") && !uploadedImage) {
-      alert("Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø±ÙØ¹ ØµÙˆØ±Ø© Ø§Ù„Ø£ÙØ§ØªØ§Ø± Ø£Ùˆ Ø§Ù„Ù…Ø´Ù‡Ø¯ Ø£ÙˆÙ„Ø§Ù‹ Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠØ©.");
+    if ((activeType === "ai-avatar" || activeType === "image-to-avatar") && !uploadedImage) {
+      alert("الرجاء رفع صورة الأفاتار أو المشهد أولاً من لوحة التحكم الجانبية.");
       return;
     }
 
@@ -146,7 +138,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
     try {
       let targetEndpoint = "/api/generate-video";
       if (activeType === "ai-avatar") targetEndpoint = "/api/generate-avatar";
-      if (activeType === "image-to-video") targetEndpoint = "/api/generate-image";
+      if (activeType === "image-to-avatar") targetEndpoint = "/api/generate-image";
       if (activeType === "voice-clone") targetEndpoint = "/api/generate-voice";
 
      const requestBody: any = { 
@@ -157,7 +149,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
         requestBody.aspectRatio = aspectRatio;
         requestBody.cameraMotion = cameraMotion;
         requestBody.creativity = creativity;
-      } else if (activeType === "ai-avatar" || activeType === "image-to-video") {
+      } else if (activeType === "ai-avatar" || activeType === "image-to-avatar") {
         requestBody.uploadedImage = uploadedImage;
         requestBody.aspectRatio = aspectRatio;
       } else if (activeType === "voice-clone") {
@@ -173,7 +165,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
         body: JSON.stringify(requestBody)
       });
 
-      // Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† Ø§Ù„Ø±ØµÙŠØ¯
+      // التحقق من الرصيد
       if (response.status === 402) {
         window.location.href = "/pricing";
         return;
@@ -181,7 +173,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Ø­Ø¯Ø« Ø®Ø·Ø£ ØºÙŠØ± Ù…ØªÙˆÙ‚Ø¹");
+        throw new Error(data.error || "حدث خطأ غير متوقع");
       }
 
       let data = await response.json();
@@ -211,7 +203,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
 
       const reply: Message = { 
         role: "assistant", 
-        content: `âš¡ ØªÙ… Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡ Ù…Ù† Ù…Ø¹Ø§Ù„Ø¬Ø© Ø±ÙˆØªÙŠÙ†Ø§Øª Ø§Ù„Ø¥Ø®Ø±Ø§Ø¬ Ø¨Ù†Ø¬Ø§Ø­.\nâ€¢ Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ: ${data.remainingCredits ?? credits}`, 
+        content: `⚡ تم الانتهاء من معالجة روتينات الإخراج بنجاح.\n• الرصيد المتبقي: ${data.remainingCredits ?? credits}`, 
         outputUrl: outputUrl,
         meta: { type: (activeType === "voice-clone" && isLipSyncActive) ? "ai-video" : activeType }
       };
@@ -220,9 +212,9 @@ const [showDurationModal, setShowDurationModal] = useState(false);
       setRenderQueue(prev => prev.map(j => j.id === clientJobId ? { ...j, progress: 100, status: "completed" } : j));
       setCredits(data.remainingCredits ?? credits);
 
-    } catch (e: any) {
+        } catch (e: any) {
       console.error(e);
-      alert(e.message || "Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªÙˆÙ„ÙŠØ¯");
+      alert(e.message || "حدث خطأ أثناء التوليد");
     } finally {
       setIsGenerating(false);
     }
@@ -254,7 +246,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                 <div className="bg-white/5 rounded-xl p-3 border border-white/5 space-y-2">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
                     <span>Active GPU Queue</span>
-                    <span className="text-purple-400 font-mono animate-pulse">â— Live</span>
+                    <span className="text-purple-400 font-mono animate-pulse">● Live</span>
                   </p>
                   <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
                     {renderQueue.map(job => (
@@ -273,7 +265,12 @@ const [showDurationModal, setShowDurationModal] = useState(false);
               </div>
             </div>
 
-
+            <div className="p-4 border-t border-white/5 bg-black/30">
+              <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 flex justify-between items-center text-xs">
+                <span className="text-gray-400 font-mono">Allocation State</span>
+                <span className="font-bold text-purple-400 font-mono">{credits} Nodes</span>
+              </div>
+            </div>
           </motion.aside>
         )}
       </AnimatePresence>
@@ -295,7 +292,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
 
           <div className="flex items-center gap-3">
             <button onClick={() => setSupportOpen(true)} className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-xs text-gray-400 font-mono hover:text-white transition"><LifeBuoy size={12} /> Live Support</button>
-            <Link href="/pricing" className="bg-gradient-to-r from-zinc-900 to-black px-4 py-2 rounded-full border border-white/10 hover:border-purple-500/30 transition text-xs font-bold text-gray-300">ðŸ’Ž Upgrade Plan</Link>
+            <Link href="/pricing" className="bg-gradient-to-r from-zinc-900 to-black px-4 py-2 rounded-full border border-white/10 hover:border-purple-500/30 transition text-xs font-bold text-gray-300">💎 Upgrade Plan</Link>
             <button className="hidden items-center gap-1.5 rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-xs text-gray-400 md:flex font-mono"><Layers3 size={12} /> Asset Desk</button>
           </div>
         </header>
@@ -330,8 +327,8 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                   </div>
                 </button>
 
-                <button onClick={() => setActiveType("image-to-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "image-to-video" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                  <ImageIcon size={14} className={activeType === "image-to-video" ? "text-emerald-400" : "text-gray-500"} />
+                <button onClick={() => setActiveType("image-to-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "image-to-avatar" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
+                  <ImageIcon size={14} className={activeType === "image-to-avatar" ? "text-emerald-400" : "text-gray-500"} />
                   <div>
                     <p className="text-[11px] font-black tracking-tight">Image To Video</p>
                     <span className="text-[9px] text-gray-500 font-mono">HeyGen Engine Mode</span>
@@ -349,7 +346,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
             </div>
 
             {/* Asset Seed Uploader for Images */}
-            {(activeType === "ai-avatar" || activeType === "image-to-video") && (
+            {(activeType === "ai-avatar" || activeType === "image-to-avatar") && (
               <div className="space-y-1.5 border-t border-white/5 pt-3">
                 <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Upload size={11} /> Source Face/Scene Image</label>
                 <div onClick={() => imageInputRef.current?.click()} className="border border-dashed border-white/10 hover:border-purple-500/30 bg-white/5 rounded-xl p-3 text-center cursor-pointer transition min-h-[90px] flex items-center justify-center">
@@ -376,16 +373,16 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                   <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Mic size={11} className="text-amber-400" /> 1. Voice Sample (Instant Cloning)</label>
                   <div onClick={() => voiceInputRef.current?.click()} className="border border-dashed border-white/10 bg-neutral-900 rounded-xl p-2.5 text-center cursor-pointer text-[10px] text-gray-400">
                     <input type="file" ref={voiceInputRef} className="hidden" accept="audio/*" onChange={handleVoiceUpload} />
-                    {voiceSampleUrl ? "âœ… Ø¹ÙŠÙ†Ø© Ø§Ù„ØµÙˆØª Ù…Ø´Ø­ÙˆÙ†Ø© Ø¨Ù†Ø¬Ø§Ø­ ÙÙŠ Ø§Ù„Ù†Ø¸Ø§Ù…" : "Ø§Ø±ÙØ¹ Ù…Ù„Ù ØµÙˆØªÙŠ Ù„Ù†ÙØ³Ùƒ (5 Ø«ÙˆØ§Ù†Ù) Ù„Ù†Ø·Ù‚ Ø¨ØµÙ…ØªÙƒ Ø§Ù„ØµÙˆØªÙŠØ©"}
+                    {voiceSampleUrl ? "✅ عينة الصوت مشحونة بنجاح في النظام" : "ارفع ملف صوتي لنفسك (5 ثوانٍ) لنطق بصمتك الصوتية"}
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">2. Target Language</label>
                   <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="w-full bg-black text-xs text-gray-400 border border-white/10 rounded-xl p-2 outline-none">
-                    <option value="ar">Ø§Ù„Ø¹Ø±Ø¨ÙŠØ© Ø§Ù„ÙØµØ­Ù‰ ðŸ‡¸ðŸ‡¦</option>
-                    <option value="en">English US ðŸ‡ºðŸ‡¸</option>
-                    <option value="fr">French ðŸ‡«ðŸ‡·</option>
+                    <option value="ar">العربية الفصحى 🇸🇦</option>
+                    <option value="en">English US 🇺🇸</option>
+                    <option value="fr">French 🇫🇷</option>
                   </select>
                 </div>
 
@@ -395,7 +392,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                       <label className="text-[10px] font-bold text-purple-400 uppercase">Active Lip-Sync Overlay</label>
                       <input type="checkbox" checked={isLipSyncActive} onChange={(e) => setIsLipSyncActive(e.target.checked)} className="accent-purple-400 cursor-pointer" />
                     </div>
-                    <p className="text-[9px] text-gray-500 leading-tight">Ø¯Ù…Ø¬ ÙˆÙ…Ø²Ø§Ù…Ù†Ø© Ø¨ØµÙ…Ø© Ø§Ù„ØµÙˆØª Ø§Ù„Ù…ÙˆÙ„Ø¯Ø© ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ Ù…Ø¹ Ø­Ø±ÙƒØ© Ø´ÙØ§ÙŠÙ Ø¢Ø®Ø± Ø£ÙØ§ØªØ§Ø± Ù‚Ù…Øª Ø¨Ø¥Ù†ØªØ§Ø¬Ù‡.</p>
+                    <p className="text-[9px] text-gray-500 leading-tight">دمج ومزامنة بصمة الصوت المولدة تلقائياً مع حركة شفايف آخر أفاتار قمت بإنتاجه.</p>
                   </div>
                 )}
               </div>
@@ -475,7 +472,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                 ) : isGenerating ? (
                   <div className="text-center space-y-3 px-4">
                     <Loader2 size={32} className="text-purple-500 animate-spin mx-auto" />
-                    <p className="text-xs font-bold text-gray-400">Ø§Ù„Ø°ÙƒØ§Ø¡ Ø§Ù„Ø§ØµØ·Ù†Ø§Ø¹ÙŠ ÙŠÙ‚ÙˆÙ… Ø¨Ø­ÙŠØ§ÙƒØ© Ø§Ù„Ø¥Ø·Ø§Ø±Ø§Øª ÙˆØªØ­Ø±ÙŠÙƒ Ø§Ù„Ø£ÙØ§ØªØ§Ø±...</p>
+                    <p className="text-xs font-bold text-gray-400">الذكاء الاصطناعي يقوم بحياكة الإطارات وتحريك الأفاتار...</p>
                     <div className="w-48 h-1 bg-zinc-800 rounded-full mx-auto overflow-hidden">
                       <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progress}%` }} />
                     </div>
@@ -486,7 +483,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                       <Play size={18} fill="currentColor" className="translate-x-0.5" />
                     </div>
                     <p className="text-xs font-black text-gray-400">Ready for Production</p>
-                    <p className="text-[11px] text-gray-600 max-w-xs mx-auto">Ø¹Ù†Ø¯ Ø§Ù„Ø¶ØºØ· Ø¹Ù„Ù‰ Ø§Ù„ØªÙˆÙ„ÙŠØ¯ØŒ Ø³ØªØ¸Ù‡Ø± Ø§Ù„Ù„Ù‚Ø·Ø§Øª ÙˆØ§Ù„ØªØ­Ø±ÙŠÙƒØ§Øª Ø§Ù„ØµÙˆØªÙŠØ© ÙˆØ§Ù„ÙˆØ¬Ù‡ÙŠØ© Ù‡Ù†Ø§ Ù…Ø¨Ø§Ø´Ø±Ø©Ù‹.</p>
+                    <p className="text-[11px] text-gray-600 max-w-xs mx-auto">عند الضغط على التوليد، ستظهر اللقطات والتحريكات الصوتية والوجهية هنا مباشرةً.</p>
                   </div>
                 )}
               </div>
@@ -509,62 +506,43 @@ const [showDurationModal, setShowDurationModal] = useState(false);
             </div>
 
             {/* Input Desk Area */}
-<div className="p-5 border-t border-white/5 bg-[#070709]/90 backdrop-blur-md space-y-3">
-  <div className="flex items-center gap-2 text-[10px] font-bold text-purple-400 uppercase tracking-wide">
-    <Sparkles size={12} /> Describe Your Vision
-  </div>
+            <div className="p-5 border-t border-white/5 bg-[#070709]/90 backdrop-blur-md space-y-3">
+              <div className="flex items-center gap-2 text-[10px] font-bold text-purple-400 uppercase tracking-wide">
+                <Sparkles size={12} /> Describe Your Vision
+              </div>
 
-  <div className="flex items-end gap-3 bg-[#030304] border border-white/10 rounded-2xl p-3 transition-all duration-300 focus-within:border-purple-500/60 focus-within:shadow-[0_0_0_1px_rgba(168,85,247,0.3),0_0_20px_rgba(168,85,247,0.15)] focus-within:bg-[#0a0810]">
-    <textarea
-      value={prompt}
-      onChange={(e) => setPrompt(e.target.value)}
-      placeholder={activeType === "voice-clone" ? "اكتب هنا النص المراد تحويله لبصمتك الصوتية المستنسخة أو الصوت الجاهز..." : "Describe your cinematic vision here... e.g. A futuristic city at night with neon lights, slow camera pan, 8K ultra-realistic..."}
-      rows={3}
-      className="max-h-40 min-h-[72px] flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none text-white placeholder:text-gray-700 font-mono"
-      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerateVideo(); } }}
-    />
-    <button 
-      onClick={() => setShowDurationModal(true)}
-      disabled={isGenerating || !prompt.trim()} 
-      className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-600 text-white disabled:opacity-20 transition shadow-md hover:bg-purple-500 shrink-0"
-    >
-      {isGenerating ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-    </button>
-  </div>
-
-  <div className="flex items-center gap-2 flex-wrap">
-    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Quick Style:</span>
-    {PRESET_STYLES.map(style => (
-      <button key={style.id} onClick={() => handlePresetApply(style)} className="px-3 py-1.5 rounded-full border border-white/10 bg-neutral-900 hover:border-purple-500/40 hover:text-white transition text-[10px] font-bold text-gray-400">
-        {style.name}
-      </button>
-    ))}
-  </div>
-
-  <div className="text-[10px] text-zinc-500 text-center font-mono">
-    Wan 2.2 TI2V-5B • RTX 4090 on demand • 5 credits/second • 5s clips
-  </div>
-
-              <div className="flex items-end gap-3 bg-[#030304] border border-white/5 rounded-2xl p-2.5 focus-within:border-purple-500/30 transition">
+              <div className="flex items-end gap-3 bg-[#030304] border border-white/10 rounded-2xl p-3 transition-all duration-300 focus-within:border-purple-500/60 focus-within:shadow-[0_0_0_1px_rgba(168,85,247,0.3),0_0_20px_rgba(168,85,247,0.15)] focus-within:bg-[#0a0810]">
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder={activeType === "voice-clone" ? "Ø§ÙƒØªØ¨ Ù‡Ù†Ø§ Ø§Ù„Ù†Øµ Ø§Ù„Ù…Ø±Ø§Ø¯ ØªØ­ÙˆÙŠÙ„Ù‡ Ù„Ø¨ØµÙ…ØªÙƒ Ø§Ù„ØµÙˆØªÙŠØ© Ø§Ù„Ù…Ø³ØªÙ†Ø³Ø®Ø© Ø£Ùˆ Ø§Ù„ØµÙˆØª Ø§Ù„Ø¬Ø§Ù‡Ø²..." : "Describe the video you want to generate (e.g., 'A futuristic cyberpunk city with neon lights and flying cars, cinematic lighting, 4k')..."}
-                  className="max-h-24 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-1.5 text-xs outline-none text-white placeholder:text-gray-700"
+                  placeholder={activeType === "voice-clone" ? "اكتب هنا النص المراد تحويله لبصمتك الصوتية المستنسخة أو الصوت الجاهز..." : "Describe your cinematic vision here... e.g. A futuristic city at night with neon lights, slow camera pan, 8K ultra-realistic..."}
+                  rows={3}
+                  className="max-h-40 min-h-[72px] flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none text-white placeholder:text-gray-700 font-mono"
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerateVideo(); } }}
                 />
                 <button 
-  onClick={() => setShowDurationModal(true)} // Ù‡Ø°Ø§ Ø§Ù„ØªØºÙŠÙŠØ± Ø³ÙŠÙØªØ­ Ø§Ù„Ù†Ø§ÙØ°Ø© Ø¨Ø¯Ù„Ø§Ù‹ Ù…Ù† Ø§Ù„ØªÙˆÙ„ÙŠØ¯ Ø§Ù„Ù…Ø¨Ø§Ø´Ø±
+  onClick={() => setShowDurationModal(true)} // هذا التغيير سيفتح النافذة بدلاً من التوليد المباشر
   disabled={isGenerating || !prompt.trim()} 
-  className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white disabled:opacity-20 transition shadow-md"
+  className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-600 text-white disabled:opacity-20 transition shadow-md hover:bg-purple-500 shrink-0"
 >
-  {isGenerating ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+  {isGenerating ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
 </button>
               </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Quick Style:</span>
+                {PRESET_STYLES.map(style => (
+                  <button key={style.id} onClick={() => handlePresetApply(style)} className="px-3 py-1.5 rounded-full border border-white/10 bg-neutral-900 hover:border-purple-500/40 hover:text-white transition text-[10px] font-bold text-gray-400">
+                    {style.name}
+                  </button>
+                ))}
+              </div>
+
               <div className="text-[10px] text-zinc-500 text-center font-mono">
-                Wan 2.2 TI2V-5B â€¢ RTX 4090 on demand â€¢ 5 credits/second â€¢ 5s clips
+                Wan 2.2 TI2V-5B • RTX 4090 on demand • 5 credits/second • 5s clips
               </div>
             </div>
+
 
           </div>
         </div>
@@ -590,7 +568,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
           </motion.div>
         )}
       </AnimatePresence>
-{/* Ù†Ø§ÙØ°Ø© Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ù…Ø¯Ø© Ø§Ù„Ø²Ù…Ù†ÙŠØ© */}
+{/* نافذة اختيار المدة الزمنية */}
         {showDurationModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#121215] p-6 shadow-2xl">
@@ -620,4 +598,3 @@ const [showDurationModal, setShowDurationModal] = useState(false);
       </main>
     );
 }
-

@@ -15,11 +15,11 @@ import {
 } from "lucide-react";
 
 /* ================= TYPES ================= */
-type PlanType = "trial" | "monthly" | "quarterly" | "biannually";
+type PlanType = "trial" | "quarterly" | "biannually";
 type MediaType = "video" | "avatar" | "voice"; 
 type AspectRatioType = "16:9" | "9:16" | "1:1";
 type CameraMoveType = "zoom-in" | "pan-left" | "orbit-360" | "tilt-up";
-type DashMediaType = "ai-video" | "ai-avatar" | "image-to-video" | "voice-clone";
+type DashMediaType = "ai-video" | "ai-avatar" | "image-to-avatar" | "voice-clone";
 
 const PRESET_STYLES = [
   { id: "cyberpunk", name: "Cyberpunk neon", suffix: ", cyberpunk neon style, blade runner aesthetics, high contrast, 8k" },
@@ -29,12 +29,12 @@ const PRESET_STYLES = [
 ];
 
 const TEMPLATES = [
-  { id: "news", icon: "­ƒô░", name: "News Anchor", prompt: "Professional AI news anchor presenting breaking news in a modern broadcast studio, dynamic lighting, 4K cinematic." },
-  { id: "product", icon: "­ƒøì´©Å", name: "Product Ad", prompt: "Cinematic product advertisement video, luxury brand presentation, dramatic lighting, slow motion reveal, photorealistic 8K." },
-  { id: "tutorial", icon: "­ƒÄô", name: "Tutorial", prompt: "Engaging educational presenter explaining complex concepts with dynamic graphics and animations in a clean modern studio." },
-  { id: "social", icon: "­ƒô▒", name: "Social Reel", prompt: "Viral social media reel, trendy transitions, vibrant colors, energetic music sync, 9:16 vertical format for TikTok/Reels." },
-  { id: "promo", icon: "­ƒÜÇ", name: "Startup Pitch", prompt: "High-energy startup pitch video with CEO avatar, dynamic data visualization overlays, corporate cinematic style." },
-  { id: "arabic", icon: "­ƒç©­ƒçª", name: "Arabic Presenter", prompt: "Professional Arabic-speaking AI avatar presenter in elegant attire, clean studio backdrop, natural lip-sync, ultra-realistic." },
+  { id: "news", icon: "📰", name: "News Anchor", prompt: "Professional AI news anchor presenting breaking news in a modern broadcast studio, dynamic lighting, 4K cinematic." },
+  { id: "product", icon: "🛍️", name: "Product Ad", prompt: "Cinematic product advertisement video, luxury brand presentation, dramatic lighting, slow motion reveal, photorealistic 8K." },
+  { id: "tutorial", icon: "🎓", name: "Tutorial", prompt: "Engaging educational presenter explaining complex concepts with dynamic graphics and animations in a clean modern studio." },
+  { id: "social", icon: "📱", name: "Social Reel", prompt: "Viral social media reel, trendy transitions, vibrant colors, energetic music sync, 9:16 vertical format for TikTok/Reels." },
+  { id: "promo", icon: "🚀", name: "Startup Pitch", prompt: "High-energy startup pitch video with CEO avatar, dynamic data visualization overlays, corporate cinematic style." },
+  { id: "arabic", icon: "🇸🇦", name: "Arabic Presenter", prompt: "Professional Arabic-speaking AI avatar presenter in elegant attire, clean studio backdrop, natural lip-sync, ultra-realistic." },
 ];
 
 interface FeatureProps { icon: React.ReactNode; title: string; text: string; }
@@ -45,9 +45,9 @@ interface PricingCardProps {
 
 /* ================= CONSTANTS & STATIC DATA ================= */
 const PRESET_SUGGESTIONS = [
-  { label: "­ƒÄ¼ Cinematic Studio", text: "cinematic corporate presentation speaker, photorealistic avatar, studio 8k lighting" },
-  { label: "­ƒîî Futuristic Presenter", text: "cyberpunk news room anchor, professional avatar broadcasting, hyper-detailed" },
-  { label: "­ƒº© Explainer Video", text: "3d animated tutor style avatar, vibrant workspace atmosphere, highly expressive" },
+  { label: "🎬 Cinematic Studio", text: "cinematic corporate presentation speaker, photorealistic avatar, studio 8k lighting" },
+  { label: "🌌 Futuristic Presenter", text: "cyberpunk news room anchor, professional avatar broadcasting, hyper-detailed" },
+  { label: "🧸 Explainer Video", text: "3d animated tutor style avatar, vibrant workspace atmosphere, highly expressive" },
 ];
 
 const AI_GALLERY = [
@@ -103,15 +103,11 @@ export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [credits, setCredits] = useState(0);
 
-  // STUDIO VISIBILITY ÔÇö ┘äÏº ┘èÏ©┘çÏ▒ ÏÑ┘äÏº Ï¿Ï╣Ï» Ïº┘äÏÂÏ║ÏÀ Ï╣┘ä┘ë ÏúÏ¡Ï» Ïº┘äÏúÏ▓Ï▒ÏºÏ▒ Ïº┘äÏúÏ▒Ï¿Ï╣Ï®
+  // STUDIO VISIBILITY — لا يظهر إلا بعد الضغط على أحد الأزرار الأربعة
   const [studioVisible, setStudioVisible] = useState(false);
   const [activeStudioTool, setActiveStudioTool] = useState<DashMediaType | null>(null);
 
   const openStudio = (tool: DashMediaType) => {
-    if (tool === "ai-video") {
-      router.push("/dashboard/generate");
-      return;
-    }
     setActiveStudioTool(tool);
     setDashType(tool);
     setStudioVisible(true);
@@ -153,7 +149,7 @@ export default function HomePage() {
     return "excellent" as const;
   })();
 
-  // LIVE STATS ÔÇö values come from the backend, never simulated in the UI.
+  // LIVE STATS — values come from the backend, never simulated in the UI.
   useEffect(() => {
     const loadStats = async () => {
       try {
@@ -180,8 +176,8 @@ export default function HomePage() {
         const data = await res.json();
         if (data?.credits !== undefined) setCredits(data.credits);
         else if (data?.remainingCredits !== undefined) setCredits(data.remainingCredits);
-        // ÔÜá´©Å ┘è┘üÏ¬Ï▒ÏÂ Ïú┘å Ïº┘ä┘Ç backend ┘èÏ▒Ï¼Ï╣ Ï¡Ïº┘äÏ® Ïº┘äÏºÏ┤Ï¬Ï▒Ïº┘â Ïº┘ä┘üÏ╣┘ä┘èÏ® (Ï¿Ï╣Ï» Ïº┘äÏ¬Ï¡┘é┘é ┘à┘å Ï¿┘êÏºÏ¿Ï® Ïº┘äÏ»┘üÏ╣/Ïº┘ä┘ê┘èÏ¿┘ç┘ê┘â)
-        // Ï╣Ï»┘æ┘ä ÏºÏ│┘à Ïº┘äÏ¡┘é┘ä ┘ç┘åÏº (plan / status / subscriptionStatus) ┘ä┘èÏÀÏºÏ¿┘é ÏºÏ│Ï¬Ï¼ÏºÏ¿Ï® Ïº┘ä┘Ç API Ïº┘äÏ¡┘é┘è┘é┘èÏ® Ï╣┘åÏ»┘â
+        // ⚠️ يفترض أن الـ backend يرجع حالة الاشتراك الفعلية (بعد التحقق من بوابة الدفع/الويبهوك)
+        // عدّل اسم الحقل هنا (plan / status / subscriptionStatus) ليطابق استجابة الـ API الحقيقية عندك
         if (data?.plan === "paid" || data?.subscriptionStatus === "active" || data?.isPaidSubscriber === true) {
           setIsPaidSubscriber(true);
         } else {
@@ -259,7 +255,7 @@ export default function HomePage() {
     if (!dashInput.trim()) return;
     if (!isSignedIn) { router.push("/sign-in?redirect_url=/#studio"); return; }
     
-    // ­ƒöÆ ┘üÏ¡ÏÁ Ïº┘äÏ▒ÏÁ┘èÏ» ÔÇö ÏÑÏ░Ïº Ïº┘åÏ¬┘ç┘ë ┘è┘üÏ¬Ï¡ modal Ïº┘äÏºÏ┤Ï¬Ï▒Ïº┘â
+    // 🔒 فحص الرصيد — إذا انتهى يفتح modal الاشتراك
     if (credits <= 0) {
       setPricingModalOpen(true);
       return;
@@ -281,14 +277,14 @@ export default function HomePage() {
     try {
       let endpoint = "/api/generate-video";
       if (dashType === "ai-avatar") endpoint = "/api/generate-avatar";
-      if (dashType === "image-to-video") endpoint = "/api/generate-image";
+      if (dashType === "image-to-avatar") endpoint = "/api/generate-image";
       if (dashType === "voice-clone") endpoint = "/api/generate-voice";
       const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: dashInput, aspectRatio: dashAspect, cameraMotion: dashCamera }),
       });
 
-      // 402 = Ï▒ÏÁ┘èÏ» ┘à┘åÏ¬┘ç┘è ┘à┘å Ïº┘äÏ│┘èÏ▒┘üÏ▒
+      // 402 = رصيد منتهي من السيرفر
       if (res.status === 402) {
         setCredits(0);
         setPricingModalOpen(true);
@@ -298,7 +294,7 @@ export default function HomePage() {
 
       const data = await res.json();
 
-      // Ï▒ÏÁ┘èÏ» ┘à┘åÏ¬┘ç┘è ┘à┘å Ïº┘ä┘Ç response body
+      // رصيد منتهي من الـ response body
       if (data?.error?.toLowerCase().includes("credit") || data?.remainingCredits === 0) {
         setCredits(0);
         setPricingModalOpen(true);
@@ -313,55 +309,55 @@ export default function HomePage() {
   };
 
   const studioTabs = [
-    { id: "video" as MediaType, title: "AI Video", subtitle: "Ï¬┘ê┘ä┘èÏ» ┘ü┘èÏ»┘è┘ê Ï░┘â┘è", icon: Video, color: "text-blue-400", bgGlow: "from-blue-500/20", placeholder: "ÏÁ┘ü ┘à┘êÏÂ┘êÏ╣ Ïú┘ê ┘àÏ┤┘çÏ» Ïº┘ä┘ü┘èÏ»┘è┘ê Ïº┘äÏ│┘è┘å┘àÏºÏª┘è Ïº┘äÏ░┘è Ï¬Ï▒Ï║Ï¿ ┘ü┘è Ï¬┘ê┘ä┘èÏ»┘ç Ï¿Ïº┘äÏ¬┘üÏÁ┘è┘ä Ï¿┘êÏºÏ│ÏÀÏ® Ïº┘äÏ░┘âÏºÏí Ïº┘äÏºÏÁÏÀ┘åÏºÏ╣┘è..." },
-    { id: "avatar" as MediaType, title: "AI Avatar", subtitle: "Ï┤Ï«ÏÁ┘èÏ® Ï▒┘é┘à┘èÏ® ┘àÏ¬Ï¡Ï»Ï½Ï®", icon: UserSquare2, color: "text-cyan-400", bgGlow: "from-cyan-500/20", placeholder: "Ïº┘âÏ¬Ï¿ Ïº┘ä┘åÏÁ Ïú┘ê Ïº┘äÏ│┘è┘åÏºÏ▒┘è┘ê Ïº┘ä┘âÏº┘à┘ä Ïº┘äÏ░┘è Ï¬Ï▒Ï║Ï¿ ┘à┘å Ïº┘äÏ┤Ï«ÏÁ┘èÏ® Ïº┘äÏ▒┘é┘à┘èÏ® (Ïº┘äÏú┘üÏºÏ¬ÏºÏ▒) Ïº┘äÏ¬Ï¡Ï»Ï½ Ï¿┘ç ┘ê┘àÏ¡Ïº┘âÏºÏ¬┘ç Ïú┘àÏº┘à Ïº┘ä┘âÏº┘à┘èÏ▒Ïº..." },
-    { id: "voice" as MediaType, title: "AI Voice Generator & Lip-Sync", subtitle: "Ï¬┘ê┘ä┘èÏ» ┘ê┘àÏ▓Ïº┘à┘åÏ® Ïº┘äÏÁ┘êÏ¬ Ï¡Ï▒┘â┘èÏº┘ï", icon: Mic, color: "text-amber-400", bgGlow: "from-amber-500/20", placeholder: "Ïº┘âÏ¬Ï¿ ┘ç┘åÏº Ïº┘ä┘åÏÁ Ïº┘ä┘àÏ▒ÏºÏ» Ï¬Ï¡┘ê┘è┘ä┘ç ┘äÏÁ┘êÏ¬┘â Ïº┘äÏºÏ¡Ï¬Ï▒Ïº┘ü┘è ┘àÏ╣ ┘à┘èÏ▓Ï® Ï¬Ï▒┘â┘èÏ¿ ┘êÏ¡Ï▒┘âÏ® Ïº┘äÏ┤┘üÏº┘è┘ü Ïº┘äÏºÏ¡Ï¬Ï▒Ïº┘ü┘èÏ®..." },
+    { id: "video" as MediaType, title: "AI Video", subtitle: "توليد فيديو ذكي", icon: Video, color: "text-blue-400", bgGlow: "from-blue-500/20", placeholder: "صف موضوع أو مشهد الفيديو السينمائي الذي ترغب في توليده بالتفصيل بواسطة الذكاء الاصطناعي..." },
+    { id: "avatar" as MediaType, title: "AI Avatar", subtitle: "شخصية رقمية متحدثة", icon: UserSquare2, color: "text-cyan-400", bgGlow: "from-cyan-500/20", placeholder: "اكتب النص أو السيناريو الكامل الذي ترغب من الشخصية الرقمية (الأفاتار) التحدث به ومحاكاته أمام الكاميرا..." },
+    { id: "voice" as MediaType, title: "AI Voice Generator & Lip-Sync", subtitle: "توليد ومزامنة الصوت حركياً", icon: Mic, color: "text-amber-400", bgGlow: "from-amber-500/20", placeholder: "اكتب هنا النص المراد تحويله لصوتك الاحترافي مع ميزة تركيب وحركة الشفايف الاحترافية..." },
   ];
 
   const currentTabInfo = studioTabs.find(t => t.id === type)!;
 
   return (
-    <main className="relative min-h-screen overflow-hidden text-white font-sans selection:bg-cyan-500/30">
+    <main className="relative min-h-screen overflow-hidden text-slate-800 font-sans selection:bg-teal-500/20 bg-[#eaf6f1]">
       
-      {/* ­ƒÄ¼ BACKGROUND VIDEO */}
+      {/* 🎬 BACKGROUND VIDEO */}
       <video
         autoPlay
         loop
         muted
         playsInline
-        className="fixed inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
+        className="fixed inset-0 w-full h-full object-cover opacity-[0.06] pointer-events-none"
         style={{ zIndex: 0 }}
       >
         <source src="/demo/videos/demo.mp4" type="video/mp4" />
       </video>
-      {/* overlay Ï»Ïº┘â┘å */}
-      <div className="fixed inset-0 bg-[#030303]/75 pointer-events-none" style={{ zIndex: 1 }} />
-      {/* ­ƒîî BACKGROUND MATRIX GRID */}
-      <div className="fixed inset-0 bg-[linear-gradient(to_right,#141416_1px,transparent_1px),linear-gradient(to_bottom,#141416_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-40 pointer-events-none" style={{ zIndex: 2 }} />
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.15),transparent_50%),radial-gradient(circle_at_bottom,rgba(99,102,241,0.05),transparent_60%)] pointer-events-none" style={{ zIndex: 2 }} />
+      {/* overlay فاتح */}
+      <div className="fixed inset-0 bg-[#eaf6f1]/90 pointer-events-none" style={{ zIndex: 1 }} />
+      {/* 🌌 BACKGROUND MATRIX GRID */}
+      <div className="fixed inset-0 bg-[linear-gradient(to_right,#c7ded4_1px,transparent_1px),linear-gradient(to_bottom,#c7ded4_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-40 pointer-events-none" style={{ zIndex: 2 }} />
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(20,184,166,0.10),transparent_50%),radial-gradient(circle_at_bottom,rgba(45,212,191,0.05),transparent_60%)] pointer-events-none" style={{ zIndex: 2 }} />
 
-      {/* ­ƒîê TRACKING CURSOR GLOW */}
-      <div id="cursor-glow" className="pointer-events-none fixed z-0 h-[450px] w-[450px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-cyan-500/5 to-indigo-500/5 blur-[120px] hidden md:block animate-pulse" />
+      {/* 🌈 TRACKING CURSOR GLOW */}
+      <div id="cursor-glow" className="pointer-events-none fixed z-0 h-[450px] w-[450px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-teal-500/5 to-emerald-500/5 blur-[120px] hidden md:block animate-pulse" />
 
       {/* GLOBAL HEADER */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#030303]/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-black/5 bg-white/70 backdrop-blur-xl">
 
-        {/* ÔöÇÔöÇ Ï┤Ï▒┘èÏÀ ÏÑÏ╣┘äÏº┘å┘è ÏúÏ╣┘ä┘ë Ïº┘ä┘ç┘èÏ»Ï▒ ÔöÇÔöÇ */}
-        <div className="bg-gradient-to-r from-cyan-500/10 via-indigo-500/10 to-cyan-500/10 border-b border-cyan-500/10 px-4 py-1.5 text-center">
-          <p className="text-[11px] text-cyan-300 font-semibold">
-            Ô£¿ Introducing AMKAAI Avatar V2 ÔÇö the most lifelike AI presenter ever made.{" "}
-            <button onClick={() => setPricingModalOpen(true)} className="underline font-black hover:text-white transition">
-              Try it free ÔåÆ
+        {/* ── شريط إعلاني أعلى الهيدر ── */}
+        <div className="bg-gradient-to-r from-teal-100/60 via-emerald-100/60 to-teal-100/60 border-b border-teal-900/5 px-4 py-1.5 text-center">
+          <p className="text-[11px] text-teal-800 font-semibold">
+            ✨ Introducing AMKAAI Avatar V2 — the most lifelike AI presenter ever made.{" "}
+            <button onClick={() => setPricingModalOpen(true)} className="underline font-black hover:text-teal-900 transition">
+              Try it free →
             </button>
           </p>
         </div>
 
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
 
-          {/* ÔöÇÔöÇ LOGO + NAV ÔöÇÔöÇ */}
+          {/* ── LOGO + NAV ── */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2 text-xl font-black tracking-tighter bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
-              <Sparkles className="text-cyan-400 animate-pulse" size={20} />
+            <Link href="/" className="flex items-center gap-2 text-xl font-black tracking-tighter text-teal-800">
+              <Sparkles className="text-teal-600 animate-pulse" size={20} />
               AMKAAI
             </Link>
             <nav className="hidden items-center md:flex">
@@ -370,118 +366,118 @@ export default function HomePage() {
                 { label: "Developers", onClick: () => setDevModalOpen(true)      },
               ].map(item => (
                 <button key={item.label} onClick={item.onClick}
-                  className="px-3.5 py-2 text-[12px] font-semibold text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition">
+                  className="px-3.5 py-2 text-[12px] font-semibold text-slate-600 hover:text-teal-900 hover:bg-black/[0.03] rounded-xl transition">
                   {item.label}
                 </button>
               ))}
               <button onClick={() => setPricingModalOpen(true)}
-                className="px-3.5 py-2 text-[12px] font-semibold text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/5 rounded-xl transition">
-                Upgrade Ô£ª
+                className="px-3.5 py-2 text-[12px] font-semibold text-teal-700 hover:text-teal-900 hover:bg-teal-500/5 rounded-xl transition">
+                Upgrade ✦
               </button>
             </nav>
           </motion.div>
 
-          {/* ÔöÇÔöÇ RIGHT ACTIONS ÔöÇÔöÇ */}
+          {/* ── RIGHT ACTIONS ── */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2.5">
 
-            {/* Ï▓Ï▒ Ï¬Ï║┘è┘èÏ▒ Ïº┘ä┘äÏ║Ï® */}
-            <div className="flex items-center rounded-xl border border-white/10 overflow-hidden bg-white/[0.03]">
+            {/* زر تغيير اللغة */}
+            <div className="flex items-center rounded-xl border border-black/10 overflow-hidden bg-white">
               <button onClick={() => setLocale('en')}
-                className={`px-3 py-1.5 text-[11px] font-black tracking-wider transition ${locale === 'en' ? 'bg-cyan-500 text-black' : 'text-gray-500 hover:text-white'}`}>
+                className={`px-3 py-1.5 text-[11px] font-black tracking-wider transition ${locale === 'en' ? 'bg-teal-600 text-white' : 'text-slate-500 hover:text-teal-900'}`}>
                 EN
               </button>
               <button onClick={() => setLocale('ar')}
-                className={`px-3 py-1.5 text-[11px] font-black tracking-wider transition ${locale === 'ar' ? 'bg-cyan-500 text-black' : 'text-gray-500 hover:text-white'}`}>
+                className={`px-3 py-1.5 text-[11px] font-black tracking-wider transition ${locale === 'ar' ? 'bg-teal-600 text-white' : 'text-slate-500 hover:text-teal-900'}`}>
                 AR
               </button>
             </div>
 
-            {/* ÔöÇÔöÇ Ïº┘äÏ¡Ïº┘äÏ®: Ï║┘èÏ▒ ┘àÏ│Ï¼┘æ┘ä ÔöÇÔöÇ */}
+            {/* ── الحالة: غير مسجّل ── */}
             {!isSignedIn ? (
               <>
-                {/* Sign In ÔåÆ ÏÁ┘üÏ¡Ï® Ï¬Ï│Ï¼┘è┘ä Ïº┘äÏ»Ï«┘ê┘ä */}
+                {/* Sign In → صفحة تسجيل الدخول */}
                 <Link href="/sign-in"
-                  className="px-4 py-2 rounded-xl text-[12px] font-bold text-gray-300 border border-white/10 bg-white/[0.03] hover:bg-white/10 transition">
+                  className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-700 border border-black/10 bg-white hover:bg-black/[0.03] transition">
                   Sign In
                 </Link>
 
-                {/* Get Started for Free ÔåÆ ÏÁ┘üÏ¡Ï® ÏÑ┘åÏ┤ÏºÏí Ïº┘äÏ¡Ï│ÏºÏ¿ */}
+                {/* Get Started for Free → صفحة إنشاء الحساب */}
                 <Link href="/sign-up"
-                  className="px-5 py-2 rounded-xl text-[12px] font-black text-black bg-gradient-to-r from-cyan-400 to-indigo-500 hover:opacity-90 transition shadow-[0_0_20px_rgba(6,182,212,0.25)] uppercase tracking-wide whitespace-nowrap">
+                  className="px-5 py-2 rounded-xl text-[12px] font-black text-white bg-gradient-to-r from-teal-500 to-emerald-600 hover:opacity-90 transition shadow-[0_0_20px_rgba(20,184,166,0.25)] uppercase tracking-wide whitespace-nowrap">
                   Get Started for Free
                 </Link>
               </>
             ) : (
-              /* ÔöÇÔöÇ Ïº┘äÏ¡Ïº┘äÏ®: ┘àÏ│Ï¼┘æ┘ä ÔÇö dropdown ┘ä┘äÏ¡Ï│ÏºÏ¿ ÔöÇÔöÇ */
+              /* ── الحالة: مسجّل — dropdown للحساب ── */
               <div className="relative group">
-                <button className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/8 px-3 py-1.5 transition">
+                <button className="flex items-center gap-2 rounded-xl border border-black/10 bg-white hover:bg-black/[0.03] px-3 py-1.5 transition">
                   {/* Credits badge */}
-                  <span className={`flex items-center gap-1 text-[11px] font-bold ${credits === 0 ? "text-amber-400" : "text-cyan-400"}`}>
-                    {credits === 0 ? "ÔÜí Upgrade" : `­ƒÆÄ ${credits}`}
+                  <span className={`flex items-center gap-1 text-[11px] font-bold ${credits === 0 ? "text-amber-600" : "text-teal-700"}`}>
+                    {credits === 0 ? "⚡ Upgrade" : `💎 ${credits}`}
                   </span>
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 flex items-center justify-center text-[11px] font-black text-black">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-[11px] font-black text-white">
                     U
                   </div>
-                  <ChevronDown size={12} className="text-gray-500 group-hover:text-gray-300 transition" />
+                  <ChevronDown size={12} className="text-slate-400 group-hover:text-slate-600 transition" />
                 </button>
 
                 {/* Dropdown menu */}
-                <div className="absolute right-0 top-full mt-2 w-52 bg-[#0f0f17] border border-white/10 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 overflow-hidden z-50">
-                  {/* Ï▒ÏÁ┘èÏ» Credits */}
-                  <div className="px-4 py-3 border-b border-white/5">
-                    <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wide mb-1">Balance</p>
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-black/10 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 overflow-hidden z-50">
+                  {/* رصيد Credits */}
+                  <div className="px-4 py-3 border-b border-black/5">
+                    <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wide mb-1">Balance</p>
                     {credits === 0 ? (
                       <div>
-                        <p className="text-xs text-amber-400 font-bold mb-1.5">No credits yet</p>
-                        <p className="text-[10px] text-gray-500 leading-snug mb-2.5">Subscribe to get credits and start generating.</p>
+                        <p className="text-xs text-amber-600 font-bold mb-1.5">No credits yet</p>
+                        <p className="text-[10px] text-slate-500 leading-snug mb-2.5">Subscribe to get credits and start generating.</p>
                         <button
                           onClick={() => setPricingModalOpen(true)}
-                          className="w-full py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 text-black text-[11px] font-black hover:opacity-90 transition"
-                        >Ô£ª Get Credits ÔÇö Subscribe</button>
+                          className="w-full py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 text-white text-[11px] font-black hover:opacity-90 transition"
+                        >✦ Get Credits — Subscribe</button>
                       </div>
                     ) : (
                       <>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-black text-white">­ƒÆÄ {credits} credits</span>
+                          <span className="text-sm font-black text-slate-800">💎 {credits} credits</span>
                           <button onClick={() => setPricingModalOpen(true)}
-                            className="text-[10px] font-bold text-cyan-400 border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 rounded-lg hover:bg-cyan-500/20 transition">
+                            className="text-[10px] font-bold text-teal-700 border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 rounded-lg hover:bg-teal-500/20 transition">
                             Top Up
                           </button>
                         </div>
-                        <div className="mt-2 h-1 bg-white/10 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 rounded-full transition-all"
+                        <div className="mt-2 h-1 bg-black/5 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-teal-500 to-emerald-600 rounded-full transition-all"
                             style={{ width: `${Math.min(100,(credits/300)*100)}%` }} />
                         </div>
                       </>
                     )}
                   </div>
 
-                  {/* Ï▒┘êÏºÏ¿ÏÀ Ïº┘äÏ¡Ï│ÏºÏ¿ */}
+                  {/* روابط الحساب */}
                   <div className="py-1.5">
                     {[
-                      { icon: "­ƒæñ", label: "My Account",   href: "/dashboard" },
-                      { icon: "­ƒÄ¼", label: "My Videos",    href: "/dashboard" },
-                      { icon: "­ƒÆÄ", label: "Upgrade Plan", href: "#", action: () => setPricingModalOpen(true) },
-                      { icon: "ÔÜÖ´©Å", label: "Settings",     href: "/dashboard" },
+                      { icon: "👤", label: "My Account",   href: "/dashboard" },
+                      { icon: "🎬", label: "My Videos",    href: "/dashboard" },
+                      { icon: "💎", label: "Upgrade Plan", href: "#", action: () => setPricingModalOpen(true) },
+                      { icon: "⚙️", label: "Settings",     href: "/dashboard" },
                     ].map(item => (
                       item.action
                         ? <button key={item.label} onClick={item.action}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] text-gray-300 hover:text-white hover:bg-white/5 transition text-left">
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] text-slate-600 hover:text-teal-900 hover:bg-black/[0.03] transition text-left">
                             <span>{item.icon}</span>{item.label}
                           </button>
                         : <Link key={item.label} href={item.href}
-                            className="flex items-center gap-3 px-4 py-2.5 text-[12px] text-gray-300 hover:text-white hover:bg-white/5 transition">
+                            className="flex items-center gap-3 px-4 py-2.5 text-[12px] text-slate-600 hover:text-teal-900 hover:bg-black/[0.03] transition">
                             <span>{item.icon}</span>{item.label}
                           </Link>
                     ))}
                   </div>
 
                   {/* Sign Out */}
-                  <div className="border-t border-white/5 py-1.5">
+                  <div className="border-t border-black/5 py-1.5">
                     <button
                       onClick={() => signOut({ redirectUrl: "/" })}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] text-red-400 hover:text-red-300 hover:bg-red-500/5 transition text-left">
-                      <span>­ƒÜ¬</span> Sign Out
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] text-red-500 hover:text-red-600 hover:bg-red-500/5 transition text-left">
+                      <span>🚪</span> Sign Out
                     </button>
                   </div>
                 </div>
@@ -493,103 +489,103 @@ export default function HomePage() {
 
       {/* HERO SECTION */}
       <section className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-6 pb-16 pt-28 text-center">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mb-6 flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-4 py-1.5 text-[11px] font-bold text-cyan-300 tracking-wide uppercase backdrop-blur-md">
-          <Flame size={12} className="text-orange-400 animate-pulse" />
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mb-6 flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-1.5 text-[11px] font-bold text-teal-700 tracking-wide uppercase backdrop-blur-md shadow-sm">
+          <Flame size={12} className="text-orange-500 animate-pulse" />
           AMKAAI Quantum Physics Engine Live
         </motion.div>
 
-        <motion.h1 initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="max-w-5xl text-5xl font-black tracking-tight leading-[1.05] md:text-7xl">
-          The WorldÔÇÖs Most Powerful <br />
-          <span className="bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">AI Cinematic Orchestration Engine</span>
+        <motion.h1 initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="max-w-5xl text-5xl font-black tracking-tight leading-[1.05] md:text-7xl text-teal-900">
+          The World's Most Powerful <br />
+          AI Cinematic Orchestration Engine
         </motion.h1>
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mt-6 max-w-3xl text-sm md:text-base text-gray-400 leading-relaxed font-light">
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mt-6 max-w-3xl text-sm md:text-base text-slate-600 leading-relaxed font-light">
           Unlock uncompressed latent diffusion chains, multi-layered fluid mechanics, advanced AI rendering geometry, and automated AI acoustics inside a single timeline terminal.
         </motion.p>
 
-        <div className="mt-8 flex flex-wrap justify-center gap-4 text-[11px] font-mono text-gray-500">
-          <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
+        <div className="mt-8 flex flex-wrap justify-center gap-4 text-[11px] font-mono text-slate-500">
+          <div className="flex items-center gap-1.5 bg-white border border-black/5 px-3 py-1.5 rounded-xl shadow-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-emerald-400 font-bold">Live GPU Rendering</span>
+            <span className="text-emerald-600 font-bold">Live GPU Rendering</span>
           </div>
-          <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
-            <ShieldCheck size={12} className="text-cyan-400" />
-            <span className="text-gray-400">No watermark on Pro</span>
+          <div className="flex items-center gap-1.5 bg-white border border-black/5 px-3 py-1.5 rounded-xl shadow-sm">
+            <ShieldCheck size={12} className="text-teal-600" />
+            <span className="text-slate-500">No watermark on Pro</span>
           </div>
         </div>
 
-        {/* ÔöÇÔöÇ 4 TOOL BUTTONS ÔöÇÔöÇ */}
+        {/* ── 4 TOOL BUTTONS ── */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="mt-12 w-full max-w-4xl">
-          <p className="text-[11px] font-mono text-gray-600 uppercase tracking-[0.2em] mb-5 text-center">Choose your creation tool</p>
+          <p className="text-[11px] font-mono text-slate-500 uppercase tracking-[0.2em] mb-5 text-center">Choose your creation tool</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 
-            {/* 1 ÔÇö AI Video Generator */}
+            {/* 1 — AI Video Generator */}
             <motion.button
               whileHover={{ y: -4, scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => openStudio("ai-video")}
-              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-purple-500/20 bg-gradient-to-b from-purple-500/10 to-transparent px-4 py-6 transition-all hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(168,85,247,0.2)] text-center"
+              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-purple-200 bg-white px-4 py-6 transition-all hover:border-purple-400 hover:shadow-[0_10px_30px_rgba(168,85,247,0.15)] text-center shadow-sm"
             >
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/25 transition">
-                <Video size={22} className="text-purple-400" />
+              <div className="w-12 h-12 rounded-2xl bg-purple-100 border border-purple-200 flex items-center justify-center group-hover:bg-purple-200 transition">
+                <Video size={22} className="text-purple-600" />
               </div>
               <div>
-                <p className="text-[13px] font-black text-white leading-tight">AI Video</p>
-                <p className="text-[13px] font-black text-white leading-tight">Generator</p>
-                <p className="text-[10px] text-gray-500 mt-1 font-mono">Text ÔåÆ Cinematic Video</p>
+                <p className="text-[13px] font-black text-slate-800 leading-tight">AI Video</p>
+                <p className="text-[13px] font-black text-slate-800 leading-tight">Generator</p>
+                <p className="text-[10px] text-slate-500 mt-1 font-mono">Text → Cinematic Video</p>
               </div>
               <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-purple-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
             </motion.button>
 
-            {/* 2 ÔÇö Create an Avatar */}
+            {/* 2 — Create an Avatar */}
             <motion.button
               whileHover={{ y: -4, scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => openStudio("ai-avatar")}
-              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-cyan-500/20 bg-gradient-to-b from-cyan-500/10 to-transparent px-4 py-6 transition-all hover:border-cyan-500/50 hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] text-center"
+              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-sky-200 bg-white px-4 py-6 transition-all hover:border-sky-400 hover:shadow-[0_10px_30px_rgba(14,165,233,0.15)] text-center shadow-sm"
             >
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/20 flex items-center justify-center group-hover:bg-cyan-500/25 transition">
-                <UserSquare2 size={22} className="text-cyan-400" />
+              <div className="w-12 h-12 rounded-2xl bg-sky-100 border border-sky-200 flex items-center justify-center group-hover:bg-sky-200 transition">
+                <UserSquare2 size={22} className="text-sky-600" />
               </div>
               <div>
-                <p className="text-[13px] font-black text-white leading-tight">Create an</p>
-                <p className="text-[13px] font-black text-white leading-tight">Avatar</p>
-                <p className="text-[10px] text-gray-500 mt-1 font-mono">AI Digital Presenter</p>
+                <p className="text-[13px] font-black text-slate-800 leading-tight">Create an</p>
+                <p className="text-[13px] font-black text-slate-800 leading-tight">Avatar</p>
+                <p className="text-[10px] text-slate-500 mt-1 font-mono">AI Digital Presenter</p>
               </div>
-              <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-cyan-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
+              <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-sky-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
             </motion.button>
 
-            {/* 3 ÔÇö Image to Video */}
+            {/* 3 — Image to Video */}
             <motion.button
               whileHover={{ y: -4, scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => openStudio("image-to-video")}
-              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent px-4 py-6 transition-all hover:border-emerald-500/50 hover:shadow-[0_0_30px_rgba(16,185,129,0.2)] text-center"
+              onClick={() => openStudio("image-to-avatar")}
+              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-6 transition-all hover:border-emerald-400 hover:shadow-[0_10px_30px_rgba(16,185,129,0.15)] text-center shadow-sm"
             >
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/25 transition">
-                <ImageIcon size={22} className="text-emerald-400" />
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center group-hover:bg-emerald-200 transition">
+                <ImageIcon size={22} className="text-emerald-600" />
               </div>
               <div>
-                <p className="text-[13px] font-black text-white leading-tight">Image to</p>
-                <p className="text-[13px] font-black text-white leading-tight">Video</p>
-                <p className="text-[10px] text-gray-500 mt-1 font-mono">HeyGen Engine Mode</p>
+                <p className="text-[13px] font-black text-slate-800 leading-tight">Image to</p>
+                <p className="text-[13px] font-black text-slate-800 leading-tight">Video</p>
+                <p className="text-[10px] text-slate-500 mt-1 font-mono">HeyGen Engine Mode</p>
               </div>
               <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-emerald-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
             </motion.button>
 
-            {/* 4 ÔÇö AI AI Voice Generator & Lip-Sync */}
+            {/* 4 — AI AI Voice Generator & Lip-Sync */}
             <motion.button
               whileHover={{ y: -4, scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => openStudio("voice-clone")}
-              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-amber-500/20 bg-gradient-to-b from-amber-500/10 to-transparent px-4 py-6 transition-all hover:border-amber-500/50 hover:shadow-[0_0_30px_rgba(245,158,11,0.2)] text-center"
+              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-6 transition-all hover:border-amber-400 hover:shadow-[0_10px_30px_rgba(245,158,11,0.15)] text-center shadow-sm"
             >
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center group-hover:bg-amber-500/25 transition">
-                <Mic size={22} className="text-amber-400" />
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center group-hover:bg-amber-200 transition">
+                <Mic size={22} className="text-amber-600" />
               </div>
               <div>
-                <p className="text-[13px] font-black text-white leading-tight">AI Voice</p>
-                <p className="text-[13px] font-black text-white leading-tight">Generator & Lip-Sync</p>
-                <p className="text-[10px] text-gray-500 mt-1 font-mono">Voice Matrix</p>
+                <p className="text-[13px] font-black text-slate-800 leading-tight">AI Voice</p>
+                <p className="text-[13px] font-black text-slate-800 leading-tight">Generator & Lip-Sync</p>
+                <p className="text-[10px] text-slate-500 mt-1 font-mono">Voice Matrix</p>
               </div>
               <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-amber-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
             </motion.button>
@@ -598,7 +594,7 @@ export default function HomePage() {
 
           {!isSignedIn && (
             <div className="mt-6 flex justify-center">
-              <Link href="/sign-up" className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-8 py-3 text-sm font-bold text-gray-300 transition hover:bg-white/10 uppercase tracking-wider">
+              <Link href="/sign-up" className="flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-8 py-3 text-sm font-bold text-slate-700 transition hover:bg-black/[0.03] uppercase tracking-wider shadow-sm">
                 Get Started Free
               </Link>
             </div>
@@ -606,22 +602,22 @@ export default function HomePage() {
         </motion.div>
       </section>
 
-      {/* ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
-          HOW IT WORKS ÔÇö 3 STEPS
-      ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ */}
+      {/* ═══════════════════════════════════════════════════
+          HOW IT WORKS — 3 STEPS
+      ═══════════════════════════════════════════════════ */}
       <section className="relative z-10 mx-auto max-w-5xl px-6 py-20">
         <div className="text-center mb-12">
           <p className="text-[11px] font-mono text-cyan-500 uppercase tracking-[0.2em] mb-3">Simple Process</p>
           <h2 className="text-3xl md:text-4xl font-black text-white">How It Works</h2>
-          <p className="text-gray-500 text-sm mt-3 max-w-xl mx-auto">From prompt to cinematic video in under a minute ÔÇö no editing skills needed.</p>
+          <p className="text-gray-500 text-sm mt-3 max-w-xl mx-auto">From prompt to cinematic video in under a minute — no editing skills needed.</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
           {/* connector line */}
           <div className="hidden md:block absolute top-10 left-[16%] right-[16%] h-px bg-gradient-to-r from-cyan-500/20 via-indigo-500/40 to-cyan-500/20" />
           {[
-            { step: "01", icon: "Ô£ì´©Å", title: "Describe Your Vision", desc: "Type a prompt in plain language. Be as detailed or as brief as you like ÔÇö our AI understands context, style, and emotion.", color: "from-cyan-500/20 to-transparent", border: "border-cyan-500/20", badge: "text-cyan-400" },
-            { step: "02", icon: "ÔÜí", title: "AI Renders Instantly", desc: "Our GPU cluster processes your request in real-time ÔÇö applying cinematic grading, AI color science, voice synthesis, and motion.", color: "from-indigo-500/20 to-transparent", border: "border-indigo-500/20", badge: "text-indigo-400" },
-            { step: "03", icon: "­ƒÄ¼", title: "Download & Share", desc: "Export in HD, share directly to social media, or embed anywhere. No watermark on Pro plans.", color: "from-purple-500/20 to-transparent", border: "border-purple-500/20", badge: "text-purple-400" },
+            { step: "01", icon: "✍️", title: "Describe Your Vision", desc: "Type a prompt in plain language. Be as detailed or as brief as you like — our AI understands context, style, and emotion.", color: "from-cyan-500/20 to-transparent", border: "border-cyan-500/20", badge: "text-cyan-400" },
+            { step: "02", icon: "⚡", title: "AI Renders Instantly", desc: "Our GPU cluster processes your request in real-time — applying cinematic grading, AI color science, voice synthesis, and motion.", color: "from-indigo-500/20 to-transparent", border: "border-indigo-500/20", badge: "text-indigo-400" },
+            { step: "03", icon: "🎬", title: "Download & Share", desc: "Export in HD, share directly to social media, or embed anywhere. No watermark on Pro plans.", color: "from-purple-500/20 to-transparent", border: "border-purple-500/20", badge: "text-purple-400" },
           ].map((s) => (
             <motion.div key={s.step} whileHover={{ y: -4 }} className={`relative rounded-2xl border ${s.border} bg-gradient-to-b ${s.color} p-7 backdrop-blur-md`}>
               <div className={`text-[11px] font-black font-mono ${s.badge} mb-4 tracking-widest`}>STEP {s.step}</div>
@@ -633,14 +629,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
-          GALLERY ÔÇö Real Examples
-      ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ */}
+      {/* ═══════════════════════════════════════════════════
+          GALLERY — Real Examples
+      ═══════════════════════════════════════════════════ */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 py-10 pb-20">
         <div className="text-center mb-10">
           <p className="text-[11px] font-mono text-cyan-500 uppercase tracking-[0.2em] mb-3">Made with AMKAAI</p>
           <h2 className="text-3xl md:text-4xl font-black text-white">Real Generations</h2>
-          <p className="text-gray-500 text-sm mt-3">Examples created by our users ÔÇö no post-editing.</p>
+          <p className="text-gray-500 text-sm mt-3">Examples created by our users — no post-editing.</p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {AI_GALLERY.map((item) => (
@@ -673,33 +669,33 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
-          COMMUNITY ÔÇö Discord + Affiliate
-      ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ */}
+      {/* ═══════════════════════════════════════════════════
+          COMMUNITY — Discord + Affiliate
+      ═══════════════════════════════════════════════════ */}
       <section className="relative z-10 mx-auto max-w-5xl px-6 py-10 pb-24">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
           {/* Discord */}
           <motion.div whileHover={{ y: -3 }} className="relative rounded-3xl border border-indigo-500/20 bg-gradient-to-br from-indigo-950/40 to-violet-950/20 p-8 overflow-hidden">
             <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-2xl" />
-            <div className="text-4xl mb-4">­ƒÆ¼</div>
+            <div className="text-4xl mb-4">💬</div>
             <h3 className="text-xl font-black text-white mb-2">Join our Discord</h3>
             <p className="text-sm text-gray-400 leading-relaxed mb-6">Connect with 500+ creators. Share prompts, get feedback, and stay up to date with new features and model releases.</p>
             <div className="flex items-center gap-3 mb-6">
-              {["­ƒºæÔÇì­ƒÆ╗", "­ƒæ®ÔÇì­ƒÄ¿", "­ƒÄ¼", "­ƒñû", "­ƒîì"].map((e, i) => (
+              {["🧑‍💻", "👩‍🎨", "🎬", "🤖", "🌍"].map((e, i) => (
                 <div key={i} className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-sm">{e}</div>
               ))}
               <span className="text-[11px] text-gray-500 font-mono">+500 members</span>
             </div>
             <a href="https://discord.gg/amkaai" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-black transition shadow-[0_0_24px_rgba(99,102,241,0.3)]">
-              Join Discord ÔåÆ
+              Join Discord →
             </a>
           </motion.div>
 
           {/* Affiliate */}
           <motion.div whileHover={{ y: -3 }} className="relative rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/40 to-teal-950/20 p-8 overflow-hidden">
             <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-emerald-500/10 blur-2xl" />
-            <div className="text-4xl mb-4">­ƒÆ©</div>
+            <div className="text-4xl mb-4">💸</div>
             <h3 className="text-xl font-black text-white mb-2">Affiliate Program</h3>
             <p className="text-sm text-gray-400 leading-relaxed mb-6">Earn <span className="text-emerald-400 font-bold">30% recurring commission</span> for every user you refer. No cap, paid monthly directly to your account.</p>
             <div className="grid grid-cols-3 gap-3 mb-6">
@@ -715,18 +711,18 @@ export default function HomePage() {
               ))}
             </div>
             <a href="mailto:affiliate@amkaai.net" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-black transition shadow-[0_0_24px_rgba(16,185,129,0.3)]">
-              Apply Now ÔåÆ
+              Apply Now →
             </a>
           </motion.div>
 
         </div>
       </section>
 
-      {/* ­ƒÄø´©Å STUDIO CONSOLE ÔÇö ┘èÏ©┘çÏ▒ ┘ü┘éÏÀ Ï¿Ï╣Ï» ÏºÏ«Ï¬┘èÏºÏ▒ ÏúÏ»ÏºÏ® */}
+      {/* 🎛️ STUDIO CONSOLE — يظهر فقط بعد اختيار أداة */}
       {studioVisible && (
       <section id="studio" className="relative z-10 mx-auto max-w-7xl px-6 pb-32">
 
-        {/* Section Label ┘àÏ╣ ÏºÏ│┘à Ïº┘äÏúÏ»ÏºÏ® Ïº┘ä┘åÏ┤ÏÀÏ® */}
+        {/* Section Label مع اسم الأداة النشطة */}
         <div className="flex items-center gap-3 mb-6">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
           <div className="flex items-center gap-3">
@@ -734,20 +730,20 @@ export default function HomePage() {
               <Sparkles size={11} className="animate-pulse" />
               {activeStudioTool === "ai-video" && "AI Video Generator"}
               {activeStudioTool === "ai-avatar" && "Create an Avatar"}
-              {activeStudioTool === "image-to-video" && "Image to Video"}
+              {activeStudioTool === "image-to-avatar" && "Image to Video"}
               {activeStudioTool === "voice-clone" && "AI Voice Generator & Lip-Sync"}
             </span>
             <button
               onClick={() => { setStudioVisible(false); setActiveStudioTool(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}
               className="text-[10px] text-gray-600 hover:text-gray-400 border border-white/10 rounded-lg px-2.5 py-1 transition font-mono"
             >
-              Ô£ò Close
+              ✕ Close
             </button>
             <button
               onClick={() => { setStudioVisible(false); setActiveStudioTool(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}
               className="flex items-center gap-1.5 text-[10px] text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/15 rounded-lg px-2.5 py-1 transition font-mono"
             >
-              ÔåÉ Home
+              ← Home
             </button>
           </div>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
@@ -755,7 +751,7 @@ export default function HomePage() {
 
         <div className="w-full rounded-3xl border border-white/10 bg-[#07070a] shadow-2xl overflow-hidden flex h-[680px]">
 
-          {/* ÔöÇÔöÇ LEFT SIDEBAR ÔöÇÔöÇ */}
+          {/* ── LEFT SIDEBAR ── */}
           <AnimatePresence>
             {sidebarOpen && (
               <motion.div
@@ -786,7 +782,7 @@ export default function HomePage() {
                     <div className="bg-white/5 rounded-xl p-3 border border-white/5 space-y-2">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
                         <span>Active GPU Queue</span>
-                        <span className="text-cyan-400 font-mono animate-pulse">ÔùÅ Live</span>
+                        <span className="text-cyan-400 font-mono animate-pulse">● Live</span>
                       </p>
                       <div className="space-y-2 max-h-[120px] overflow-y-auto">
                         {renderQueue.length === 0 && (
@@ -808,7 +804,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Bottom ÔÇö Credits & User */}
+                {/* Bottom — Credits & User */}
                 <div className="p-4 border-t border-white/5 space-y-3">
                   <div className={`rounded-xl border p-3 flex justify-between items-center text-xs ${credits <= 0 ? "border-red-500/30 bg-red-500/5" : credits < 50 ? "border-amber-500/30 bg-amber-500/5" : "border-cyan-500/20 bg-cyan-500/5"}`}>
                     <span className="text-gray-400 font-mono">Allocation State</span>
@@ -818,21 +814,21 @@ export default function HomePage() {
                   </div>
                   {credits <= 0 && (
                     <p className="text-[10px] text-red-400 font-mono text-center">
-                      {locale === 'ar' ? 'ÔÜá´©Å Ï▒ÏÁ┘èÏ»┘â Ïº┘åÏ¬┘ç┘ë ÔÇö ÏºÏ┤Ï¬Ï▒┘â ┘ä┘ä┘àÏ¬ÏºÏ¿Ï╣Ï®' : 'ÔÜá´©Å Credits depleted ÔÇö upgrade to continue'}
+                      {locale === 'ar' ? '⚠️ رصيدك انتهى — اشترك للمتابعة' : '⚠️ Credits depleted — upgrade to continue'}
                     </p>
                   )}
                   <button
                     onClick={() => setPricingModalOpen(true)}
                     className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2 text-xs font-bold text-amber-400 hover:bg-amber-500/10 transition"
                   >
-                    ­ƒÆÄ Upgrade Plan
+                    💎 Upgrade Plan
                   </button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* ÔöÇÔöÇ MAIN AREA ÔöÇÔöÇ */}
+          {/* ── MAIN AREA ── */}
           <div className="flex flex-1 overflow-hidden">
 
             {/* SYNTHESIS CONTROL HUB */}
@@ -849,14 +845,14 @@ export default function HomePage() {
                   <SlidersHorizontal size={13} className="text-cyan-400" />
                   <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Synthesis Control Hub</h2>
                 </div>
-                <button onClick={() => setAdvancedOpen(false)} className="text-gray-500 hover:text-white transition text-[10px]">Ô£ò</button>
+                <button onClick={() => setAdvancedOpen(false)} className="text-gray-500 hover:text-white transition text-[10px]">✕</button>
               </div>
 
               {/* AI Generation Engine */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">AI Generation Engine</label>
                 <div className="grid grid-cols-2 gap-2">
-                 <button onClick={() => openStudio("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-video" ? "bg-purple-600/10 border-purple-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
+                  <button onClick={() => setDashType("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-video" ? "bg-purple-600/10 border-purple-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
                     <Video size={14} className={dashType === "ai-video" ? "text-purple-400" : "text-gray-500"} />
                     <div>
                       <p className="text-[11px] font-black tracking-tight">AI Video Generator</p>
@@ -872,8 +868,8 @@ export default function HomePage() {
                     </div>
                   </button>
 
-                  <button onClick={() => setDashType("image-to-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "image-to-video" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                    <ImageIcon size={14} className={dashType === "image-to-video" ? "text-emerald-400" : "text-gray-500"} />
+                  <button onClick={() => setDashType("image-to-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "image-to-avatar" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
+                    <ImageIcon size={14} className={dashType === "image-to-avatar" ? "text-emerald-400" : "text-gray-500"} />
                     <div>
                       <p className="text-[11px] font-black tracking-tight">Image To Video</p>
                       <span className="text-[9px] text-gray-500 font-mono">HeyGen Engine Mode</span>
@@ -916,7 +912,7 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* ÔöÇÔöÇ POWER TOOLS ÔöÇÔöÇ */}
+              {/* ── POWER TOOLS ── */}
               <div className="space-y-2 pt-2 border-t border-white/5">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Power Tools</label>
 
@@ -944,7 +940,7 @@ export default function HomePage() {
                   </div>
                   <div>
                     <p className="text-[11px] font-bold text-gray-300">Script to Video</p>
-                    <p className="text-[9px] text-gray-600 font-mono">{scriptMode ? "Ô£ô Script mode ON" : "Full script ÔåÆ video"}</p>
+                    <p className="text-[9px] text-gray-600 font-mono">{scriptMode ? "✓ Script mode ON" : "Full script → video"}</p>
                   </div>
                 </button>
 
@@ -955,10 +951,10 @@ export default function HomePage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-[11px] font-bold text-gray-300">Style Transfer</p>
-                    <p className="text-[9px] text-gray-600 font-mono">{styleTransferImg ? "Ô£ô Style image loaded" : "Upload reference image"}</p>
+                    <p className="text-[9px] text-gray-600 font-mono">{styleTransferImg ? "✓ Style image loaded" : "Upload reference image"}</p>
                   </div>
                   {styleTransferImg && (
-                    <button onClick={(e) => { e.preventDefault(); setStyleTransferImg(null); }} className="text-gray-500 hover:text-red-400 transition text-[10px]">Ô£ò</button>
+                    <button onClick={(e) => { e.preventDefault(); setStyleTransferImg(null); }} className="text-gray-500 hover:text-red-400 transition text-[10px]">✕</button>
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -979,14 +975,14 @@ export default function HomePage() {
                   </div>
                   <div>
                     <p className="text-[11px] font-bold text-gray-300">Add Subtitles</p>
-                    <p className="text-[9px] text-gray-600 font-mono">{subtitlesEnabled ? "Ô£ô Auto-subtitles ON" : "Auto-generated captions"}</p>
+                    <p className="text-[9px] text-gray-600 font-mono">{subtitlesEnabled ? "✓ Auto-subtitles ON" : "Auto-generated captions"}</p>
                   </div>
                 </button>
               </div>
             </div>
             )}
 
-            {/* ÔöÇÔöÇ CINEMA MONITOR + INPUT ÔöÇÔöÇ */}
+            {/* ── CINEMA MONITOR + INPUT ── */}
             <div className="flex-1 flex flex-col bg-black overflow-hidden">
 
               {/* Cinema Monitor Stage */}
@@ -1010,7 +1006,7 @@ export default function HomePage() {
                         </button>
                       ))}
                     </div>
-                    {/* Watermark status ÔÇö shown only during the trial, hidden once the user is a paid subscriber */}
+                    {/* Watermark status — shown only during the trial, hidden once the user is a paid subscriber */}
                     {!isPaidSubscriber && (
                       <div
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold border bg-white/5 border-white/10 text-gray-500"
@@ -1049,7 +1045,7 @@ export default function HomePage() {
                     </span>
                     {credits < 50 && (
                       <button onClick={() => setPricingModalOpen(true)} className="text-[9px] font-bold text-amber-400 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded-lg hover:bg-amber-500/20 transition whitespace-nowrap">
-                        ÔÜí Top Up
+                        ⚡ Top Up
                       </button>
                     )}
                   </div>
@@ -1103,7 +1099,7 @@ export default function HomePage() {
                 {/* Script mode label */}
                 {scriptMode && (
                   <div className="flex items-center gap-2 text-[10px] text-indigo-400 font-mono">
-                    <FileText size={11} /> Script Mode ÔÇö paste your full script below, it will be converted to video
+                    <FileText size={11} /> Script Mode — paste your full script below, it will be converted to video
                   </div>
                 )}
 
@@ -1111,7 +1107,7 @@ export default function HomePage() {
                 {styleTransferImg && (
                   <div className="flex items-center gap-2 text-[10px] text-emerald-400 font-mono">
                     <Palette size={11} />
-                    <span>Style reference loaded ÔÇö video will match this aesthetic</span>
+                    <span>Style reference loaded — video will match this aesthetic</span>
                     <img src={styleTransferImg} alt="style" className="w-8 h-8 rounded-lg object-cover border border-emerald-500/30 ml-auto" />
                   </div>
                 )}
@@ -1128,7 +1124,7 @@ export default function HomePage() {
                         <div className={`w-6 h-1.5 rounded-full transition-all duration-300 ${promptQuality === "excellent" ? "bg-emerald-500" : "bg-white/10"}`} />
                       </div>
                       <span className={`text-[9px] font-black uppercase font-mono tracking-wide transition-all duration-300 ${promptQuality === "poor" ? "text-red-400" : promptQuality === "good" ? "text-amber-400" : "text-emerald-400"}`}>
-                        {promptQuality === "poor" ? "ÔÜá Poor" : promptQuality === "good" ? "ÔùÉ Good" : "Ô£ª Excellent"}
+                        {promptQuality === "poor" ? "⚠ Poor" : promptQuality === "good" ? "◐ Good" : "✦ Excellent"}
                       </span>
                     </div>
                   )}
@@ -1136,7 +1132,7 @@ export default function HomePage() {
                   <textarea
                     value={dashInput}
                     onChange={(e) => setDashInput(e.target.value)}
-                    placeholder={scriptMode ? "Paste your full script here ÔÇö Scene 1: ...\nScene 2: ...\nNarrator: ..." : dashType === "voice-clone" ? "Ïº┘âÏ¬Ï¿ Ïº┘ä┘åÏÁ Ïº┘ä┘àÏ▒ÏºÏ» Ï¬Ï¡┘ê┘è┘ä┘ç ┘äÏÁ┘êÏ¬┘â Ïº┘äÏºÏ¡Ï¬Ï▒Ïº┘ü┘è..." : "Describe your production criteria for this pipeline execution..."}
+                    placeholder={scriptMode ? "Paste your full script here — Scene 1: ...\nScene 2: ...\nNarrator: ..." : dashType === "voice-clone" ? "اكتب النص المراد تحويله لصوتك الاحترافي..." : "Describe your production criteria for this pipeline execution..."}
                     rows={scriptMode ? 4 : 2}
                     className="max-h-32 min-h-[40px] flex-1 resize-none bg-transparent px-3 py-1.5 text-xs outline-none text-white placeholder:text-gray-700 font-mono"
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !scriptMode) { e.preventDefault(); executeDash(); } }}
@@ -1147,7 +1143,7 @@ export default function HomePage() {
                     className={`flex h-10 w-10 items-center justify-center rounded-xl text-black disabled:opacity-20 transition shadow-md ${credits <= 0 ? "bg-amber-400 hover:bg-amber-300" : "bg-cyan-500 hover:bg-cyan-400"}`}
                     title={credits <= 0 ? "Upgrade to continue" : "Send"}
                   >
-                    {credits <= 0 ? <span className="text-[9px] font-black">­ƒÆÄ</span> : <Send size={14} />}
+                    {credits <= 0 ? <span className="text-[9px] font-black">💎</span> : <Send size={14} />}
                   </button>
                 </div>
                 </div>
@@ -1163,9 +1159,9 @@ export default function HomePage() {
       </section>
       )} {/* end studioVisible */}
 
-      {/* ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
+      {/* ════════════════════════════════════
           FOOTER
-      ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ */}
+      ════════════════════════════════════ */}
       <footer className="relative z-10 border-t border-white/5 bg-[#070709]/80 backdrop-blur-md mt-8">
         <div className="mx-auto max-w-6xl px-6 py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
@@ -1174,10 +1170,10 @@ export default function HomePage() {
               <div className="flex items-center gap-2 text-lg font-black bg-gradient-to-r from-cyan-400 to-indigo-400 bg-clip-text text-transparent mb-3">
                 <Sparkles size={16} className="text-cyan-400" /> AMKAAI
               </div>
-              <p className="text-[11px] text-gray-600 leading-relaxed max-w-[180px]">The world's most powerful AI cinematic engine ÔÇö built for creators.</p>
+              <p className="text-[11px] text-gray-600 leading-relaxed max-w-[180px]">The world's most powerful AI cinematic engine — built for creators.</p>
               <div className="flex items-center gap-3 mt-4">
-                <a href="https://discord.gg/amkaai" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-xl border border-indigo-500/30 bg-indigo-500/10 flex items-center justify-center text-sm hover:bg-indigo-500/20 transition" title="Discord">­ƒÆ¼</a>
-                <a href="https://twitter.com/amkaai" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-sm hover:bg-white/10 transition" title="Twitter/X">­ØòÅ</a>
+                <a href="https://discord.gg/amkaai" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-xl border border-indigo-500/30 bg-indigo-500/10 flex items-center justify-center text-sm hover:bg-indigo-500/20 transition" title="Discord">💬</a>
+                <a href="https://twitter.com/amkaai" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-sm hover:bg-white/10 transition" title="Twitter/X">𝕏</a>
               </div>
             </div>
             {/* Product */}
@@ -1208,14 +1204,14 @@ export default function HomePage() {
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-4 font-mono">Community</p>
               <div className="space-y-2.5">
                 <a href="https://discord.gg/amkaai" target="_blank" rel="noreferrer" className="block text-[12px] text-gray-500 hover:text-indigo-400 transition">Discord Community</a>
-                <a href="mailto:affiliate@amkaai.net" className="block text-[12px] text-gray-500 hover:text-emerald-400 transition">Affiliate Program ÔÇö 30%</a>
+                <a href="mailto:affiliate@amkaai.net" className="block text-[12px] text-gray-500 hover:text-emerald-400 transition">Affiliate Program — 30%</a>
                 <button onClick={() => setPlatformModalOpen(true)} className="block text-[12px] text-gray-500 hover:text-white transition text-left">Enterprise</button>
                 <a href="mailto:hello@amkaai.net" className="block text-[12px] text-gray-500 hover:text-white transition">Contact Us</a>
               </div>
             </div>
           </div>
           <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
-            <p className="text-[10px] text-gray-700 font-mono">┬® 2025 AMKAAI. All rights reserved.</p>
+            <p className="text-[10px] text-gray-700 font-mono">© 2025 AMKAAI. All rights reserved.</p>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <Link href="/terms" className="text-[10px] text-gray-600 hover:text-gray-400 transition font-mono">Terms</Link>
@@ -1230,7 +1226,7 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-      {/* ­ƒôï TEMPLATE MODAL */}
+      {/* 📋 TEMPLATE MODAL */}
       <AnimatePresence>
         {templateModalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1245,7 +1241,7 @@ export default function HomePage() {
                   <h3 className="text-base font-black text-white flex items-center gap-2"><Layers3 size={16} className="text-cyan-400" /> Use Template</h3>
                   <p className="text-[11px] text-gray-500 mt-0.5">Ready-made prompts for instant production</p>
                 </div>
-                <button onClick={() => setTemplateModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition">Ô£ò</button>
+                <button onClick={() => setTemplateModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {TEMPLATES.map(t => (
@@ -1263,7 +1259,7 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      {/* ­ƒöù SHARE MODAL */}
+      {/* 🔗 SHARE MODAL */}
       <AnimatePresence>
         {shareModalOpen && dashResult && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1275,7 +1271,7 @@ export default function HomePage() {
             >
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-base font-black text-white flex items-center gap-2"><Share2 size={16} className="text-indigo-400" /> Share Output</h3>
-                <button onClick={() => setShareModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition">Ô£ò</button>
+                <button onClick={() => setShareModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition">✕</button>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center gap-2 bg-black/50 border border-white/10 rounded-xl p-3">
@@ -1302,7 +1298,7 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      {/* ­ƒÆ│ PRICING UPGRADE MODAL */}
+      {/* 💳 PRICING UPGRADE MODAL */}
       <AnimatePresence>
         {pricingModalOpen && (
           <motion.div
@@ -1329,14 +1325,14 @@ export default function HomePage() {
                   </p>
                 </div>
                 <button onClick={() => setPricingModalOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0 ml-4 mt-0.5">
-                  Ô£ò
+                  ✕
                 </button>
               </div>
 
               {/* Social proof */}
               <div className="mx-6 mb-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">
                 <p className="text-[11px] text-emerald-400 font-bold text-center">
-                  ­ƒöÑ 7,068+ people have used this offer today!
+                  🔥 7,068+ people have used this offer today!
                 </p>
               </div>
 
@@ -1354,15 +1350,6 @@ export default function HomePage() {
                     <span className="text-sm font-bold text-white">3-Day Full Access Trial</span>
                   </div>
                   <span className="text-sm font-black text-white">$0</span>
-                </button>
-
-                {/* Monthly */}
-                <button
-                  onClick={() => setSelectedPlan("monthly")}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition ${selectedPlan === "monthly" ? "border-blue-500 bg-blue-500/10" : "border-white/10 bg-white/[0.02]"}`}
-                >
-                  <div className="flex items-center gap-3"><div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedPlan === "monthly" ? "border-blue-500" : "border-gray-600"}`}>{selectedPlan === "monthly" && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}</div><span className="text-sm font-bold text-white">Monthly</span></div>
-                  <span className="text-sm font-black text-white">$17.99</span>
                 </button>
 
                 {/* Quarterly */}
@@ -1406,9 +1393,7 @@ export default function HomePage() {
               <div className="px-6 mb-5">
                 <p className="text-[10px] text-gray-500 leading-relaxed">
                   {selectedPlan === "trial"
-                    ? "Get a 3-day trial for $0. After the trial, you'll be charged $17.99/month unless you cancel through your account settings."
-                    : selectedPlan === "monthly"
-                    ? "Billed as $17.99 every month. Cancel anytime through your account settings."
+                    ? "Get a 3-day trial for just $0. After the trial, you'll be charged $17.99/month unless you cancel through your account settings."
                     : selectedPlan === "quarterly"
                     ? "Billed as $44.97 every 3 months. Cancel anytime through your account settings."
                     : "Billed as $77.94 every 6 months. Cancel anytime through your account settings."
@@ -1424,7 +1409,7 @@ export default function HomePage() {
               <div className="px-6 flex items-center justify-between mb-4">
                 <span className="text-base font-black text-white">Due now</span>
                 <span className="text-base font-black text-white">
-                  {selectedPlan === "trial" ? "$0" : selectedPlan === "monthly" ? "$17.99" : selectedPlan === "quarterly" ? "$44.97" : "$77.94"}
+                  {selectedPlan === "trial" ? "$0" : selectedPlan === "quarterly" ? "$44.97" : "$77.94"}
                 </span>
               </div>
 
@@ -1435,7 +1420,7 @@ export default function HomePage() {
                   disabled={loadingPlan !== null}
                   className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-indigo-500 text-black font-black text-sm uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:opacity-90 transition disabled:opacity-50"
                 >
-                  {loadingPlan ? "Processing..." : "Purchase Now ÔåÆ"}
+                  {loadingPlan ? "Processing..." : "Purchase Now →"}
                 </button>
               </div>
             </motion.div>
@@ -1443,9 +1428,9 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      {/* ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
+      {/* ══════════════════════════════════════
           DEVELOPERS MODAL
-      ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ */}
+      ══════════════════════════════════════ */}
       <AnimatePresence>
         {devModalOpen && (
           <motion.div
@@ -1468,20 +1453,20 @@ export default function HomePage() {
               <button
                 onClick={() => setDevModalOpen(false)}
                 className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-gray-500 hover:text-white transition text-sm"
-              >Ô£ò</button>
+              >✕</button>
 
               <div className="p-8 pt-7">
                 {/* heading */}
                 <div className="flex items-center gap-3.5 mb-3">
-                  <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-2xl shrink-0">ÔÜí</div>
+                  <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-2xl shrink-0">⚡</div>
                   <div>
                     <h2 className="text-[22px] font-black text-white tracking-tight leading-tight">AMKAAI for Developers</h2>
-                    <p className="text-[11px] text-cyan-400 font-mono mt-0.5">REST API ┬À SDKs ┬À Webhooks ┬À Real-time Streaming</p>
+                    <p className="text-[11px] text-cyan-400 font-mono mt-0.5">REST API · SDKs · Webhooks · Real-time Streaming</p>
                   </div>
                 </div>
                 <p className="text-sm text-gray-400 mb-7 leading-relaxed max-w-2xl">
                   Integrate the full power of AMKAAI's AI engine directly into your apps and pipelines.
-                  Generate cinematic videos, lifelike avatars, and AI voices at scale ÔÇö with a single API call.
+                  Generate cinematic videos, lifelike avatars, and AI voices at scale — with a single API call.
                 </p>
 
                 {/* code block */}
@@ -1511,12 +1496,12 @@ console.log(video.credits); // 12  (remaining credits)`}</pre>
                 {/* feature grid */}
                 <div className="grid grid-cols-3 gap-3 mb-7">
                   {[
-                    { icon: "­ƒöî", title: "REST API",       desc: "Full JSON API ÔÇö OpenAPI 3.1 spec included" },
-                    { icon: "­ƒôª", title: "Official SDKs",  desc: "TypeScript ┬À Python ┬À Go ┬À PHP ┬À Swift" },
-                    { icon: "­ƒ¬Ø", title: "Webhooks",       desc: "Push render status to your server in real-time" },
-                    { icon: "ÔÜí", title: "SSE Streaming",  desc: "Live progress events during generation" },
-                    { icon: "­ƒöÉ", title: "OAuth 2.0",      desc: "Secure token-based authentication flow" },
-                    { icon: "­ƒôè", title: "Usage Dashboard",desc: "Credits, throughput, error rates at a glance" },
+                    { icon: "🔌", title: "REST API",       desc: "Full JSON API — OpenAPI 3.1 spec included" },
+                    { icon: "📦", title: "Official SDKs",  desc: "TypeScript · Python · Go · PHP · Swift" },
+                    { icon: "🪝", title: "Webhooks",       desc: "Push render status to your server in real-time" },
+                    { icon: "⚡", title: "SSE Streaming",  desc: "Live progress events during generation" },
+                    { icon: "🔐", title: "OAuth 2.0",      desc: "Secure token-based authentication flow" },
+                    { icon: "📊", title: "Usage Dashboard",desc: "Credits, throughput, error rates at a glance" },
                   ].map(f => (
                     <div key={f.title} className="p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-cyan-500/25 hover:bg-cyan-500/[0.04] transition group cursor-default">
                       <span className="text-[22px] mb-2 block">{f.icon}</span>
@@ -1529,7 +1514,7 @@ console.log(video.credits); // 12  (remaining credits)`}</pre>
                 {/* CTA */}
                 <div className="flex gap-3">
                   <Link href="/sign-up" onClick={() => setDevModalOpen(false)} className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-500 text-black text-sm font-black hover:opacity-90 transition shadow-[0_0_24px_rgba(6,182,212,0.25)] text-center">
-                    Get Free API Key ÔåÆ
+                    Get Free API Key →
                   </Link>
                   <a href="mailto:api@amkaai.net" className="px-6 py-3 rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 text-sm font-bold hover:bg-white/[0.07] transition">
                     Contact API Team
@@ -1541,9 +1526,9 @@ console.log(video.credits); // 12  (remaining credits)`}</pre>
         )}
       </AnimatePresence>
 
-      {/* ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
+      {/* ══════════════════════════════════════
           PLATFORM MODAL
-      ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ */}
+      ══════════════════════════════════════ */}
       <AnimatePresence>
         {platformModalOpen && (
           <motion.div
@@ -1563,15 +1548,15 @@ console.log(video.credits); // 12  (remaining credits)`}</pre>
               <button
                 onClick={() => setPlatformModalOpen(false)}
                 className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-gray-500 hover:text-white transition text-sm"
-              >Ô£ò</button>
+              >✕</button>
 
               <div className="p-8 pt-7">
                 {/* heading */}
                 <div className="flex items-center gap-3.5 mb-3">
-                  <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-2xl shrink-0">­ƒÅó</div>
+                  <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-2xl shrink-0">🏢</div>
                   <div>
                     <h2 className="text-[22px] font-black text-white tracking-tight leading-tight">AMKAAI Platform</h2>
-                    <p className="text-[11px] text-indigo-400 font-mono mt-0.5">Enterprise ┬À Agencies ┬À Branded AI Workflows</p>
+                    <p className="text-[11px] text-indigo-400 font-mono mt-0.5">Enterprise · Agencies · Branded AI Workflows</p>
                   </div>
                 </div>
                 <p className="text-sm text-gray-400 mb-7 leading-relaxed max-w-2xl">
@@ -1597,12 +1582,12 @@ console.log(video.credits); // 12  (remaining credits)`}</pre>
                 {/* features */}
                 <div className="grid grid-cols-2 gap-3 mb-7">
                   {[
-                    { icon: "­ƒÄ¿", title: "White-label Studio",    desc: "Your logo, domain, and brand colors ÔÇö no AMKAAI branding visible to end users" },
-                    { icon: "­ƒæÑ", title: "Team Workspaces",       desc: "Role-based access, shared asset libraries, real-time collaboration" },
-                    { icon: "­ƒñû", title: "Custom AI Models",      desc: "Fine-tune video & avatar models on your brand's visual identity and tone of voice" },
-                    { icon: "­ƒöÆ", title: "Enterprise Security",   desc: "SSO / SAML, audit logs, data residency options, GDPR & SOC 2 Type II" },
-                    { icon: "­ƒôê", title: "Advanced Analytics",    desc: "Content performance, ROI tracking, usage heatmaps, and export reports" },
-                    { icon: "­ƒÜÇ", title: "Dedicated GPU Cluster", desc: "Reserved rendering capacity ÔÇö guaranteed SLA throughput for high-volume workloads" },
+                    { icon: "🎨", title: "White-label Studio",    desc: "Your logo, domain, and brand colors — no AMKAAI branding visible to end users" },
+                    { icon: "👥", title: "Team Workspaces",       desc: "Role-based access, shared asset libraries, real-time collaboration" },
+                    { icon: "🤖", title: "Custom AI Models",      desc: "Fine-tune video & avatar models on your brand's visual identity and tone of voice" },
+                    { icon: "🔒", title: "Enterprise Security",   desc: "SSO / SAML, audit logs, data residency options, GDPR & SOC 2 Type II" },
+                    { icon: "📈", title: "Advanced Analytics",    desc: "Content performance, ROI tracking, usage heatmaps, and export reports" },
+                    { icon: "🚀", title: "Dedicated GPU Cluster", desc: "Reserved rendering capacity — guaranteed SLA throughput for high-volume workloads" },
                   ].map(f => (
                     <div key={f.title} className="flex gap-3.5 p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-indigo-500/25 hover:bg-indigo-500/[0.04] transition group cursor-default">
                       <span className="text-xl shrink-0 mt-0.5">{f.icon}</span>
@@ -1620,7 +1605,7 @@ console.log(video.credits); // 12  (remaining credits)`}</pre>
                     onClick={() => { setPlatformModalOpen(false); setPricingModalOpen(true); }}
                     className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-sm font-black hover:opacity-90 transition shadow-[0_0_24px_rgba(99,102,241,0.25)]"
                   >
-                    Start Enterprise Trial ÔåÆ
+                    Start Enterprise Trial →
                   </button>
                   <button className="px-6 py-3 rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 text-sm font-bold hover:bg-white/[0.07] transition">
                     Talk to Sales
