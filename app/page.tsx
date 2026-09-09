@@ -1,4 +1,4 @@
-﻿ "use client";
+ "use client";
 
 import Link from "next/link";
 import Image from "next/image"; 
@@ -15,11 +15,11 @@ import {
 } from "lucide-react";
 
 /* ================= TYPES ================= */
-type PlanType = "trial" | "quarterly" | "biannually";
+type PlanType = "trial" | "monthly" | "quarterly" | "biannually";
 type MediaType = "video" | "avatar" | "voice"; 
 type AspectRatioType = "16:9" | "9:16" | "1:1";
 type CameraMoveType = "zoom-in" | "pan-left" | "orbit-360" | "tilt-up";
-type DashMediaType = "ai-video" | "ai-avatar" | "image-to-avatar" | "voice-clone";
+type DashMediaType = "ai-video" | "ai-avatar" | "image-to-video" | "voice-clone";
 
 const PRESET_STYLES = [
   { id: "cyberpunk", name: "Cyberpunk neon", suffix: ", cyberpunk neon style, blade runner aesthetics, high contrast, 8k" },
@@ -216,8 +216,15 @@ export default function HomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      const data = await res.json();
-      if (!data?.url) { alert("Checkout failed"); return; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error || data?.message || "Checkout failed");
+        return;
+      }
+      if (!data?.url) {
+        alert(data?.error || data?.message || "Checkout failed");
+        return;
+      }
       window.location.href = data.url;
     } catch (error) {
       console.error(error);
@@ -277,7 +284,7 @@ export default function HomePage() {
     try {
       let endpoint = "/api/generate-video";
       if (dashType === "ai-avatar") endpoint = "/api/generate-avatar";
-      if (dashType === "image-to-avatar") endpoint = "/api/generate-image";
+      if (dashType === "image-to-video") endpoint = "/api/generate-image";
       if (dashType === "voice-clone") endpoint = "/api/generate-voice";
       const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -325,13 +332,13 @@ export default function HomePage() {
         loop
         muted
         playsInline
-        className="fixed inset-0 w-full h-full object-cover opacity-[0.06] pointer-events-none"
+        className="fixed inset-0 w-full h-full object-cover opacity-[0.32] pointer-events-none"
         style={{ zIndex: 0 }}
       >
-        <source src="/demo/videos/demo.mp4" type="video/mp4" />
+        <source src="/demo.mp4" type="video/mp4" />
       </video>
       {/* overlay فاتح */}
-      <div className="fixed inset-0 bg-[#eaf6f1]/90 pointer-events-none" style={{ zIndex: 1 }} />
+      <div className="fixed inset-0 bg-[#eaf6f1]/60 pointer-events-none" style={{ zIndex: 1 }} />
       {/* 🌌 BACKGROUND MATRIX GRID */}
       <div className="fixed inset-0 bg-[linear-gradient(to_right,#c7ded4_1px,transparent_1px),linear-gradient(to_bottom,#c7ded4_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-40 pointer-events-none" style={{ zIndex: 2 }} />
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(20,184,166,0.10),transparent_50%),radial-gradient(circle_at_bottom,rgba(45,212,191,0.05),transparent_60%)] pointer-events-none" style={{ zIndex: 2 }} />
@@ -558,7 +565,7 @@ export default function HomePage() {
             <motion.button
               whileHover={{ y: -4, scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => openStudio("image-to-avatar")}
+              onClick={() => openStudio("image-to-video")}
               className="group relative flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-6 transition-all hover:border-emerald-400 hover:shadow-[0_10px_30px_rgba(16,185,129,0.15)] text-center shadow-sm"
             >
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center group-hover:bg-emerald-200 transition">
@@ -730,7 +737,7 @@ export default function HomePage() {
               <Sparkles size={11} className="animate-pulse" />
               {activeStudioTool === "ai-video" && "AI Video Generator"}
               {activeStudioTool === "ai-avatar" && "Create an Avatar"}
-              {activeStudioTool === "image-to-avatar" && "Image to Video"}
+              {activeStudioTool === "image-to-video" && "Image to Video"}
               {activeStudioTool === "voice-clone" && "AI Voice Generator & Lip-Sync"}
             </span>
             <button
@@ -749,22 +756,22 @@ export default function HomePage() {
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
         </div>
 
-        <div className="w-full rounded-3xl border border-white/10 bg-[#07070a] shadow-2xl overflow-hidden flex h-[680px]">
+        <div className="w-full rounded-3xl border border-teal-900/10 bg-[#eaf7f2] shadow-2xl overflow-hidden flex h-[680px]">
 
           {/* ── LEFT SIDEBAR ── */}
           <AnimatePresence>
             {sidebarOpen && (
               <motion.div
                 initial={{ x: -280, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -280, opacity: 0 }}
-                className="w-64 bg-[#070709] border-r border-white/5 flex flex-col justify-between shrink-0"
+                className="w-64 bg-[#d9eee6] border-r border-teal-900/10 flex flex-col justify-between shrink-0"
               >
                 {/* Brand */}
                 <div>
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-teal-900/10">
                     <span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-indigo-400 bg-clip-text text-sm font-black tracking-tighter text-transparent flex items-center gap-2">
-                      <Flame size={14} className="text-cyan-400 animate-pulse" /> AMKAAI STUDIO PRO
+                      <Flame size={14} className="text-teal-600 animate-pulse" /> AMKAAI STUDIO PRO
                     </span>
-                    <button onClick={() => setSidebarOpen(false)} className="text-gray-500 hover:text-white transition"><PanelLeft size={14} /></button>
+                    <button onClick={() => setSidebarOpen(false)} className="text-slate-500 hover:text-slate-800 transition"><PanelLeft size={14} /></button>
                   </div>
 
                   {/* New Session */}
@@ -779,23 +786,23 @@ export default function HomePage() {
 
                   {/* GPU Queue */}
                   <div className="px-4 mb-4">
-                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 space-y-2">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                    <div className="bg-white/65 rounded-xl p-3 border border-teal-900/10 space-y-2">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
                         <span>Active GPU Queue</span>
-                        <span className="text-cyan-400 font-mono animate-pulse">● Live</span>
+                        <span className="text-teal-600 font-mono animate-pulse">● Live</span>
                       </p>
                       <div className="space-y-2 max-h-[120px] overflow-y-auto">
                         {renderQueue.length === 0 && (
-                          <p className="text-[10px] text-gray-600 font-mono text-center py-2">No active jobs</p>
+                          <p className="text-[10px] text-slate-500 font-mono text-center py-2">No active jobs</p>
                         )}
                         {renderQueue.map(job => (
-                          <div key={job.id} className="text-[11px] bg-black/40 p-2 rounded-lg border border-white/5">
-                            <div className="flex justify-between text-gray-400 text-[10px] mb-1">
+                          <div key={job.id} className="text-[11px] bg-white/40 p-2 rounded-lg border border-teal-900/10">
+                            <div className="flex justify-between text-slate-500 text-[10px] mb-1">
                               <span className="truncate max-w-[110px] font-mono">{job.prompt}</span>
-                              <span className="text-cyan-400 font-mono">{job.progress}%</span>
+                              <span className="text-teal-600 font-mono">{job.progress}%</span>
                             </div>
-                            <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
-                              <div className="h-full bg-cyan-500 transition-all duration-500" style={{ width: `${job.progress}%` }} />
+                            <div className="w-full bg-white/80 h-1 rounded-full overflow-hidden">
+                              <div className="h-full bg-teal-500 transition-all duration-500" style={{ width: `${job.progress}%` }} />
                             </div>
                           </div>
                         ))}
@@ -805,10 +812,10 @@ export default function HomePage() {
                 </div>
 
                 {/* Bottom — Credits & User */}
-                <div className="p-4 border-t border-white/5 space-y-3">
-                  <div className={`rounded-xl border p-3 flex justify-between items-center text-xs ${credits <= 0 ? "border-red-500/30 bg-red-500/5" : credits < 50 ? "border-amber-500/30 bg-amber-500/5" : "border-cyan-500/20 bg-cyan-500/5"}`}>
-                    <span className="text-gray-400 font-mono">Allocation State</span>
-                    <span className={`font-bold font-mono ${credits <= 0 ? "text-red-400" : credits < 50 ? "text-amber-400" : "text-cyan-400"}`}>
+                <div className="p-4 border-t border-teal-900/10 space-y-3">
+                  <div className={`rounded-xl border p-3 flex justify-between items-center text-xs ${credits <= 0 ? "border-red-500/30 bg-red-500/5" : credits < 50 ? "border-amber-500/30 bg-amber-500/5" : "border-teal-500/20 bg-teal-500/5"}`}>
+                    <span className="text-slate-500 font-mono">Allocation State</span>
+                    <span className={`font-bold font-mono ${credits <= 0 ? "text-red-400" : credits < 50 ? "text-amber-400" : "text-teal-600"}`}>
                       {credits <= 0 ? "No Credits" : `${credits} Nodes`}
                     </span>
                   </div>
@@ -833,54 +840,54 @@ export default function HomePage() {
 
             {/* SYNTHESIS CONTROL HUB */}
             {advancedOpen && (
-            <div className="w-72 border-r border-white/5 bg-[#050507] p-5 space-y-5 overflow-y-auto shrink-0">
+            <div className="w-72 border-r border-teal-900/10 bg-[#e0f1eb] p-5 space-y-5 overflow-y-auto shrink-0">
               
               {/* Toggle sidebar if closed */}
               {!sidebarOpen && (
-                <button onClick={() => setSidebarOpen(true)} className="mb-2 text-gray-500 hover:text-white transition"><PanelLeft size={14} /></button>
+                <button onClick={() => setSidebarOpen(true)} className="mb-2 text-slate-500 hover:text-slate-800 transition"><PanelLeft size={14} /></button>
               )}
 
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+              <div className="flex items-center justify-between border-b border-teal-900/10 pb-3">
                 <div className="flex items-center gap-1.5">
-                  <SlidersHorizontal size={13} className="text-cyan-400" />
-                  <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Synthesis Control Hub</h2>
+                  <SlidersHorizontal size={13} className="text-teal-600" />
+                  <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Synthesis Control Hub</h2>
                 </div>
-                <button onClick={() => setAdvancedOpen(false)} className="text-gray-500 hover:text-white transition text-[10px]">✕</button>
+                <button onClick={() => setAdvancedOpen(false)} className="text-slate-500 hover:text-slate-800 transition text-[10px]">✕</button>
               </div>
 
               {/* AI Generation Engine */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">AI Generation Engine</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">AI Generation Engine</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setDashType("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-video" ? "bg-purple-600/10 border-purple-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                    <Video size={14} className={dashType === "ai-video" ? "text-purple-400" : "text-gray-500"} />
+                  <button onClick={() => setDashType("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-video" ? "bg-teal-600/10 border-teal-500 text-slate-800" : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"}`}>
+                    <Video size={14} className={dashType === "ai-video" ? "text-teal-600" : "text-slate-500"} />
                     <div>
                       <p className="text-[11px] font-black tracking-tight">AI Video Generator</p>
-                      <span className="text-[9px] text-gray-500 font-mono">Text to Video</span>
+                      <span className="text-[9px] text-slate-500 font-mono">Text to Video</span>
                     </div>
                   </button>
 
-                  <button onClick={() => setDashType("ai-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-avatar" ? "bg-cyan-600/10 border-cyan-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                    <UserSquare2 size={14} className={dashType === "ai-avatar" ? "text-cyan-400" : "text-gray-500"} />
+                  <button onClick={() => setDashType("ai-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-avatar" ? "bg-cyan-600/10 border-cyan-500 text-slate-800" : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"}`}>
+                    <UserSquare2 size={14} className={dashType === "ai-avatar" ? "text-teal-600" : "text-slate-500"} />
                     <div>
                       <p className="text-[11px] font-black tracking-tight">Create an Avatar</p>
-                      <span className="text-[9px] text-gray-500 font-mono">Photo Presenter</span>
+                      <span className="text-[9px] text-slate-500 font-mono">Photo Presenter</span>
                     </div>
                   </button>
 
-                  <button onClick={() => setDashType("image-to-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "image-to-avatar" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                    <ImageIcon size={14} className={dashType === "image-to-avatar" ? "text-emerald-400" : "text-gray-500"} />
+                  <button onClick={() => setDashType("image-to-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "image-to-video" ? "bg-emerald-500/10 border-emerald-500 text-slate-800" : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"}`}>
+                    <ImageIcon size={14} className={dashType === "image-to-video" ? "text-emerald-400" : "text-slate-500"} />
                     <div>
                       <p className="text-[11px] font-black tracking-tight">Image To Video</p>
-                      <span className="text-[9px] text-gray-500 font-mono">HeyGen Engine Mode</span>
+                      <span className="text-[9px] text-slate-500 font-mono">HeyGen Engine Mode</span>
                     </div>
                   </button>
 
-                  <button onClick={() => setDashType("voice-clone")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "voice-clone" ? "bg-amber-600/10 border-amber-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                    <Mic size={14} className={dashType === "voice-clone" ? "text-amber-400" : "text-gray-500"} />
+                  <button onClick={() => setDashType("voice-clone")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "voice-clone" ? "bg-amber-500/10 border-amber-500 text-slate-800" : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"}`}>
+                    <Mic size={14} className={dashType === "voice-clone" ? "text-amber-400" : "text-slate-500"} />
                     <div>
                       <p className="text-[10px] font-black tracking-tight leading-none">AI Voice Generator & Lip-Sync</p>
-                      <span className="text-[9px] text-gray-500 font-mono">Voice Matrix</span>
+                      <span className="text-[9px] text-slate-500 font-mono">Voice Matrix</span>
                     </div>
                   </button>
                 </div>
@@ -889,10 +896,10 @@ export default function HomePage() {
               {/* Aspect Dimensions */}
               {dashType !== "voice-clone" && (
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Aspect Dimensions</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Aspect Dimensions</label>
                   <div className="grid grid-cols-3 gap-2">
                     {(["16:9", "9:16", "1:1"] as AspectRatioType[]).map((r) => (
-                      <button key={r} onClick={() => setDashAspect(r)} className={`py-1.5 text-xs rounded-xl border font-mono transition ${dashAspect === r ? "border-cyan-500 text-cyan-400 bg-cyan-500/10 font-bold" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>{r}</button>
+                      <button key={r} onClick={() => setDashAspect(r)} className={`py-1.5 text-xs rounded-xl border font-mono transition ${dashAspect === r ? "border-cyan-500 text-teal-600 bg-teal-500/10 font-bold" : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"}`}>{r}</button>
                     ))}
                   </div>
                 </div>
@@ -901,8 +908,8 @@ export default function HomePage() {
               {/* Camera Lens */}
               {dashType === "ai-video" && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Move size={11} /> Camera Lens Vector</label>
-                  <select value={dashCamera} onChange={(e) => setDashCamera(e.target.value)} className="w-full bg-black text-xs text-gray-400 border border-white/10 rounded-xl p-2.5 outline-none font-mono">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Move size={11} /> Camera Lens Vector</label>
+                  <select value={dashCamera} onChange={(e) => setDashCamera(e.target.value)} className="w-full bg-white text-xs text-slate-500 border border-teal-900/10 rounded-xl p-2.5 outline-none font-mono">
                     <option value="static">Static Lens</option>
                     <option value="zoom-in">Zoom In Vector</option>
                     <option value="zoom-out">Zoom Out Vector</option>
@@ -913,48 +920,48 @@ export default function HomePage() {
               )}
 
               {/* ── POWER TOOLS ── */}
-              <div className="space-y-2 pt-2 border-t border-white/5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Power Tools</label>
+              <div className="space-y-2 pt-2 border-t border-teal-900/10">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Power Tools</label>
 
                 {/* Use Template */}
                 <button
                   onClick={() => setTemplateModalOpen(true)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition text-left group"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/65 border border-teal-900/10 hover:border-teal-500/30 hover:bg-teal-500/5 transition text-left group"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0 group-hover:bg-cyan-500/20 transition">
-                    <Layers3 size={13} className="text-cyan-400" />
+                  <div className="w-7 h-7 rounded-lg bg-teal-500/10 flex items-center justify-center shrink-0 group-hover:bg-teal-500/20 transition">
+                    <Layers3 size={13} className="text-teal-600" />
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold text-gray-300">Use Template</p>
-                    <p className="text-[9px] text-gray-600 font-mono">6 ready-made prompts</p>
+                    <p className="text-[11px] font-bold text-slate-600">Use Template</p>
+                    <p className="text-[9px] text-slate-500 font-mono">6 ready-made prompts</p>
                   </div>
                 </button>
 
                 {/* Script to Video */}
                 <button
                   onClick={() => { setScriptMode(!scriptMode); setDashInput(""); }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition text-left group ${scriptMode ? "border-indigo-500 bg-indigo-500/10" : "bg-white/5 border-white/5 hover:border-indigo-500/30 hover:bg-indigo-500/5"}`}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition text-left group ${scriptMode ? "border-indigo-500 bg-indigo-500/10" : "bg-white/65 border-teal-900/10 hover:border-indigo-500/30 hover:bg-indigo-500/5"}`}
                 >
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition ${scriptMode ? "bg-indigo-500/20" : "bg-indigo-500/10 group-hover:bg-indigo-500/20"}`}>
                     <FileText size={13} className="text-indigo-400" />
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold text-gray-300">Script to Video</p>
-                    <p className="text-[9px] text-gray-600 font-mono">{scriptMode ? "✓ Script mode ON" : "Full script → video"}</p>
+                    <p className="text-[11px] font-bold text-slate-600">Script to Video</p>
+                    <p className="text-[9px] text-slate-500 font-mono">{scriptMode ? "✓ Script mode ON" : "Full script → video"}</p>
                   </div>
                 </button>
 
                 {/* Style Transfer */}
-                <label className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition text-left group cursor-pointer ${styleTransferImg ? "border-emerald-500 bg-emerald-500/10" : "bg-white/5 border-white/5 hover:border-emerald-500/30 hover:bg-emerald-500/5"}`}>
+                <label className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition text-left group cursor-pointer ${styleTransferImg ? "border-emerald-500 bg-emerald-500/10" : "bg-white/65 border-teal-900/10 hover:border-emerald-500/30 hover:bg-emerald-500/5"}`}>
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${styleTransferImg ? "bg-emerald-500/20" : "bg-emerald-500/10"}`}>
                     <Palette size={13} className="text-emerald-400" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-[11px] font-bold text-gray-300">Style Transfer</p>
-                    <p className="text-[9px] text-gray-600 font-mono">{styleTransferImg ? "✓ Style image loaded" : "Upload reference image"}</p>
+                    <p className="text-[11px] font-bold text-slate-600">Style Transfer</p>
+                    <p className="text-[9px] text-slate-500 font-mono">{styleTransferImg ? "✓ Style image loaded" : "Upload reference image"}</p>
                   </div>
                   {styleTransferImg && (
-                    <button onClick={(e) => { e.preventDefault(); setStyleTransferImg(null); }} className="text-gray-500 hover:text-red-400 transition text-[10px]">✕</button>
+                    <button onClick={(e) => { e.preventDefault(); setStyleTransferImg(null); }} className="text-slate-500 hover:text-red-400 transition text-[10px]">✕</button>
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -968,14 +975,14 @@ export default function HomePage() {
                 {/* Add Subtitles */}
                 <button
                   onClick={() => setSubtitlesEnabled(!subtitlesEnabled)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition text-left group ${subtitlesEnabled ? "border-amber-500 bg-amber-500/10" : "bg-white/5 border-white/5 hover:border-amber-500/30 hover:bg-amber-500/5"}`}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition text-left group ${subtitlesEnabled ? "border-amber-500 bg-amber-500/10" : "bg-white/65 border-teal-900/10 hover:border-amber-500/30 hover:bg-amber-500/5"}`}
                 >
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${subtitlesEnabled ? "bg-amber-500/20" : "bg-amber-500/10"}`}>
                     <span className="text-amber-400 text-xs font-black">CC</span>
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold text-gray-300">Add Subtitles</p>
-                    <p className="text-[9px] text-gray-600 font-mono">{subtitlesEnabled ? "✓ Auto-subtitles ON" : "Auto-generated captions"}</p>
+                    <p className="text-[11px] font-bold text-slate-600">Add Subtitles</p>
+                    <p className="text-[9px] text-slate-500 font-mono">{subtitlesEnabled ? "✓ Auto-subtitles ON" : "Auto-generated captions"}</p>
                   </div>
                 </button>
               </div>
@@ -983,24 +990,24 @@ export default function HomePage() {
             )}
 
             {/* ── CINEMA MONITOR + INPUT ── */}
-            <div className="flex-1 flex flex-col bg-black overflow-hidden">
+            <div className="flex-1 flex flex-col bg-white overflow-hidden">
 
               {/* Cinema Monitor Stage */}
-              <div className="flex-1 relative flex items-center justify-center bg-[#060608] overflow-hidden">
+              <div className="flex-1 relative flex items-center justify-center bg-[#f4fbf8] overflow-hidden">
 
                 {/* Top bar */}
-                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-black/60 backdrop-blur-md border-b border-white/5">
-                  <div className="text-[9px] uppercase font-mono tracking-widest text-gray-400 flex items-center gap-1.5">
-                    <Tv size={11} className="text-cyan-400" /> Cinema Monitor Stage
+                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-white/60 backdrop-blur-md border-b border-teal-900/10">
+                  <div className="text-[9px] uppercase font-mono tracking-widest text-slate-500 flex items-center gap-1.5">
+                    <Tv size={11} className="text-teal-600" /> Cinema Monitor Stage
                   </div>
                   <div className="flex items-center gap-3">
                     {/* Duration selector */}
-                    <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-0.5">
+                    <div className="flex items-center gap-1 bg-white/65 border border-teal-900/10 rounded-lg p-0.5">
                       {([5, 10, 30, 60] as const).map(d => (
                         <button
                           key={d}
                           onClick={() => setDuration(d)}
-                          className={`px-2 py-1 rounded-md text-[9px] font-black font-mono transition ${duration === d ? "bg-cyan-500 text-black" : "text-gray-500 hover:text-white"}`}
+                          className={`px-2 py-1 rounded-md text-[9px] font-black font-mono transition ${duration === d ? "bg-teal-500 text-black" : "text-slate-500 hover:text-slate-800"}`}
                         >
                           {d}s
                         </button>
@@ -1009,7 +1016,7 @@ export default function HomePage() {
                     {/* Watermark status — shown only during the trial, hidden once the user is a paid subscriber */}
                     {!isPaidSubscriber && (
                       <div
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold border bg-white/5 border-white/10 text-gray-500"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold border bg-white/65 border-teal-900/10 text-slate-500"
                         title="Trial plan: watermark shown until you upgrade"
                       >
                         <span className="w-3 h-3 rounded-full border border-gray-600 flex items-center justify-center" />
@@ -1023,7 +1030,7 @@ export default function HomePage() {
                     </div>
                     {/* ETA */}
                     {dashLoading && renderETA !== null && (
-                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg animate-pulse">
+                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-teal-700 bg-teal-500/10 border border-teal-500/20 px-2.5 py-1 rounded-lg animate-pulse">
                         <Clock size={10} /> ~{renderETA}s
                       </div>
                     )}
@@ -1031,16 +1038,16 @@ export default function HomePage() {
                 </div>
 
                 {/* Credit Progress Bar */}
-                <div className="absolute bottom-0 left-0 right-0 z-10 px-4 py-2 bg-black/60 backdrop-blur-md border-t border-white/5">
+                <div className="absolute bottom-0 left-0 right-0 z-10 px-4 py-2 bg-white/60 backdrop-blur-md border-t border-teal-900/10">
                   <div className="flex items-center gap-3">
-                    <span className="text-[9px] font-mono text-gray-500 whitespace-nowrap">Credits</span>
-                    <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <span className="text-[9px] font-mono text-slate-500 whitespace-nowrap">Credits</span>
+                    <div className="flex-1 h-1.5 bg-white/80 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-700 ${credits <= 0 ? "bg-red-500" : credits < 50 ? "bg-amber-400" : "bg-gradient-to-r from-cyan-500 to-indigo-500"}`}
                         style={{ width: `${Math.min(100, (credits / 300) * 100)}%` }}
                       />
                     </div>
-                    <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${credits <= 0 ? "text-red-400" : credits < 50 ? "text-amber-400" : "text-cyan-400"}`}>
+                    <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${credits <= 0 ? "text-red-400" : credits < 50 ? "text-amber-400" : "text-teal-600"}`}>
                       {credits}/300
                     </span>
                     {credits < 50 && (
@@ -1060,10 +1067,10 @@ export default function HomePage() {
                     )}
                     {/* Action buttons after generation */}
                     <div className="absolute bottom-14 right-4 flex flex-col gap-2">
-                      <a href={dashResult} download target="_blank" rel="noreferrer" className="bg-black/80 hover:bg-cyan-500 hover:text-black p-2.5 rounded-xl border border-white/10 text-xs font-bold flex items-center gap-1.5 transition-all text-white">
+                      <a href={dashResult} download target="_blank" rel="noreferrer" className="bg-white/80 hover:bg-teal-500 hover:text-black p-2.5 rounded-xl border border-teal-900/10 text-xs font-bold flex items-center gap-1.5 transition-all text-slate-800">
                         <Download size={13} /> Export
                       </a>
-                      <button onClick={() => setShareModalOpen(true)} className="bg-black/80 hover:bg-indigo-500 hover:text-white p-2.5 rounded-xl border border-white/10 text-xs font-bold flex items-center gap-1.5 transition-all text-gray-300">
+                      <button onClick={() => setShareModalOpen(true)} className="bg-white/80 hover:bg-indigo-500 hover:text-slate-800 p-2.5 rounded-xl border border-teal-900/10 text-xs font-bold flex items-center gap-1.5 transition-all text-slate-600">
                         <Share2 size={13} /> Share
                       </button>
                     </div>
@@ -1071,26 +1078,26 @@ export default function HomePage() {
                 ) : dashLoading ? (
                   <div className="text-center space-y-3 pt-8">
                     <div className="w-10 h-10 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-[11px] text-cyan-400 font-mono tracking-wider animate-pulse">Rendering sequence pipeline via live GPU nodes...</p>
+                    <p className="text-[11px] text-teal-600 font-mono tracking-wider animate-pulse">Rendering sequence pipeline via live GPU nodes...</p>
                     {renderETA !== null && (
-                      <p className="text-[10px] text-gray-600 font-mono">Estimated completion in {renderETA}s</p>
+                      <p className="text-[10px] text-slate-500 font-mono">Estimated completion in {renderETA}s</p>
                     )}
                   </div>
                 ) : (
                   <div className="text-center pt-8">
                     <Wand2 size={36} className="mx-auto text-zinc-800 mb-3" />
-                    <p className="text-xs text-gray-600 font-bold font-mono">Workspace Pipeline Standby</p>
-                    <p className="text-[10px] text-gray-700 font-mono mt-1">Describe your production criteria below</p>
+                    <p className="text-xs text-slate-500 font-bold font-mono">Workspace Pipeline Standby</p>
+                    <p className="text-[10px] text-slate-500 font-mono mt-1">Describe your production criteria below</p>
                   </div>
                 )}
               </div>
 
               {/* Input Desk */}
-              <div className="p-4 border-t border-white/5 bg-[#070709]/90 backdrop-blur-md space-y-3">
+              <div className="p-4 border-t border-teal-900/10 bg-[#d9eee6]/90 backdrop-blur-md space-y-3">
                 {/* Preset Styles */}
                 <div className="grid grid-cols-4 gap-2">
                   {PRESET_STYLES.map(s => (
-                    <button key={s.id} onClick={() => setDashInput(prev => (prev.trim() + " " + s.suffix).trim())} className="h-8 rounded-xl border border-white/5 bg-neutral-900 hover:border-white/20 transition text-[10px] font-bold text-gray-400 truncate px-2">
+                    <button key={s.id} onClick={() => setDashInput(prev => (prev.trim() + " " + s.suffix).trim())} className="h-8 rounded-xl border border-teal-900/10 bg-neutral-900 hover:border-white/20 transition text-[10px] font-bold text-slate-500 truncate px-2">
                       {s.name}
                     </button>
                   ))}
@@ -1117,30 +1124,30 @@ export default function HomePage() {
                   {/* Quality indicator */}
                   {promptQuality && (
                     <div className="flex items-center gap-2 px-1">
-                      <span className="text-[9px] font-mono text-gray-600 uppercase tracking-wide">Prompt Quality</span>
+                      <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wide">Prompt Quality</span>
                       <div className="flex items-center gap-1">
-                        <div className={`w-6 h-1.5 rounded-full transition-all duration-300 ${promptQuality === "poor" || promptQuality === "good" || promptQuality === "excellent" ? "bg-red-500" : "bg-white/10"}`} />
-                        <div className={`w-6 h-1.5 rounded-full transition-all duration-300 ${promptQuality === "good" || promptQuality === "excellent" ? "bg-amber-400" : "bg-white/10"}`} />
-                        <div className={`w-6 h-1.5 rounded-full transition-all duration-300 ${promptQuality === "excellent" ? "bg-emerald-500" : "bg-white/10"}`} />
+                        <div className={`w-6 h-1.5 rounded-full transition-all duration-300 ${promptQuality === "poor" || promptQuality === "good" || promptQuality === "excellent" ? "bg-red-500" : "bg-white/80"}`} />
+                        <div className={`w-6 h-1.5 rounded-full transition-all duration-300 ${promptQuality === "good" || promptQuality === "excellent" ? "bg-amber-400" : "bg-white/80"}`} />
+                        <div className={`w-6 h-1.5 rounded-full transition-all duration-300 ${promptQuality === "excellent" ? "bg-emerald-500" : "bg-white/80"}`} />
                       </div>
                       <span className={`text-[9px] font-black uppercase font-mono tracking-wide transition-all duration-300 ${promptQuality === "poor" ? "text-red-400" : promptQuality === "good" ? "text-amber-400" : "text-emerald-400"}`}>
                         {promptQuality === "poor" ? "⚠ Poor" : promptQuality === "good" ? "◐ Good" : "✦ Excellent"}
                       </span>
                     </div>
                   )}
-                <div className="flex items-end gap-3 bg-[#030304] border border-white/10 rounded-2xl p-2.5 transition-all duration-300 focus-within:border-cyan-500/60 focus-within:shadow-[0_0_0_1px_rgba(6,182,212,0.3),0_0_20px_rgba(6,182,212,0.15)] focus-within:bg-[#060810]">
+                <div className="flex items-end gap-3 bg-[#d8eee6] border border-teal-900/10 rounded-2xl p-2.5 transition-all duration-300 focus-within:border-cyan-500/60 focus-within:shadow-[0_0_0_1px_rgba(6,182,212,0.3),0_0_20px_rgba(6,182,212,0.15)] focus-within:bg-[#e7f6f1]">
                   <textarea
                     value={dashInput}
                     onChange={(e) => setDashInput(e.target.value)}
                     placeholder={scriptMode ? "Paste your full script here — Scene 1: ...\nScene 2: ...\nNarrator: ..." : dashType === "voice-clone" ? "اكتب النص المراد تحويله لصوتك الاحترافي..." : "Describe your production criteria for this pipeline execution..."}
                     rows={scriptMode ? 4 : 2}
-                    className="max-h-32 min-h-[40px] flex-1 resize-none bg-transparent px-3 py-1.5 text-xs outline-none text-white placeholder:text-gray-700 font-mono"
+                    className="max-h-32 min-h-[40px] flex-1 resize-none bg-transparent px-3 py-1.5 text-xs outline-none text-slate-800 placeholder:text-slate-500 font-mono"
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !scriptMode) { e.preventDefault(); executeDash(); } }}
                   />
                   <button
                     onClick={executeDash}
                     disabled={dashLoading}
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl text-black disabled:opacity-20 transition shadow-md ${credits <= 0 ? "bg-amber-400 hover:bg-amber-300" : "bg-cyan-500 hover:bg-cyan-400"}`}
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl text-black disabled:opacity-20 transition shadow-md ${credits <= 0 ? "bg-amber-400 hover:bg-amber-300" : "bg-teal-500 hover:bg-cyan-400"}`}
                     title={credits <= 0 ? "Upgrade to continue" : "Send"}
                   >
                     {credits <= 0 ? <span className="text-[9px] font-black">💎</span> : <Send size={14} />}
@@ -1154,7 +1161,7 @@ export default function HomePage() {
         </div>
 
         <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] font-mono text-zinc-600">
-          <ShieldCheck size={12} className="text-cyan-500/60" /> Secure payment gateways layered via PayPal Merchant Global Node.
+          <ShieldCheck size={12} className="text-teal-600/60" /> Secure payment gateways layered via PayPal Merchant Global Node.
         </div>
       </section>
       )} {/* end studioVisible */}
@@ -1350,6 +1357,20 @@ export default function HomePage() {
                     <span className="text-sm font-bold text-white">3-Day Full Access Trial</span>
                   </div>
                   <span className="text-sm font-black text-white">$0</span>
+                </button>
+
+                {/* Monthly */}
+                <button
+                  onClick={() => setSelectedPlan("monthly")}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition ${selectedPlan === "monthly" ? "border-blue-500 bg-blue-500/10" : "border-white/10 bg-white/[0.02]"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedPlan === "monthly" ? "border-blue-500" : "border-gray-600"}`}>
+                      {selectedPlan === "monthly" && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                    </div>
+                    <span className="text-sm font-bold text-white">Monthly</span>
+                  </div>
+                  <span className="text-sm font-black text-white">$17.99</span>
                 </button>
 
                 {/* Quarterly */}
