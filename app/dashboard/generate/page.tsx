@@ -212,7 +212,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
       setRenderQueue(prev => prev.map(j => j.id === clientJobId ? { ...j, progress: 100, status: "completed" } : j));
       setCredits(data.remainingCredits ?? credits);
 
-        } catch (e: any) {
+    } catch (e: any) {
       console.error(e);
       alert(e.message || "حدث خطأ أثناء التوليد");
     } finally {
@@ -221,41 +221,41 @@ const [showDurationModal, setShowDurationModal] = useState(false);
   };
 
   return (
-    <main className="flex h-screen overflow-hidden bg-[#030303] text-white font-sans selection:bg-cyan-500/40">
+    <main className="flex h-screen overflow-hidden bg-[#eaf6f1] text-slate-800 font-sans selection:bg-cyan-500/40">
       
       {/* SIDEBAR ARCHIVE SYSTEM */}
       <AnimatePresence>
         {sidebarOpen && (
-          <motion.aside initial={{ x: -300, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -300, opacity: 0 }} className="w-72 border-r border-white/5 bg-[#070709] flex flex-col justify-between z-30">
+          <motion.aside initial={{ x: -300, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -300, opacity: 0 }} className="w-72 border-r border-black/10 bg-[#dcebe4] flex flex-col justify-between z-30">
             <div>
-              <div className="border-b border-white/5 p-5 flex items-center justify-between">
+              <div className="border-b border-black/10 p-5 flex items-center justify-between">
                 <Link href="/" className="bg-gradient-to-r from-purple-400 via-indigo-400 to-cyan-400 bg-clip-text text-md font-black tracking-tighter text-transparent flex items-center gap-2">
                   <Flame size={16} className="text-purple-400 animate-pulse" /> AMKAAI STUDIO PRO
                 </Link>
-                <button onClick={() => setSidebarOpen(false)} className="text-gray-500 hover:text-white transition"><PanelLeft size={16} /></button>
+                <button onClick={() => setSidebarOpen(false)} className="text-slate-500 hover:text-slate-800 transition"><PanelLeft size={16} /></button>
               </div>
 
               <div className="p-4">
-                <button onClick={createChat} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:opacity-95 transition shadow-lg">
+                <button onClick={createChat} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-slate-800 hover:opacity-95 transition shadow-lg">
                   <Plus size={14} /> Open Production Desk
                 </button>
               </div>
 
               {/* RENDER QUEUE SYSTEM */}
               <div className="px-4 mb-4">
-                <div className="bg-white/5 rounded-xl p-3 border border-white/5 space-y-2">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                <div className="bg-black/[0.03] rounded-xl p-3 border border-black/10 space-y-2">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
                     <span>Active GPU Queue</span>
                     <span className="text-purple-400 font-mono animate-pulse">● Live</span>
                   </p>
                   <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
                     {renderQueue.map(job => (
-                      <div key={job.id} className="text-[11px] bg-black/40 p-2 rounded-lg border border-white/5">
-                        <div className="flex justify-between text-gray-400 text-[10px] mb-1">
+                      <div key={job.id} className="text-[11px] bg-white/60 p-2 rounded-lg border border-black/10">
+                        <div className="flex justify-between text-slate-500 text-[10px] mb-1">
                           <span className="truncate max-w-[120px] font-mono">{job.prompt}</span>
                           <span className="text-purple-400 font-mono">{job.progress}%</span>
                         </div>
-                        <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
+                        <div className="w-full bg-black/5 h-1 rounded-full overflow-hidden">
                           <div className="h-full bg-purple-500 transition-all duration-500" style={{ width: `${job.progress}%` }} />
                         </div>
                       </div>
@@ -265,9 +265,9 @@ const [showDurationModal, setShowDurationModal] = useState(false);
               </div>
             </div>
 
-            <div className="p-4 border-t border-white/5 bg-black/30">
+            <div className="p-4 border-t border-black/10 bg-white/50">
               <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 flex justify-between items-center text-xs">
-                <span className="text-gray-400 font-mono">Allocation State</span>
+                <span className="text-slate-500 font-mono">Allocation State</span>
                 <span className="font-bold text-purple-400 font-mono">{credits} Nodes</span>
               </div>
             </div>
@@ -278,22 +278,22 @@ const [showDurationModal, setShowDurationModal] = useState(false);
       {/* CORE CONTROL DESK */}
       <section className="flex flex-1 flex-col overflow-hidden">
         
-        <header className="flex items-center justify-between border-b border-white/5 bg-[#070709]/70 px-6 py-4 backdrop-blur-md">
-          <div className="flex items-center gap-3 bg-zinc-900/80 px-3 py-2 rounded-xl border border-white/5 shadow-xl">
-            {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="text-gray-400 hover:text-white transition"><PanelLeft size={15} /></button>}
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-500 via-indigo-500 to-cyan-600 flex items-center justify-center text-white shadow-lg">
+        <header className="flex items-center justify-between border-b border-black/10 bg-[#dcebe4]/70 px-6 py-4 backdrop-blur-md">
+          <div className="flex items-center gap-3 bg-white/90 px-3 py-2 rounded-xl border border-black/10 shadow-xl">
+            {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="text-slate-500 hover:text-slate-800 transition"><PanelLeft size={15} /></button>}
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-500 via-indigo-500 to-cyan-600 flex items-center justify-center text-slate-800 shadow-lg">
               <Sparkles size={14} className="animate-pulse" />
             </div>
-            <div className="w-[1px] h-5 bg-white/10" />
-            <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-white transition">
+            <div className="w-[1px] h-5 bg-black/5" />
+            <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800 transition">
               <ArrowLeft size={13} /> Back to Hub
             </Link>
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={() => setSupportOpen(true)} className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-xs text-gray-400 font-mono hover:text-white transition"><LifeBuoy size={12} /> Live Support</button>
-            <Link href="/pricing" className="bg-gradient-to-r from-zinc-900 to-black px-4 py-2 rounded-full border border-white/10 hover:border-purple-500/30 transition text-xs font-bold text-gray-300">💎 Upgrade Plan</Link>
-            <button className="hidden items-center gap-1.5 rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-xs text-gray-400 md:flex font-mono"><Layers3 size={12} /> Asset Desk</button>
+            <button onClick={() => setSupportOpen(true)} className="flex items-center gap-1.5 rounded-xl border border-black/10 bg-black/[0.03] px-3 py-2 text-xs text-slate-500 font-mono hover:text-slate-800 transition"><LifeBuoy size={12} /> Live Support</button>
+            <Link href="/pricing" className="bg-gradient-to-r from-zinc-900 to-black px-4 py-2 rounded-full border border-black/10 hover:border-purple-500/30 transition text-xs font-bold text-slate-600">💎 Upgrade Plan</Link>
+            <button className="hidden items-center gap-1.5 rounded-xl border border-black/10 bg-black/[0.03] px-3 py-2 text-xs text-slate-500 md:flex font-mono"><Layers3 size={12} /> Asset Desk</button>
           </div>
         </header>
 
@@ -301,45 +301,45 @@ const [showDurationModal, setShowDurationModal] = useState(false);
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
           
           {/* PARAMETERS CONTROL TOWER */}
-          <div className="lg:col-span-4 border-r border-white/5 bg-[#050507] p-5 space-y-5 overflow-y-auto custom-scrollbar">
-            <div className="flex items-center gap-1.5 border-b border-white/5 pb-2">
+          <div className="lg:col-span-4 border-r border-black/10 bg-[#d3e6dd] p-5 space-y-5 overflow-y-auto custom-scrollbar">
+            <div className="flex items-center gap-1.5 border-b border-black/10 pb-2">
               <SlidersHorizontal size={13} className="text-purple-400" />
-              <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Synthesis Control Hub</h2>
+              <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Synthesis Control Hub</h2>
             </div>
 
             {/* Pipeline Buttons Selector */}
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">AI Generation Engine</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">AI Generation Engine</label>
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setActiveType("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "ai-video" ? "bg-purple-600/10 border-purple-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                  <Video size={14} className={activeType === "ai-video" ? "text-purple-400" : "text-gray-500"} />
+                <button onClick={() => setActiveType("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "ai-video" ? "bg-purple-600/10 border-purple-500 text-slate-800" : "bg-black/[0.03] border-black/10 text-slate-500 hover:bg-black/5"}`}>
+                  <Video size={14} className={activeType === "ai-video" ? "text-purple-400" : "text-slate-500"} />
                   <div>
                     <p className="text-[11px] font-black tracking-tight">AI Video Generator</p>
-                    <span className="text-[9px] text-gray-500 font-mono">Text to Video</span>
+                    <span className="text-[9px] text-slate-500 font-mono">Text to Video</span>
                   </div>
                 </button>
 
-                <button onClick={() => setActiveType("ai-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "ai-avatar" ? "bg-cyan-600/10 border-cyan-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                  <UserSquare2 size={14} className={activeType === "ai-avatar" ? "text-cyan-400" : "text-gray-500"} />
+                <button onClick={() => setActiveType("ai-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "ai-avatar" ? "bg-cyan-600/10 border-cyan-500 text-slate-800" : "bg-black/[0.03] border-black/10 text-slate-500 hover:bg-black/5"}`}>
+                  <UserSquare2 size={14} className={activeType === "ai-avatar" ? "text-cyan-400" : "text-slate-500"} />
                   <div>
                     <p className="text-[11px] font-black tracking-tight">Create an Avatar</p>
-                    <span className="text-[9px] text-gray-500 font-mono">Photo Presenter</span>
+                    <span className="text-[9px] text-slate-500 font-mono">Photo Presenter</span>
                   </div>
                 </button>
 
-                <button onClick={() => setActiveType("image-to-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "image-to-avatar" ? "bg-emerald-600/10 border-emerald-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                  <ImageIcon size={14} className={activeType === "image-to-avatar" ? "text-emerald-400" : "text-gray-500"} />
+                <button onClick={() => setActiveType("image-to-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "image-to-avatar" ? "bg-emerald-600/10 border-emerald-500 text-slate-800" : "bg-black/[0.03] border-black/10 text-slate-500 hover:bg-black/5"}`}>
+                  <ImageIcon size={14} className={activeType === "image-to-avatar" ? "text-emerald-400" : "text-slate-500"} />
                   <div>
                     <p className="text-[11px] font-black tracking-tight">Image To Video</p>
-                    <span className="text-[9px] text-gray-500 font-mono">HeyGen Engine Mode</span>
+                    <span className="text-[9px] text-slate-500 font-mono">HeyGen Engine Mode</span>
                   </div>
                 </button>
 
-                <button onClick={() => setActiveType("voice-clone")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "voice-clone" ? "bg-amber-600/10 border-amber-500 text-white" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
-                  <Mic size={14} className={activeType === "voice-clone" ? "text-amber-400" : "text-gray-500"} />
+                <button onClick={() => setActiveType("voice-clone")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "voice-clone" ? "bg-amber-600/10 border-amber-500 text-slate-800" : "bg-black/[0.03] border-black/10 text-slate-500 hover:bg-black/5"}`}>
+                  <Mic size={14} className={activeType === "voice-clone" ? "text-amber-400" : "text-slate-500"} />
                   <div>
                     <p className="text-[10px] font-black tracking-tight leading-none">AI Voice Cloning & Lip-Sync</p>
-                    <span className="text-[9px] text-gray-500 font-mono">Cloning Matrix</span>
+                    <span className="text-[9px] text-slate-500 font-mono">Cloning Matrix</span>
                   </div>
                 </button>
               </div>
@@ -347,19 +347,19 @@ const [showDurationModal, setShowDurationModal] = useState(false);
 
             {/* Asset Seed Uploader for Images */}
             {(activeType === "ai-avatar" || activeType === "image-to-avatar") && (
-              <div className="space-y-1.5 border-t border-white/5 pt-3">
-                <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Upload size={11} /> Source Face/Scene Image</label>
-                <div onClick={() => imageInputRef.current?.click()} className="border border-dashed border-white/10 hover:border-purple-500/30 bg-white/5 rounded-xl p-3 text-center cursor-pointer transition min-h-[90px] flex items-center justify-center">
+              <div className="space-y-1.5 border-t border-black/10 pt-3">
+                <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Upload size={11} /> Source Face/Scene Image</label>
+                <div onClick={() => imageInputRef.current?.click()} className="border border-dashed border-black/10 hover:border-purple-500/30 bg-black/[0.03] rounded-xl p-3 text-center cursor-pointer transition min-h-[90px] flex items-center justify-center">
                   <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
                   {uploadedImage ? (
                     <div className="relative w-full h-20 rounded-lg overflow-hidden">
                       <img src={uploadedImage} alt="Core Matrix Seed" className="w-full h-full object-cover" />
-                      <button onClick={(e) => { e.stopPropagation(); setUploadedImage(null); }} className="absolute top-1 right-1 bg-black/80 p-1 rounded-full text-gray-400"><X size={10} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setUploadedImage(null); }} className="absolute top-1 right-1 bg-white/90 p-1 rounded-full text-slate-500"><X size={10} /></button>
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <p className="text-[10px] text-gray-400 font-mono font-bold">Drop an image here or click to browse</p>
-                      <p className="text-[9px] text-gray-600">Transforms Photo to Speaking Studio Avatar</p>
+                      <p className="text-[10px] text-slate-500 font-mono font-bold">Drop an image here or click to browse</p>
+                      <p className="text-[9px] text-slate-500">Transforms Photo to Speaking Studio Avatar</p>
                     </div>
                   )}
                 </div>
@@ -368,18 +368,18 @@ const [showDurationModal, setShowDurationModal] = useState(false);
 
             {/* Voice Clone Upload Control Box */}
             {activeType === "voice-clone" && (
-              <div className="space-y-3 border-t border-white/5 pt-3 font-mono">
+              <div className="space-y-3 border-t border-black/10 pt-3 font-mono">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Mic size={11} className="text-amber-400" /> 1. Voice Sample (Instant Cloning)</label>
-                  <div onClick={() => voiceInputRef.current?.click()} className="border border-dashed border-white/10 bg-neutral-900 rounded-xl p-2.5 text-center cursor-pointer text-[10px] text-gray-400">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Mic size={11} className="text-amber-400" /> 1. Voice Sample (Instant Cloning)</label>
+                  <div onClick={() => voiceInputRef.current?.click()} className="border border-dashed border-black/10 bg-white rounded-xl p-2.5 text-center cursor-pointer text-[10px] text-slate-500">
                     <input type="file" ref={voiceInputRef} className="hidden" accept="audio/*" onChange={handleVoiceUpload} />
                     {voiceSampleUrl ? "✅ عينة الصوت مشحونة بنجاح في النظام" : "ارفع ملف صوتي لنفسك (5 ثوانٍ) لنطق بصمتك الصوتية"}
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">2. Target Language</label>
-                  <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="w-full bg-black text-xs text-gray-400 border border-white/10 rounded-xl p-2 outline-none">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">2. Target Language</label>
+                  <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="w-full bg-white text-xs text-slate-500 border border-black/10 rounded-xl p-2 outline-none">
                     <option value="ar">العربية الفصحى 🇸🇦</option>
                     <option value="en">English US 🇺🇸</option>
                     <option value="fr">French 🇫🇷</option>
@@ -392,7 +392,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                       <label className="text-[10px] font-bold text-purple-400 uppercase">Active Lip-Sync Overlay</label>
                       <input type="checkbox" checked={isLipSyncActive} onChange={(e) => setIsLipSyncActive(e.target.checked)} className="accent-purple-400 cursor-pointer" />
                     </div>
-                    <p className="text-[9px] text-gray-500 leading-tight">دمج ومزامنة بصمة الصوت المولدة تلقائياً مع حركة شفايف آخر أفاتار قمت بإنتاجه.</p>
+                    <p className="text-[9px] text-slate-500 leading-tight">دمج ومزامنة بصمة الصوت المولدة تلقائياً مع حركة شفايف آخر أفاتار قمت بإنتاجه.</p>
                   </div>
                 )}
               </div>
@@ -401,10 +401,10 @@ const [showDurationModal, setShowDurationModal] = useState(false);
             {/* Dimensions Control */}
             {activeType !== "voice-clone" && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Aspect Dimensions</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Aspect Dimensions</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(["16:9", "9:16", "1:1"] as AspectRatioType[]).map((ratio) => (
-                    <button key={ratio} onClick={() => setAspectRatio(ratio)} className={`py-1.5 text-[11px] rounded-xl border font-mono transition ${aspectRatio === ratio ? "border-purple-500 text-purple-400 bg-purple-500/10 font-bold" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"}`}>
+                    <button key={ratio} onClick={() => setAspectRatio(ratio)} className={`py-1.5 text-[11px] rounded-xl border font-mono transition ${aspectRatio === ratio ? "border-purple-500 text-purple-400 bg-purple-500/10 font-bold" : "bg-black/[0.03] border-black/10 text-slate-500 hover:bg-black/5"}`}>
                       {ratio === "16:9" && "Horizontal (16:9)"}
                       {ratio === "9:16" && "Vertical (9:16)"}
                       {ratio === "1:1" && "Square (1:1)"}
@@ -417,8 +417,8 @@ const [showDurationModal, setShowDurationModal] = useState(false);
             {/* Vector Movement Controls */}
             {activeType === "ai-video" && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Move size={11} /> Camera Lens Vector</label>
-                <select value={cameraMotion} onChange={(e) => setCameraMotion(e.target.value as CameraMotionType)} className="w-full bg-black text-xs text-gray-400 border border-white/10 rounded-xl p-2.5 outline-none font-mono">
+                <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Move size={11} /> Camera Lens Vector</label>
+                <select value={cameraMotion} onChange={(e) => setCameraMotion(e.target.value as CameraMotionType)} className="w-full bg-white text-xs text-slate-500 border border-black/10 rounded-xl p-2.5 outline-none font-mono">
                   <option value="static">Static Lens</option>
                   <option value="zoom-in">Zoom In Vector</option>
                   <option value="zoom-out">Zoom Out Vector</option>
@@ -430,16 +430,16 @@ const [showDurationModal, setShowDurationModal] = useState(false);
           </div>
 
           {/* ADVANCED MONITOR STAGE */}
-          <div className="lg:col-span-8 flex flex-col justify-between overflow-hidden bg-black relative">
+          <div className="lg:col-span-8 flex flex-col justify-between overflow-hidden bg-white relative">
             <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
               
-              <div className="relative aspect-video max-h-[400px] w-full mx-auto rounded-2xl border border-white/5 bg-[#060608] flex items-center justify-center overflow-hidden shadow-2xl">
+              <div className="relative aspect-video max-h-[400px] w-full mx-auto rounded-2xl border border-black/10 bg-[#d3e6dd] flex items-center justify-center overflow-hidden shadow-2xl">
                 <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-                  <div className="text-[9px] uppercase font-mono tracking-widest text-gray-400 bg-black/70 px-3 py-1.5 rounded-lg border border-white/10 backdrop-blur-md flex items-center gap-1">
+                  <div className="text-[9px] uppercase font-mono tracking-widest text-slate-500 bg-white/80 px-3 py-1.5 rounded-lg border border-black/10 backdrop-blur-md flex items-center gap-1">
                     <Tv size={11} className="text-purple-400" /> Live AI Output Preview
                   </div>
                   {lastMessage?.outputUrl && activeType !== "voice-clone" && (
-                    <button onClick={() => setCompareMode(!compareMode)} className={`flex items-center gap-1 text-[9px] font-bold uppercase font-mono px-3 py-1.5 rounded-lg border transition ${compareMode ? "bg-purple-600 text-white border-purple-400" : "bg-black/70 text-gray-400 border-white/10"}`}>
+                    <button onClick={() => setCompareMode(!compareMode)} className={`flex items-center gap-1 text-[9px] font-bold uppercase font-mono px-3 py-1.5 rounded-lg border transition ${compareMode ? "bg-purple-600 text-slate-800 border-purple-400" : "bg-white/80 text-slate-500 border-black/10"}`}>
                       <Columns size={11} /> Split Screen
                     </button>
                   )}
@@ -449,7 +449,7 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                   <div className="w-full h-full relative">
                     {compareMode ? (
                       <div className="w-full h-full relative select-none">
-                        <div className="absolute inset-0 bg-[#111]" style={{ clipPath: `polygon(${compareSlider}% 0, 100% 0, 100% 100%, ${compareSlider}% 100%)` }}>
+                        <div className="absolute inset-0 bg-[#dcebe4]" style={{ clipPath: `polygon(${compareSlider}% 0, 100% 0, 100% 100%, ${compareSlider}% 100%)` }}>
                           <video src={lastMessage.outputUrl} autoPlay loop muted className="w-full h-full object-contain" />
                         </div>
                         <div className="absolute bottom-0 top-0 w-0.5 bg-purple-400 z-20" style={{ left: `${compareSlider}%` }}>
@@ -461,9 +461,9 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                         {lastMessage.meta?.type === "voice-clone" ? (
                           <audio src={lastMessage.outputUrl} controls className="w-[80%] accent-purple-400" />
                         ) : (
-                          <video src={lastMessage.outputUrl} controls autoPlay loop className="w-full h-full object-contain bg-black" />
+                          <video src={lastMessage.outputUrl} controls autoPlay loop className="w-full h-full object-contain bg-white" />
                         )}
-                        <a href={lastMessage.outputUrl} download target="_blank" rel="noreferrer" className="absolute bottom-4 right-4 bg-black/80 hover:bg-purple-500 hover:text-black p-2.5 rounded-xl border border-white/10 text-xs font-bold flex items-center gap-1.5 transition-all">
+                        <a href={lastMessage.outputUrl} download target="_blank" rel="noreferrer" className="absolute bottom-4 right-4 bg-white/90 hover:bg-purple-500 hover:text-black p-2.5 rounded-xl border border-black/10 text-xs font-bold flex items-center gap-1.5 transition-all">
                           <Download size={13} /> Export Stream
                         </a>
                       </div>
@@ -472,31 +472,31 @@ const [showDurationModal, setShowDurationModal] = useState(false);
                 ) : isGenerating ? (
                   <div className="text-center space-y-3 px-4">
                     <Loader2 size={32} className="text-purple-500 animate-spin mx-auto" />
-                    <p className="text-xs font-bold text-gray-400">الذكاء الاصطناعي يقوم بحياكة الإطارات وتحريك الأفاتار...</p>
-                    <div className="w-48 h-1 bg-zinc-800 rounded-full mx-auto overflow-hidden">
+                    <p className="text-xs font-bold text-slate-500">الذكاء الاصطناعي يقوم بحياكة الإطارات وتحريك الأفاتار...</p>
+                    <div className="w-48 h-1 bg-slate-100 rounded-full mx-auto overflow-hidden">
                       <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progress}%` }} />
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center text-gray-500 space-y-2 p-6">
-                    <div className="w-12 h-12 bg-zinc-800/80 rounded-full flex items-center justify-center mx-auto text-gray-400 border border-white/5 shadow-inner">
+                  <div className="text-center text-slate-500 space-y-2 p-6">
+                    <div className="w-12 h-12 bg-white/80 rounded-full flex items-center justify-center mx-auto text-slate-500 border border-black/10 shadow-inner">
                       <Play size={18} fill="currentColor" className="translate-x-0.5" />
                     </div>
-                    <p className="text-xs font-black text-gray-400">Ready for Production</p>
-                    <p className="text-[11px] text-gray-600 max-w-xs mx-auto">عند الضغط على التوليد، ستظهر اللقطات والتحريكات الصوتية والوجهية هنا مباشرةً.</p>
+                    <p className="text-xs font-black text-slate-500">Ready for Production</p>
+                    <p className="text-[11px] text-slate-500 max-w-xs mx-auto">عند الضغط على التوليد، ستظهر اللقطات والتحريكات الصوتية والوجهية هنا مباشرةً.</p>
                   </div>
                 )}
               </div>
 
               {/* Execution Log Layer */}
               {activeChat && activeChat.messages.length > 0 && (
-                <div className="border-t border-white/5 pt-4 space-y-3">
+                <div className="border-t border-black/10 pt-4 space-y-3">
                   {activeChat.messages.map((msg, i) => (
-                    <div key={i} className={`flex gap-3 p-3.5 rounded-xl border ${msg.role === "user" ? "bg-white/5 border-white/5" : "bg-purple-950/5 border-purple-500/10"}`}>
-                      {msg.role === "user" ? <User size={13} className="text-gray-400 mt-0.5" /> : <Bot size={13} className="text-purple-400 mt-0.5" />}
+                    <div key={i} className={`flex gap-3 p-3.5 rounded-xl border ${msg.role === "user" ? "bg-black/[0.03] border-black/10" : "bg-purple-950/5 border-purple-500/10"}`}>
+                      {msg.role === "user" ? <User size={13} className="text-slate-500 mt-0.5" /> : <Bot size={13} className="text-purple-400 mt-0.5" />}
                       <div className="text-xs flex-1">
-                        <span className="font-bold block text-[10px] text-gray-500 uppercase">{msg.role === "user" ? "Input Criteria" : "Output Tracking Matrix"}</span>
-                        <p className="text-gray-300 font-mono whitespace-pre-wrap">{msg.content}</p>
+                        <span className="font-bold block text-[10px] text-slate-500 uppercase">{msg.role === "user" ? "Input Criteria" : "Output Tracking Matrix"}</span>
+                        <p className="text-slate-600 font-mono whitespace-pre-wrap">{msg.content}</p>
                       </div>
                     </div>
                   ))}
@@ -506,39 +506,39 @@ const [showDurationModal, setShowDurationModal] = useState(false);
             </div>
 
             {/* Input Desk Area */}
-            <div className="p-5 border-t border-white/5 bg-[#070709]/90 backdrop-blur-md space-y-3">
+            <div className="p-5 border-t border-black/10 bg-[#dcebe4]/90 backdrop-blur-md space-y-3">
               <div className="flex items-center gap-2 text-[10px] font-bold text-purple-400 uppercase tracking-wide">
                 <Sparkles size={12} /> Describe Your Vision
               </div>
 
-              <div className="flex items-end gap-3 bg-[#030304] border border-white/10 rounded-2xl p-3 transition-all duration-300 focus-within:border-purple-500/60 focus-within:shadow-[0_0_0_1px_rgba(168,85,247,0.3),0_0_20px_rgba(168,85,247,0.15)] focus-within:bg-[#0a0810]">
+              <div className="flex items-end gap-3 bg-[#cfe4da] border border-black/10 rounded-2xl p-3 transition-all duration-300 focus-within:border-purple-500/60 focus-within:shadow-[0_0_0_1px_rgba(168,85,247,0.3),0_0_20px_rgba(168,85,247,0.15)] focus-within:bg-[#d3e6dd]">
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder={activeType === "voice-clone" ? "اكتب هنا النص المراد تحويله لبصمتك الصوتية المستنسخة أو الصوت الجاهز..." : "Describe your cinematic vision here... e.g. A futuristic city at night with neon lights, slow camera pan, 8K ultra-realistic..."}
                   rows={3}
-                  className="max-h-40 min-h-[72px] flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none text-white placeholder:text-gray-700 font-mono"
+                  className="max-h-40 min-h-[72px] flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none text-slate-800 placeholder:text-slate-400 font-mono"
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerateVideo(); } }}
                 />
                 <button 
   onClick={() => setShowDurationModal(true)} // هذا التغيير سيفتح النافذة بدلاً من التوليد المباشر
   disabled={isGenerating || !prompt.trim()} 
-  className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-600 text-white disabled:opacity-20 transition shadow-md hover:bg-purple-500 shrink-0"
+  className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-600 text-slate-800 disabled:opacity-20 transition shadow-md hover:bg-purple-500 shrink-0"
 >
   {isGenerating ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
 </button>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Quick Style:</span>
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Quick Style:</span>
                 {PRESET_STYLES.map(style => (
-                  <button key={style.id} onClick={() => handlePresetApply(style)} className="px-3 py-1.5 rounded-full border border-white/10 bg-neutral-900 hover:border-purple-500/40 hover:text-white transition text-[10px] font-bold text-gray-400">
+                  <button key={style.id} onClick={() => handlePresetApply(style)} className="px-3 py-1.5 rounded-full border border-black/10 bg-white hover:border-purple-500/40 hover:text-slate-800 transition text-[10px] font-bold text-slate-500">
                     {style.name}
                   </button>
                 ))}
               </div>
 
-              <div className="text-[10px] text-zinc-500 text-center font-mono">
+              <div className="text-[10px] text-slate-500 text-center font-mono">
                 Wan 2.2 TI2V-5B • RTX 4090 on demand • 5 credits/second • 5s clips
               </div>
             </div>
@@ -551,44 +551,44 @@ const [showDurationModal, setShowDurationModal] = useState(false);
       {/* SUPPORT LAYER */}
       <AnimatePresence>
         {supportOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-            <div className="w-full max-w-lg rounded-2xl border border-white/5 bg-[#09090b] p-6 space-y-4 shadow-2xl relative">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-md p-4">
+            <div className="w-full max-w-lg rounded-2xl border border-black/10 bg-[#dcebe4] p-6 space-y-4 shadow-2xl relative">
               <div>
                 <h3 className="text-sm font-bold flex items-center gap-2"><LifeBuoy size={14} className="text-purple-400" /> Support Core</h3>
-                <p className="text-xs text-gray-500 font-mono mt-4 leading-relaxed bg-white/5 p-4 rounded-xl border border-white/5">
+                <p className="text-xs text-slate-500 font-mono mt-4 leading-relaxed bg-black/[0.03] p-4 rounded-xl border border-black/10">
                   Our clusters are operating at nominal values. If your H100 sequence allocation fails or stays inside the render queue for more than 180s, drop an analytical ticket below.
                 </p>
               </div>
               <div className="flex gap-2">
-                <input value={supportInput} onChange={e => setSupportInput(e.target.value)} className="flex-1 rounded-xl bg-black border border-white/5 p-3 text-xs outline-none text-white font-mono" placeholder="Inquire cluster debug parameters..." />
+                <input value={supportInput} onChange={e => setSupportInput(e.target.value)} className="flex-1 rounded-xl bg-white border border-black/10 p-3 text-xs outline-none text-slate-800 font-mono" placeholder="Inquire cluster debug parameters..." />
                 <button onClick={() => setSupportOpen(false)} className="rounded-xl bg-purple-500 px-5 text-xs font-bold text-black">Log Ticket</button>
               </div>
-              <button onClick={() => setSupportOpen(false)} className="absolute right-4 top-4 text-gray-500 hover:text-white" aria-label="Close support dispatch dashboard"><X size={16} /></button>
+              <button onClick={() => setSupportOpen(false)} className="absolute right-4 top-4 text-slate-500 hover:text-slate-800" aria-label="Close support dispatch dashboard"><X size={16} /></button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 {/* نافذة اختيار المدة الزمنية */}
         {showDurationModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#121215] p-6 shadow-2xl">
-              <h2 className="text-lg font-bold text-white mb-6">Select Video Duration</h2>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/90 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl border border-black/10 bg-[#dcebe4] p-6 shadow-2xl">
+              <h2 className="text-lg font-bold text-slate-800 mb-6">Select Video Duration</h2>
               
               <input 
                 type="range" min="5" max="180" step="5" 
                 value={selectedDuration} 
                 onChange={(e) => setSelectedDuration(Number(e.target.value))}
-                className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-purple-500 mb-2"
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-500 mb-2"
               />
-              <div className="flex justify-between text-xs text-gray-500 mb-6 font-mono">
+              <div className="flex justify-between text-xs text-slate-500 mb-6 font-mono">
                 <span>5s</span><span>30s</span><span>1m</span><span>3m</span>
               </div>
               
-              <div className="text-4xl font-black text-white mb-8 text-center tracking-tighter">{selectedDuration}s</div>
+              <div className="text-4xl font-black text-slate-800 mb-8 text-center tracking-tighter">{selectedDuration}s</div>
               
               <button 
                 onClick={() => { setShowDurationModal(false); handleGenerateVideo(); }}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 font-bold text-white transition hover:opacity-90"
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 font-bold text-slate-800 transition hover:opacity-90"
               >
                 Confirm ({selectedDuration * VIDEO_CREDITS_PER_SECOND} credits)
               </button>
