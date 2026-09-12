@@ -14,18 +14,7 @@ export async function POST(req: Request) {
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   if (prompt.length < LIMITS.minPromptLength) return NextResponse.json({ error: `Prompt too short. Minimum ${LIMITS.minPromptLength} characters.` }, { status: 400 });
   if (prompt.length > LIMITS.maxPromptLength) return NextResponse.json({ error: `Prompt too long. Maximum ${LIMITS.maxPromptLength} characters.` }, { status: 400 });
-  let user;
-  try {
-    user = await getOrCreateUser(clerkId);
-  } catch (error: any) {
-    console.error("GENERATE_VIDEO_GET_OR_CREATE_USER_ERROR", {
-      clerkId,
-      message: error?.message,
-      code: error?.code,
-      stack: error?.stack,
-    });
-    return NextResponse.json({ error: "Failed to load user account", detail: String(error?.message || error) }, { status: 500 });
-  }
+  const user = await getOrCreateUser(clerkId);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   try {
     const result = await createQueuedVideoJob({
@@ -54,10 +43,8 @@ export async function POST(req: Request) {
     if (message === "USAGE_ALREADY_REFUNDED" || message === "USAGE_REFERENCE_ALREADY_USED") return NextResponse.json({ error: "This generation request can no longer be reused." }, { status: 409 });
     console.error("GENERATE_VIDEO_UNEXPECTED_ERROR", {
       clerkId,
-      message: error?.message,
-      code: error?.code,
-      stack: error?.stack,
+      message: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.json({ error: "Failed to start video generation", detail: String(error?.message || error) }, { status: 500 });
+    return NextResponse.json({ error: "Failed to start video generation" }, { status: 500 });
   }
 }
