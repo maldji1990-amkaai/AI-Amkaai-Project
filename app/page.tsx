@@ -299,7 +299,7 @@ export default function HomePage() {
         return;
       }
 
-      const data = await res.json();
+      let data = await res.json();
 
       // رصيد منتهي من الـ response body
       if (data?.error?.toLowerCase().includes("credit") || data?.remainingCredits === 0) {
@@ -307,6 +307,18 @@ export default function HomePage() {
         setPricingModalOpen(true);
         setRenderQueue(prev => prev.filter(j => j.id !== jobId));
         return;
+      }
+
+      // الصورة-إلى-فيديو (خارج وضع الديمو) يرجع فوراً بحالة "processing" مع
+      // generationId، والتوليد الفعلي يعمل بشكل غير متزامن على خوادم Replicate.
+      if (dashType === "image-to-video" && data.status === "processing" && data.generationId) {
+        for (let attempt = 0; attempt < 150; attempt++) {
+          const check = await fetch(`/api/generate-image/status?generationId=${encodeURIComponent(data.generationId)}`, { cache: "no-store" });
+          const state = await check.json();
+          if (state.status === "done") { data = { ...data, videoUrl: state.videoUrl }; break; }
+          if (state.status === "failed") { setDashResult(""); break; }
+          await new Promise(resolve => setTimeout(resolve, 4000));
+        }
       }
 
       setDashResult(data.videoUrl || data.outputUrl || "");

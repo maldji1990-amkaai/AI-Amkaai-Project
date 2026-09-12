@@ -8,8 +8,8 @@ const PAYPAL_BASE =
     : "https://api-m.sandbox.paypal.com";
 
 async function getPayPalAccessToken() {
-  const clientId = process.env.PAYPAL_CLIENT_ID;
-  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  const clientSecret = process.env.PAYPAL_SECRET_KEY;
 
   if (!clientId || !clientSecret) {
     throw new Error("PayPal credentials are not configured");
@@ -42,7 +42,10 @@ async function getPayPalAccessToken() {
 
 export async function POST(req: Request) {
   try {
-    await requireAdmin();
+    const adminCheck = await requireAdmin();
+    if (!adminCheck.ok) {
+      return NextResponse.json({ error: adminCheck.error }, { status: adminCheck.status });
+    }
 
     const body = await req.json();
 

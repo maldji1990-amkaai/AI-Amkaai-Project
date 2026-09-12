@@ -244,6 +244,23 @@ export default function AIChangeConsole() {
         }
         if (!finished) throw new Error("Video generation timed out");
       }
+
+      // الصورة-إلى-فيديو (خارج وضع الديمو) يرجع فوراً بحالة "processing" مع
+      // generationId، ويحتاج استطلاعاً منفصلاً لأن التوليد الفعلي يعمل بشكل
+      // غير متزامن على خوادم Replicate.
+      if (activeType === "image-to-video" && data.status === "processing" && data.generationId) {
+        let finished = false;
+        for (let attempt = 0; attempt < 150; attempt++) {
+          setProgress(Math.min(95, 5 + attempt));
+          setRenderQueue(q => q.map(j => j.id === clientJobId ? { ...j, progress: Math.min(95, 5 + attempt) } : j));
+          const check = await fetch(`/api/generate-image/status?generationId=${encodeURIComponent(data.generationId)}`, { cache: "no-store" });
+          const state = await check.json();
+          if (state.status === "done") { data = { ...data, videoUrl: state.videoUrl }; finished = true; break; }
+          if (state.status === "failed") throw new Error(state.error || "Video generation failed. Your credits were refunded.");
+          await new Promise(resolve => setTimeout(resolve, 4000));
+        }
+        if (!finished) throw new Error("Video generation timed out");
+      }
       setProgress(100);
 
       const outputUrl = data.videoUrl || data.avatar || data.outputUrl || null;
