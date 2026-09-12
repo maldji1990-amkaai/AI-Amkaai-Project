@@ -288,7 +288,7 @@ export default function HomePage() {
       if (dashType === "voice-clone") endpoint = "/api/generate-voice";
       const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: dashInput, aspectRatio: dashAspect, cameraMotion: dashCamera }),
+        body: JSON.stringify({ prompt: dashInput, aspectRatio: dashAspect, cameraMotion: dashCamera, duration }),
       });
 
       // 402 = رصيد منتهي من السيرفر
