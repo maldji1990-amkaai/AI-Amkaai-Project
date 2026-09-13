@@ -21,52 +21,114 @@ export const PLAN_ALIASES: Record<string, ConfigPlanType> = {
   BUSINESS: "business",
 };
 
-export function normalizePlan(value: unknown): ConfigPlanType | null {
-  const key = String(value ?? "").trim().toUpperCase();
+export function normalizePlan(
+  value: unknown,
+): ConfigPlanType | null {
+  const key = String(value ?? "")
+    .trim()
+    .toUpperCase();
+
   return PLAN_ALIASES[key] ?? null;
 }
 
-export function planCredits(plan: ConfigPlanType): number {
+export function planCredits(
+  plan: ConfigPlanType,
+): number {
   return PLANS[plan].credits;
 }
 
-export function planPrice(plan: ConfigPlanType): number {
+export function planPrice(
+  plan: ConfigPlanType,
+): number {
   return PLANS[plan].price;
 }
 
-export function planDurationMonths(plan: ConfigPlanType): number | null {
+export function planDurationMonths(
+  plan: ConfigPlanType,
+): number | null {
   switch (plan) {
-    case "trial": return 0;
-    case "monthly": return 1;
-    case "quarterly": return 3;
-    case "biannually": return 6;
-    case "business": return null;
+    case "trial":
+      return 0;
+
+    case "monthly":
+      return 1;
+
+    case "quarterly":
+      return 3;
+
+    case "biannually":
+      return 6;
+
+    case "business":
+      return null;
+
+    default:
+      return null;
   }
 }
 
-export function addMonths(from: Date, months: number): Date {
+export function addMonths(
+  from: Date,
+  months: number,
+): Date {
   const date = new Date(from);
   date.setMonth(date.getMonth() + months);
   return date;
 }
 
-export function effectiveSubscriptionActive(sub: { status: string; currentPeriodEnd: Date | null } | null, now = new Date()) {
-  if (!sub) return false;
+export function effectiveSubscriptionActive(
+  sub: {
+    status: string;
+    currentPeriodEnd: Date | null;
+  } | null,
+  now = new Date(),
+): boolean {
+  if (!sub) {
+    return false;
+  }
+
   const status = sub.status.toLowerCase();
-  if (!["active", "activated"].includes(status)) return false;
-  return !sub.currentPeriodEnd || sub.currentPeriodEnd.getTime() >= now.getTime();
+
+  if (!["active", "activated"].includes(status)) {
+    return false;
+  }
+
+  return (
+    !sub.currentPeriodEnd ||
+    sub.currentPeriodEnd.getTime() >= now.getTime()
+  );
 }
 
-export async function getCurrentSubscription(userId: string) {
+export async function getCurrentSubscription(
+  userId: string,
+) {
   const subscriptions = await db.subscription.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
+    where: {
+      userId,
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
     take: 20,
   });
+
   const now = new Date();
-  return subscriptions.find((s) => effectiveSubscriptionActive(s, now)) ?? subscriptions[0] ?? null;
+
+  return (
+    subscriptions.find((subscription) =>
+      effectiveSubscriptionActive(subscription, now),
+    ) ??
+    subscriptions[0] ??
+    null
+  );
 }
 
+/**
+ * إضافة credits داخل transaction موجودة.
+ *
+ * reference يجب أن يكون unique في CreditTransaction.
+ * إذا كانت العملية موجودة سابقًا، لا نضيف الرصيد مرة ثانية.
+ */
 export async function grantCreditsTx(
   tx: Prisma.TransactionClient,
   userId: string,
@@ -75,27 +137,59 @@ export async function grantCreditsTx(
   type: string,
   metadata?: Prisma.InputJsonValue,
 ) {
+  const normalizedReference = reference.trim();
+
+  if (!normalizedReference) {
+    throw new Error("INVALID_CREDIT_REFERENCE");
+  }
+
   if (!Number.isInteger(amount) || amount <= 0) {
     throw new Error("INVALID_CREDIT_AMOUNT");
   }
 
+  if (!type.trim()) {
+    throw new Error("INVALID_CREDIT_TRANSACTION_TYPE");
+  }
+
   const existing = await tx.creditTransaction.findUnique({
-    where: { reference },
+    where: {
+      reference: normalizedReference,
+    },
   });
 
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
 
   const user = await tx.user.update({
-    where: { id: userId },
-    data: { credits: { increment: amount } },
-    select: { credits: true },
+    where: {
+      id: userId,
+    },
+    data: {
+      credits: {
+        increment: amount,
+      },
+    },
+    select: {
+      credits: true,
+    },
   });
 
   return tx.creditTransaction.create({
-    data: { userId, amount, balanceAfter: user.credits, type, reference, metadata },
+    data: {
+      userId,
+      amount,
+      balanceAfter: user.credits,
+      type,
+      reference: normalizedReference,
+      metadata: metadata ?? {},
+    },
   });
 }
 
+/**
+ * إضافة credits داخل transaction جديدة.
+ */
 export async function grantCredits(
   userId: string,
   amount: number,
@@ -103,5 +197,14 @@ export async function grantCredits(
   type: string,
   metadata?: Prisma.InputJsonValue,
 ) {
-  return db.$transaction((tx) => grantCreditsTx(tx, userId, amount, reference, type, metadata));
+  return db.$transaction((tx) =>
+    grantCreditsTx(
+      tx,
+      userId,
+      amount,
+      reference,
+      type,
+      metadata,
+    ),
+  );
 }
