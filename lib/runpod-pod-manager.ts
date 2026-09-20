@@ -8,7 +8,6 @@ const ACTIVE_SET_KEY = "amkaai:runpod:video-gpu:active-jobs:v2";
 const DISPATCH_SET_KEY = "amkaai:runpod:video-gpu:dispatch-leases:v2";
 const DEFAULT_GPUS = [
   "NVIDIA GeForce RTX 4090",
-  "NVIDIA GeForce RTX 3090",
   "NVIDIA L40S",
   "NVIDIA RTX 6000 Ada Generation",
   "NVIDIA RTX A6000",
