@@ -113,7 +113,13 @@ async function createPod() {
   if (process.env.RUNPOD_NETWORK_VOLUME_ID) {
     body.networkVolumeId = process.env.RUNPOD_NETWORK_VOLUME_ID;
   }
-  if (templateId) body.templateId = templateId; else body.imageName = imageName;
+     if (imageName) {
+    body.imageName = imageName;
+  } else if (templateId) {
+    body.templateId = templateId;
+  } else {
+    throw new Error("RUNPOD_POD_TEMPLATE_ID_OR_IMAGE_MISSING");
+  }
   if (process.env.RUNPOD_POD_DOCKER_START_CMD) body.dockerStartCmd = process.env.RUNPOD_POD_DOCKER_START_CMD.split(" ").filter(Boolean);
   if (process.env.RUNPOD_POD_DOCKER_ENTRYPOINT) body.dockerEntrypoint = process.env.RUNPOD_POD_DOCKER_ENTRYPOINT.split(" ").filter(Boolean);
   if (process.env.RUNPOD_POD_ENV_JSON) {
