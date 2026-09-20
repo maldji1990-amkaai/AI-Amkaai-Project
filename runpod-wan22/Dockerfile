@@ -37,8 +37,9 @@ RUN python -m pip install \
     "tokenizers>=0.20.3" \
     "accelerate>=1.1.1" \
     tqdm "imageio[ffmpeg]" easydict ftfy dashscope imageio-ffmpeg \
-    "numpy>=1.23.5,<2" \
-        einops \
+        "numpy==1.26.4" \
+   "scipy==1.11.4" \
+    einops \
     decord \
     librosa \
     soundfile \
