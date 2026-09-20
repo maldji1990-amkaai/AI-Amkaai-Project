@@ -9,9 +9,9 @@ export function getVideoQueue() {
   if (!queue) {
     queue = new Queue(VIDEO_QUEUE_NAME, {
       connection,
-      defaultJobOptions: {
-        attempts: 120,
-        backoff: { type: "exponential", delay: 5000 },
+            defaultJobOptions: {
+        attempts: 1000,
+        backoff: { type: "fixed", delay: 30000 },
         removeOnComplete: 100,
         removeOnFail: 500,
       },
