@@ -102,7 +102,7 @@ async function createPod() {
     gpuTypeIds: process.env.RUNPOD_GPU_TYPES
       ? process.env.RUNPOD_GPU_TYPES.split(",").map(s => s.trim()).filter(Boolean)
       : DEFAULT_GPUS,
-    gpuTypePriority: "custom",
+    gpuTypePriority: "availability",
     gpuCount: 1,
     containerDiskInGb: Math.trunc(envNumber("RUNPOD_POD_CONTAINER_DISK_GB", 50)),
     volumeInGb: Math.trunc(envNumber("RUNPOD_POD_VOLUME_GB", 80)),
