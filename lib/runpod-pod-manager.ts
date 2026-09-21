@@ -6,14 +6,11 @@ const STATE_KEY = "amkaai:runpod:video-gpu:v2";
 const LOCK_KEY = "amkaai:runpod:video-gpu:lock:v2";
 const ACTIVE_SET_KEY = "amkaai:runpod:video-gpu:active-jobs:v2";
 const DISPATCH_SET_KEY = "amkaai:runpod:video-gpu:dispatch-leases:v2";
-const DEFAULT_GPUS = [
-  "NVIDIA GeForce RTX 4090",
-  "NVIDIA L40S",
-  "NVIDIA RTX 6000 Ada Generation",
-  "NVIDIA RTX A6000",
-  "NVIDIA RTX A5000",
-  "NVIDIA L4",
-];
+   const DEFAULT_GPUS = [
+     "NVIDIA RTX PRO 4500",
+     "NVIDIA GeForce RTX 4090",
+     "NVIDIA RTX PRO 4000",
+   ];
 const DEFAULT_PORT = 8000;
 const DEFAULT_GENERATE_PATH = "/generate";
 const DEFAULT_HEALTH_PATH = "/health";
