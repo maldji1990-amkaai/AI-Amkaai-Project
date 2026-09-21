@@ -91,51 +91,107 @@ async function getPod(podId: string) { return runpodFetch<any>(`/pods/${encodeUR
 async function createPod() {
   const templateId = process.env.RUNPOD_POD_TEMPLATE_ID;
   const imageName = process.env.RUNPOD_POD_IMAGE;
-  if (!templateId && !imageName) throw new Error("RUNPOD_POD_TEMPLATE_ID_OR_IMAGE_MISSING");
+
+  if (!templateId && !imageName) {
+    throw new Error("RUNPOD_POD_TEMPLATE_ID_OR_IMAGE_MISSING");
+  }
+
   const port = podPort();
+
   const body: Record<string, unknown> = {
     name: process.env.RUNPOD_POD_NAME || "amkaai-video-4090",
-    gpuTypeIds: process.env.RUNPOD_GPU_TYPES
-      ? process.env.RUNPOD_GPU_TYPES.split(",").map(s => s.trim()).filter(Boolean)
-      : DEFAULT_GPUS,
-    gpuTypePriority: "availability",
     gpuCount: 1,
-    containerDiskInGb: Math.trunc(envNumber("RUNPOD_POD_CONTAINER_DISK_GB", 50)),
-    volumeInGb: Math.trunc(envNumber("RUNPOD_POD_VOLUME_GB", 80)),
-    volumeMountPath: process.env.RUNPOD_POD_VOLUME_MOUNT_PATH || "/workspace",
+    containerDiskInGb: Math.trunc(
+      envNumber("RUNPOD_POD_CONTAINER_DISK_GB", 50)
+    ),
+    volumeInGb: Math.trunc(
+      envNumber("RUNPOD_POD_VOLUME_GB", 80)
+    ),
+    volumeMountPath:
+      process.env.RUNPOD_POD_VOLUME_MOUNT_PATH || "/workspace",
     ports: [`${port}/http`],
     cloudType: process.env.RUNPOD_CLOUD_TYPE || "COMMUNITY",
     computeType: "GPU",
   };
+
+  // If a Template is configured, let the Template define the GPU.
+  // Do not send gpuTypeIds or gpuTypePriority in this case.
+  if (templateId) {
+    body.templateId = templateId;
+  } else {
+    // Without a Template, use the configured GPU types.
+    const gpuTypes = process.env.RUNPOD_GPU_TYPES
+      ? process.env.RUNPOD_GPU_TYPES
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : DEFAULT_GPUS;
+
+    body.gpuTypeIds = gpuTypes;
+    body.gpuTypePriority = "availability";
+
+    if (imageName) {
+      body.imageName = imageName;
+    }
+  }
+
   if (process.env.RUNPOD_NETWORK_VOLUME_ID) {
     body.networkVolumeId = process.env.RUNPOD_NETWORK_VOLUME_ID;
   }
-     if (imageName) {
-    body.imageName = imageName;
-  } else if (templateId) {
-    body.templateId = templateId;
-  } else {
-    throw new Error("RUNPOD_POD_TEMPLATE_ID_OR_IMAGE_MISSING");
+
+  if (
+    !templateId &&
+    process.env.RUNPOD_POD_DOCKER_START_CMD
+  ) {
+    body.dockerStartCmd =
+      process.env.RUNPOD_POD_DOCKER_START_CMD
+        .split(" ")
+        .filter(Boolean);
   }
-  if (process.env.RUNPOD_POD_DOCKER_START_CMD) body.dockerStartCmd = process.env.RUNPOD_POD_DOCKER_START_CMD.split(" ").filter(Boolean);
-  if (process.env.RUNPOD_POD_DOCKER_ENTRYPOINT) body.dockerEntrypoint = process.env.RUNPOD_POD_DOCKER_ENTRYPOINT.split(" ").filter(Boolean);
+
+  if (
+    !templateId &&
+    process.env.RUNPOD_POD_DOCKER_ENTRYPOINT
+  ) {
+    body.dockerEntrypoint =
+      process.env.RUNPOD_POD_DOCKER_ENTRYPOINT
+        .split(" ")
+        .filter(Boolean);
+  }
+
   if (process.env.RUNPOD_POD_ENV_JSON) {
-    try { body.env = JSON.parse(process.env.RUNPOD_POD_ENV_JSON); } catch { throw new Error("RUNPOD_POD_ENV_JSON_INVALID"); }
+    try {
+      body.env = JSON.parse(process.env.RUNPOD_POD_ENV_JSON);
+    } catch {
+      throw new Error("RUNPOD_POD_ENV_JSON_INVALID");
+    }
   }
+
   try {
-    return await runpodFetch<any>("/pods", { method: "POST", body: JSON.stringify(body) });
+    return await runpodFetch<any>("/pods", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   } catch (error) {
     const message = String(error);
+
+    // Only classify real GPU capacity errors as capacity errors.
+    // Schema validation errors such as invalid gpuTypeIds must
+    // remain visible as RUNPOD_API_400.
     if (
-      /RUNPOD_API_(400|409|422|429|500|502|503|504)/.test(message) &&
-      /(capacity|available|availability|insufficient|no instances|out of stock|resources|gpu)/i.test(message)
+      /RUNPOD_API_(409|429|500|502|503|504)/.test(message) &&
+      /(capacity|available|availability|insufficient|no instances|out of stock|resources)/i.test(
+        message
+      )
     ) {
-      throw new Error(`RUNPOD_GPU_CAPACITY_UNAVAILABLE:${message}`);
+      throw new Error(
+        `RUNPOD_GPU_CAPACITY_UNAVAILABLE:${message}`
+      );
     }
+
     throw error;
   }
 }
-
 async function waitForReady(podId: string) {
   const deadline = Date.now() + envNumber("RUNPOD_POD_READY_TIMEOUT_MS", DEFAULT_READY_TIMEOUT_MS);
   const baseUrl = buildProxyUrl(podId);
