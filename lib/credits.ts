@@ -15,7 +15,8 @@ type UseCreditsResult = {
   referenceId: string | null;
 };
 
-function calculateCreditCost(
+/** Calculate the exact server-side cost used by generation. */
+export function calculateCreditCost(
   type: AIType,
   options?: CreditOptions,
 ): number {
@@ -39,10 +40,30 @@ function calculateCreditCost(
 }
 
 /**
+ * Structured error used by the API so the UI can display the real server
+ * balance and the exact amount required, instead of guessing from stale UI
+ * state.
+ */
+export class NotEnoughCreditsError extends Error {
+  readonly requiredCredits: number;
+  readonly remainingCredits: number;
+
+  constructor(requiredCredits: number, remainingCredits: number) {
+    super("NOT_ENOUGH_CREDITS");
+    this.name = "NotEnoughCreditsError";
+    this.requiredCredits = requiredCredits;
+    this.remainingCredits = remainingCredits;
+  }
+}
+
+/**
  * خصم credits بطريقة ذرية وآمنة.
  *
  * لا يتم فحص الاشتراك أو تاريخ انتهائه.
  * السماح بالتوليد يعتمد على الرصيد المتاح فقط.
+ *
+ * Prisma Studio can therefore be used to add credits directly to the User
+ * row that belongs to the authenticated Clerk account.
  */
 export async function useCredits(
   userId: string,
@@ -53,14 +74,10 @@ export async function useCredits(
   const referenceId = options?.reference?.trim() || null;
 
   return db.$transaction(async (tx) => {
-    /*
-     * منع الخصم المكرر عند إعادة إرسال نفس الطلب.
-     */
+    // Prevent duplicate deductions when the same Idempotency-Key is reused.
     if (referenceId) {
       const existingUsage = await tx.usage.findUnique({
-        where: {
-          referenceId,
-        },
+        where: { referenceId },
         select: {
           id: true,
           userId: true,
@@ -75,17 +92,11 @@ export async function useCredits(
         }
 
         const user = await tx.user.findUnique({
-          where: {
-            id: userId,
-          },
-          select: {
-            credits: true,
-          },
+          where: { id: userId },
+          select: { credits: true },
         });
 
-        if (!user) {
-          throw new Error("USER_NOT_FOUND");
-        }
+        if (!user) throw new Error("USER_NOT_FOUND");
 
         return {
           cost: existingUsage.cost,
@@ -96,52 +107,36 @@ export async function useCredits(
       }
     }
 
-    /*
-     * الخصم الذري يمنع الرصيد السالب عند الطلبات المتزامنة.
-     */
+    // Atomic deduction: concurrent requests can never drive credits below 0.
     const updateResult = await tx.user.updateMany({
       where: {
         id: userId,
-        credits: {
-          gte: cost,
-        },
+        credits: { gte: cost },
       },
       data: {
-        credits: {
-          decrement: cost,
-        },
+        credits: { decrement: cost },
       },
     });
 
     if (updateResult.count !== 1) {
-      const userExists = await tx.user.findUnique({
-        where: {
-          id: userId,
-        },
-        select: {
-          id: true,
-        },
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { id: true, credits: true },
       });
 
-      if (!userExists) {
-        throw new Error("USER_NOT_FOUND");
-      }
+      if (!user) throw new Error("USER_NOT_FOUND");
 
-      throw new Error("NOT_ENOUGH_CREDITS");
+      // This error carries the actual DB value to the API. No subscription
+      // check is involved here.
+      throw new NotEnoughCreditsError(cost, Math.max(0, user.credits));
     }
 
     const userAfterDeduction = await tx.user.findUnique({
-      where: {
-        id: userId,
-      },
-      select: {
-        credits: true,
-      },
+      where: { id: userId },
+      select: { credits: true },
     });
 
-    if (!userAfterDeduction) {
-      throw new Error("USER_NOT_FOUND");
-    }
+    if (!userAfterDeduction) throw new Error("USER_NOT_FOUND");
 
     const usage = await tx.usage.create({
       data: {
@@ -167,84 +162,39 @@ export async function useCredits(
   });
 }
 
-/**
- * تعليم Usage كمكتمل.
- *
- * الدالة idempotent:
- * إذا كان السجل مكتملًا، تعيده دون خصم جديد.
- * وإذا كان قد استُرجع، تمنع إعادته إلى COMPLETED.
- */
-export async function markUsageSuccess(
-  referenceId: string,
-) {
+/** تعليم Usage كمكتمل. */
+export async function markUsageSuccess(referenceId: string) {
   const normalizedReferenceId = referenceId.trim();
-
-  if (!normalizedReferenceId) {
-    throw new Error("USAGE_REFERENCE_REQUIRED");
-  }
+  if (!normalizedReferenceId) throw new Error("USAGE_REFERENCE_REQUIRED");
 
   const usage = await db.usage.findUnique({
-    where: {
-      referenceId: normalizedReferenceId,
-    },
-    select: {
-      id: true,
-      status: true,
-      refunded: true,
-    },
+    where: { referenceId: normalizedReferenceId },
+    select: { id: true, status: true, refunded: true },
   });
 
-  if (!usage) {
-    throw new Error("USAGE_NOT_FOUND");
-  }
-
-  if (
-    usage.refunded ||
-    usage.status === UsageStatus.REFUNDED
-  ) {
+  if (!usage) throw new Error("USAGE_NOT_FOUND");
+  if (usage.refunded || usage.status === UsageStatus.REFUNDED) {
     throw new Error("USAGE_ALREADY_REFUNDED");
   }
-
-  if (usage.status === UsageStatus.COMPLETED) {
-    return usage;
-  }
+  if (usage.status === UsageStatus.COMPLETED) return usage;
 
   return db.usage.update({
-    where: {
-      id: usage.id,
-    },
-    data: {
-      status: UsageStatus.COMPLETED,
-    },
-    select: {
-      id: true,
-      status: true,
-      refunded: true,
-    },
+    where: { id: usage.id },
+    data: { status: UsageStatus.COMPLETED },
+    select: { id: true, status: true, refunded: true },
   });
 }
 
-/**
- * رد credits بعد فشل عملية التوليد.
- */
+/** رد credits بعد فشل عملية التوليد. */
 export async function refundCredits(
   referenceId: string,
-): Promise<{
-  refunded: boolean;
-  amount: number;
-  remainingCredits: number;
-}> {
+): Promise<{ refunded: boolean; amount: number; remainingCredits: number }> {
   const normalizedReferenceId = referenceId.trim();
-
-  if (!normalizedReferenceId) {
-    throw new Error("INVALID_REFERENCE_ID");
-  }
+  if (!normalizedReferenceId) throw new Error("INVALID_REFERENCE_ID");
 
   return db.$transaction(async (tx) => {
     const usage = await tx.usage.findUnique({
-      where: {
-        referenceId: normalizedReferenceId,
-      },
+      where: { referenceId: normalizedReferenceId },
       select: {
         id: true,
         userId: true,
@@ -254,23 +204,13 @@ export async function refundCredits(
       },
     });
 
-    if (!usage) {
-      throw new Error("USAGE_NOT_FOUND");
-    }
+    if (!usage) throw new Error("USAGE_NOT_FOUND");
 
-    if (
-      usage.refunded ||
-      usage.status === UsageStatus.REFUNDED
-    ) {
+    if (usage.refunded || usage.status === UsageStatus.REFUNDED) {
       const user = await tx.user.findUnique({
-        where: {
-          id: usage.userId,
-        },
-        select: {
-          credits: true,
-        },
+        where: { id: usage.userId },
+        select: { credits: true },
       });
-
       return {
         refunded: false,
         amount: 0,
@@ -279,13 +219,8 @@ export async function refundCredits(
     }
 
     await tx.usage.update({
-      where: {
-        id: usage.id,
-      },
-      data: {
-        refunded: true,
-        status: UsageStatus.REFUNDED,
-      },
+      where: { id: usage.id },
+      data: { refunded: true, status: UsageStatus.REFUNDED },
     });
 
     await grantCreditsTx(
@@ -302,12 +237,8 @@ export async function refundCredits(
     );
 
     const userAfterRefund = await tx.user.findUnique({
-      where: {
-        id: usage.userId,
-      },
-      select: {
-        credits: true,
-      },
+      where: { id: usage.userId },
+      select: { credits: true },
     });
 
     return {
@@ -318,9 +249,7 @@ export async function refundCredits(
   });
 }
 
-/**
- * إضافة credits يدويًا أو من خلال webhook الدفع.
- */
+/** إضافة credits يدويًا أو من خلال webhook الدفع. */
 export async function addCredits(
   userId: string,
   amount: number,

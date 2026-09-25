@@ -52,7 +52,6 @@ export default function AIChangeConsole() {
   const [creditModalReason, setCreditModalReason] = useState<"zero" | "insufficient">("zero");
   const [creditRequired, setCreditRequired] = useState(0);
   const [creditMessage, setCreditMessage] = useState("");
-  const [creditsLoaded, setCreditsLoaded] = useState(false);
 
   // 🎛️ خيارات التحكم الأساسية لـ Generation Pipeline
   const [activeType, setActiveType] = useState<MediaType>("ai-video");
@@ -89,24 +88,32 @@ export default function AIChangeConsole() {
 
   useEffect(() => { if (chats.length === 0) createChat(); }, [chats.length, createChat]);
 
+  const refreshCredits = useCallback(async () => {
+    const res = await fetch("/api/credits", { cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data?.error || "Unable to load credits");
+    }
+
+    const value = typeof data?.credits === "number"
+      ? data.credits
+      : typeof data?.remainingCredits === "number"
+        ? data.remainingCredits
+        : 0;
+
+    setCredits(Math.max(0, value));
+    return data;
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    const loadCredits = async () => {
-      try {
-        const res = await fetch("/api/credits", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        const value = typeof data?.credits === "number" ? data.credits : typeof data?.remainingCredits === "number" ? data.remainingCredits : null;
-        if (!cancelled && value !== null) setCredits(Math.max(0, value));
-      } catch (error) {
-        console.error("Credits fetch failed:", error);
-      } finally {
-        if (!cancelled) setCreditsLoaded(true);
-      }
-    };
-    loadCredits();
+    refreshCredits()
+      .catch((error) => {
+        if (!cancelled) console.error("Credits fetch failed:", error);
+      });
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshCredits]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chats, isGenerating]);
 
   const activeChat = useMemo(() => chats.find((c) => c.id === activeChatId), [chats, activeChatId]);
@@ -144,24 +151,13 @@ export default function AIChangeConsole() {
       return;
     }
 
-    // Friendly pre-check for video generations. Other tool costs remain server-controlled.
-    const estimatedRequiredCredits = activeType === "ai-video" ? selectedDuration * VIDEO_CREDITS_PER_SECOND : 0;
-
-    if (creditsLoaded && credits <= 0) {
-      setCreditModalReason("zero");
-      setCreditRequired(estimatedRequiredCredits);
-      setCreditMessage("You have used all your available credits.");
-      setCreditModalOpen(true);
-      return;
-    }
-
-    if (estimatedRequiredCredits > 0 && credits < estimatedRequiredCredits) {
-      setCreditModalReason("insufficient");
-      setCreditRequired(estimatedRequiredCredits);
-      setCreditMessage("You don't have enough credits for this generation.");
-      setCreditModalOpen(true);
-      return;
-    }
+    // The server is the authority for credits. Do not block generation from
+    // a possibly stale client-side balance (for example after credits were
+    // added manually in Prisma Studio). The API returns the exact balance and
+    // required amount on HTTP 402.
+    const estimatedRequiredCredits = activeType === "ai-video"
+      ? selectedDuration * VIDEO_CREDITS_PER_SECOND
+      : 0;
 
     const currentPrompt = prompt;
     const userMsg: Message = { role: "user", content: currentPrompt, meta: { type: activeType, aspectRatio, motion: cameraMotion } };
@@ -208,16 +204,28 @@ export default function AIChangeConsole() {
         body: JSON.stringify(requestBody)
       });
 
-      // 402 = insufficient credits; show a friendly modal instead of redirecting.
+      // 402 = insufficient credits. The server response is authoritative.
       if (response.status === 402) {
         let data: any = {};
         try { data = await response.json(); } catch { /* empty response */ }
-        const serverRemaining = typeof data?.remainingCredits === "number" ? Math.max(0, data.remainingCredits) : credits;
-        const serverRequired = typeof data?.requiredCredits === "number" ? Math.max(0, data.requiredCredits) : estimatedRequiredCredits;
+
+        const serverRemaining = typeof data?.remainingCredits === "number"
+          ? Math.max(0, data.remainingCredits)
+          : credits;
+        const serverRequired = typeof data?.requiredCredits === "number"
+          ? Math.max(0, data.requiredCredits)
+          : estimatedRequiredCredits;
+
         setCredits(serverRemaining);
         setCreditRequired(serverRequired);
         setCreditModalReason(serverRemaining <= 0 ? "zero" : "insufficient");
-        setCreditMessage(typeof data?.error === "string" ? data.error : serverRemaining <= 0 ? "You have used all your available credits." : "You don't have enough credits for this generation.");
+        setCreditMessage(
+          typeof data?.error === "string"
+            ? data.error
+            : serverRemaining <= 0
+              ? "You have no credits available for this generation."
+              : `You need ${serverRequired} credits, but only ${serverRemaining} are available.`
+        );
         setCreditModalOpen(true);
         setRenderQueue(prev => prev.filter(j => j.id !== clientJobId));
         return;
@@ -279,7 +287,11 @@ export default function AIChangeConsole() {
 
       setChats((prev) => prev.map((c) => c.id === activeChatId ? { ...c, messages: [...c.messages, reply] } : c));
       setRenderQueue(prev => prev.map(j => j.id === clientJobId ? { ...j, progress: 100, status: "completed" } : j));
-      setCredits(data.remainingCredits ?? credits);
+      if (typeof data.remainingCredits === "number") {
+        setCredits(Math.max(0, data.remainingCredits));
+      } else {
+        await refreshCredits().catch(() => undefined);
+      }
 
     } catch (e: any) {
       console.error(e);

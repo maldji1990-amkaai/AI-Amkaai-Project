@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getOrCreateUser } from "@/lib/getUser";
 import { createQueuedVideoJob } from "@/lib/create-video-job";
 import { LIMITS, FEATURES } from "@/lib/config";
+import { NotEnoughCreditsError, calculateCreditCost } from "@/lib/credits";
 
 export const dynamic = "force-dynamic";
 
@@ -16,12 +17,24 @@ export async function POST(req: Request) {
   if (prompt.length > LIMITS.maxPromptLength) return NextResponse.json({ error: `Prompt too long. Maximum ${LIMITS.maxPromptLength} characters.` }, { status: 400 });
   const user = await getOrCreateUser(clerkId);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  const duration = Number(body?.duration);
+  let requiredCredits = 0;
+  try {
+    requiredCredits = calculateCreditCost("video", { duration });
+  } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_VIDEO_DURATION") {
+      return NextResponse.json({ error: "Invalid video duration" }, { status: 400 });
+    }
+    throw error;
+  }
+
   try {
     const result = await createQueuedVideoJob({
       userId: user.id,
       clerkId,
       prompt,
-      duration: Number(body?.duration),
+      duration,
       projectId: body?.projectId || null,
       sceneId: body?.sceneId || null,
       characterIds: Array.isArray(body?.characterIds) ? body.characterIds.map(String) : [],
@@ -32,12 +45,31 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, ...result, status: "queued" });
   } catch (error: any) {
     const message = String(error?.message || "");
-    if (message === "NOT_ENOUGH_CREDITS") return NextResponse.json({ error: "Insufficient credits. Please upgrade your plan." }, { status: 402 });
+    if (error instanceof NotEnoughCreditsError || message === "NOT_ENOUGH_CREDITS") {
+      const remainingCredits = error instanceof NotEnoughCreditsError
+        ? error.remainingCredits
+        : Math.max(0, Number(user.credits) || 0);
+      const required = error instanceof NotEnoughCreditsError
+        ? error.requiredCredits
+        : requiredCredits;
+
+      return NextResponse.json(
+        {
+          error: "Not enough credits",
+          code: "NOT_ENOUGH_CREDITS",
+          requiredCredits: required,
+          remainingCredits,
+          creditsPerSecond: required > 0 && duration > 0 ? required / Math.ceil(duration) : undefined,
+        },
+        { status: 402 },
+      );
+    }
     if (message === "SUBSCRIPTION_EXPIRED_OR_INACTIVE") return NextResponse.json({ error: "Your subscription has expired or is past due." }, { status: 403 });
     if (message === "PROJECT_NOT_FOUND" || message === "SCENE_NOT_FOUND" || message === "CHARACTER_NOT_FOUND" || message === "VOICE_PROFILE_NOT_FOUND") return NextResponse.json({ error: message }, { status: 404 });
     if (message === "QUEUE_UNAVAILABLE") return NextResponse.json({ error: "Video queue unavailable. Credits refunded." }, { status: 503 });
     if (message.startsWith("VIDEO_DURATION_LIMIT:")) return NextResponse.json({ error: `Maximum video duration is ${message.split(":")[1]} seconds.` }, { status: 400 });
     if (message === "IDEMPOTENCY_KEY_REUSED") return NextResponse.json({ error: "Idempotency-Key belongs to another user." }, { status: 409 });
+    if (message === "INVALID_VIDEO_DURATION") return NextResponse.json({ error: "Invalid video duration" }, { status: 400 });
     if (message === "USAGE_ALREADY_PENDING") return NextResponse.json({ error: "This generation request is already being processed." }, { status: 409 });
     if (message === "USAGE_ALREADY_COMPLETED") return NextResponse.json({ error: "This generation request has already completed." }, { status: 409 });
     if (message === "USAGE_ALREADY_REFUNDED" || message === "USAGE_REFERENCE_ALREADY_USED") return NextResponse.json({ error: "This generation request can no longer be reused." }, { status: 409 });
