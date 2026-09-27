@@ -4,3 +4,4 @@ httpx
 pillow
 huggingface_hub
 cloudinary
+bitsandbytes>=0.43.1  # optional: only needed when WAN_QUANTIZE_8BIT=true

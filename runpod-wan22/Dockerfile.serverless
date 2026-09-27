@@ -7,7 +7,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WAN_REPO_DIR=/opt/Wan2.2 \
     WAN_MODEL_DIR=/workspace/models/Wan2.2-TI2V-5B \
     OUTPUT_DIR=/workspace/outputs \
-    JOBS_DIR=/workspace/jobs
+    JOBS_DIR=/workspace/jobs \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+    WAN_QUANTIZE_8BIT=false
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 \
@@ -70,6 +72,7 @@ RUN python -m pip install \
     pillow \
     huggingface_hub \
     cloudinary \
+    bitsandbytes>=0.43.1 \
     runpod==1.9.1
 
 RUN python -m pip install \

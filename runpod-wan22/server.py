@@ -59,6 +59,19 @@ T5_CPU = os.getenv("WAN_T5_CPU", "true").lower() == "true"
 CONVERT_DTYPE = os.getenv("WAN_CONVERT_MODEL_DTYPE", "true").lower() == "true"
 MAX_QUEUE = int(os.getenv("WAN_MAX_QUEUE", "8"))
 
+# --- VRAM reduction: 8-bit quantization (bitsandbytes LLM.int8()) ---------
+# Disabled by default. Set WAN_QUANTIZE_8BIT=true once the rebuilt image
+# (with bitsandbytes installed) has been validated on real hardware.
+# WAN_QUANTIZE_TARGETS is a comma-separated list of attribute names on the
+# loaded `model` object whose Linear layers should be converted to 8-bit.
+# "model" matches WanTI2V.model, the ~5B-parameter DiT transformer, which is
+# by far the largest consumer of GPU weight memory (the VAE and T5 text
+# encoder are left untouched by default to protect output quality).
+QUANTIZE_8BIT = os.getenv("WAN_QUANTIZE_8BIT", "false").lower() == "true"
+QUANTIZE_TARGETS = [
+    t.strip() for t in os.getenv("WAN_QUANTIZE_TARGETS", "model").split(",") if t.strip()
+]
+
 # The current app sends 5-second clips. 121 frames at 24fps is the official
 # 4n+1 frame shape and is approximately 5 seconds.
 DEFAULT_CLIP_SECONDS = float(os.getenv("WAN_CLIP_SECONDS", "5"))
@@ -101,6 +114,102 @@ def configure_cloudinary() -> None:
         log.warning("Cloudinary credentials are not configured; completed jobs cannot be persisted.")
 
 
+def _replace_linear_layers_int8(module: "torch.nn.Module", prefix: str = "") -> int:
+    """
+    Recursively replace torch.nn.Linear submodules of `module` in-place with
+    bitsandbytes 8-bit linear layers (LLM.int8()). Returns the number of
+    layers replaced. Any single layer that fails to convert (unusual shape,
+    unsupported dtype, etc.) is left untouched rather than aborting the
+    whole pass, so a partial success is still safe to run with.
+    """
+    import bitsandbytes as bnb
+
+    replaced = 0
+    for name, child in module.named_children():
+        full_name = f"{prefix}.{name}" if prefix else name
+        if isinstance(child, torch.nn.Linear):
+            try:
+                has_bias = child.bias is not None
+                device = child.weight.device
+                new_layer = bnb.nn.Linear8bitLt(
+                    child.in_features,
+                    child.out_features,
+                    bias=has_bias,
+                    has_fp16_weights=False,
+                    threshold=6.0,
+                )
+                new_layer.load_state_dict(child.state_dict())
+                # Moving to CUDA is what actually triggers bitsandbytes to
+                # quantize the weights into int8 + per-channel scales.
+                new_layer = new_layer.to(device)
+                setattr(module, name, new_layer)
+                replaced += 1
+            except Exception:
+                log.exception(
+                    "Skipping 8-bit quantization for layer %s (left as-is)",
+                    full_name,
+                )
+        else:
+            replaced += _replace_linear_layers_int8(child, full_name)
+    return replaced
+
+
+def quantize_model_8bit() -> None:
+    """
+    Optional VRAM-reduction pass, run once right after the Wan model has
+    finished loading. Converts the Linear layers inside the modules named in
+    WAN_QUANTIZE_TARGETS (by default just the DiT transformer, `model.model`)
+    to 8-bit weights via bitsandbytes. This is what lets the ~5B-parameter
+    transformer fit with a real safety margin on 24GB GPUs instead of sitting
+    within a few hundred MiB of the hardware limit, and can also make smaller
+    GPU classes (e.g. 16GB) viable.
+
+    Disabled unless WAN_QUANTIZE_8BIT=true. If bitsandbytes is not installed,
+    or a given target attribute isn't found, this logs a warning and leaves
+    the model running in its original precision instead of failing the job.
+    """
+    global model
+    if model is None:
+        return
+
+    try:
+        import bitsandbytes  # noqa: F401
+    except ImportError:
+        log.warning(
+            "WAN_QUANTIZE_8BIT=true but the `bitsandbytes` package is not "
+            "installed in this image; skipping quantization and running at "
+            "full precision. Add `bitsandbytes` to the Docker image to use this."
+        )
+        return
+
+    before_mb = torch.cuda.memory_allocated() / (1024 ** 2) if torch.cuda.is_available() else None
+
+    total_replaced = 0
+    for attr in QUANTIZE_TARGETS:
+        submodule = getattr(model, attr, None)
+        if not isinstance(submodule, torch.nn.Module):
+            log.warning(
+                "WAN_QUANTIZE_TARGETS: model.%s is not a torch module (got %r); skipping",
+                attr, type(submodule),
+            )
+            continue
+        try:
+            replaced = _replace_linear_layers_int8(submodule, prefix=attr)
+            total_replaced += replaced
+            log.info("8-bit quantization: converted %s Linear layer(s) inside model.%s", replaced, attr)
+        except Exception:
+            log.exception("8-bit quantization of model.%s failed; leaving it at full precision", attr)
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        if before_mb is not None:
+            after_mb = torch.cuda.memory_allocated() / (1024 ** 2)
+            log.info(
+                "8-bit quantization complete: %s layer(s) converted, GPU memory %.0f MiB -> %.0f MiB",
+                total_replaced, before_mb, after_mb,
+            )
+
+
 def ensure_model() -> None:
     global model_ready, model_error, model
     try:
@@ -137,6 +246,11 @@ def ensure_model() -> None:
             t5_cpu=T5_CPU,
             convert_model_dtype=CONVERT_DTYPE,
         )
+
+        if QUANTIZE_8BIT:
+            log.info("WAN_QUANTIZE_8BIT=true, converting DiT weights to 8-bit before marking model ready")
+            quantize_model_8bit()
+
         model_ready = True
         model_error = None
         log.info("Wan2.2 TI2V-5B is READY")

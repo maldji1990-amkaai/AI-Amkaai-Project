@@ -76,9 +76,41 @@ WAN_OFFLOAD_MODEL=true
 WAN_T5_CPU=true
 WAN_CONVERT_MODEL_DTYPE=true
 WAN_MAX_QUEUE=8
+
+# Reduces CUDA allocator fragmentation; directly recommended by PyTorch's own
+# OOM error message. Safe to set unconditionally, no rebuild required — it
+# can be added straight to the RunPod endpoint's environment variables.
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 ```
 
 The official Wan2.2 documentation states that TI2V-5B supports 720p and can run on a GPU with at least 24 GB VRAM such as an RTX 4090. It uses the 1280×704 or 704×1280 720p shapes.
+
+In practice, even with `WAN_OFFLOAD_MODEL=true` and `WAN_T5_CPU=true`, the model has been observed using ~23.2 GB of a 24 GB card (i.e. right at the edge, with `CUDA out of memory` failures under any extra load). The optional 8-bit quantization below exists to give real headroom back.
+
+## Optional: 8-bit quantization (VRAM reduction)
+
+```env
+WAN_QUANTIZE_8BIT=false          # set to true to enable
+WAN_QUANTIZE_TARGETS=model       # comma-separated attribute names on the
+                                  # loaded WanTI2V instance to quantize;
+                                  # "model" is the ~5B-parameter DiT
+                                  # transformer, by far the largest
+                                  # consumer of weight memory. The VAE and
+                                  # T5 text encoder are left at full
+                                  # precision by default to protect output
+                                  # quality — add them to this list
+                                  # (comma-separated) only if you need to
+                                  # squeeze further and have validated the
+                                  # quality impact.
+```
+
+Requires the `bitsandbytes` package (already added to `Dockerfile.serverless`; rebuild and push the image before setting `WAN_QUANTIZE_8BIT=true`). This converts the DiT's `torch.nn.Linear` layers to LLM.int8() weights right after the model loads, before it is marked ready to accept jobs. It is disabled by default — the image and endpoint work exactly as before until this is turned on.
+
+**This has not been benchmarked on real hardware yet.** Before relying on it for production traffic:
+- Deploy the rebuilt image with `WAN_QUANTIZE_8BIT=true` set.
+- Run a handful of real generations and check `Logs` for a line like `8-bit quantization complete: N layer(s) converted, GPU memory X MiB -> Y MiB` to confirm it engaged and see the actual memory saved.
+- Compare a few output videos against the full-precision version for visual quality before switching the fleet over.
+- If it ever fails to import `bitsandbytes` or convert a layer, the model falls back to running at full precision automatically (a warning is logged) rather than failing the job.
 
 ## First test
 
