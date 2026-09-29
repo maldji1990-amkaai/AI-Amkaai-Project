@@ -31,7 +31,17 @@ type Message = {
 };
 
 type Chat = { id: string; title: string; createdAt: number; messages: Message[] };
-type RenderJob = { id: string; prompt: string; progress: number; status: "rendering" | "completed"; type: MediaType };
+type RenderJob = {
+  id: string;
+  jobId?: string;
+  prompt: string;
+  progress: number;
+  status: "queued" | "processing" | "completed" | "failed" | "cancelled";
+  type: MediaType;
+  resultUrl?: string | null;
+  error?: string | null;
+  createdAt?: string;
+};
 
 const PRESET_STYLES: PresetStyle[] = [
   { id: "cyberpunk", name: "Cyberpunk neon", promptSuffix: ", cyberpunk neon style, blade runner aesthetics, high contrast, 8k", bgClass: "from-purple-950/40 via-fuchsia-950/20" },
@@ -114,6 +124,56 @@ export default function AIChangeConsole() {
       });
     return () => { cancelled = true; };
   }, [refreshCredits]);
+
+  const loadVideoJobs = useCallback(async () => {
+    try {
+      const response = await fetch("/api/generate-video/jobs", { cache: "no-store" });
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (!Array.isArray(data?.jobs)) return;
+
+      setRenderQueue(
+        data.jobs.map((job: any): RenderJob => {
+          const status = String(job.status ?? "PENDING").toUpperCase();
+
+          return {
+            id: job.id,
+            jobId: job.id,
+            prompt: job.prompt || "Video generation",
+            progress: typeof job.progress === "number" ? job.progress : 0,
+            status:
+              status === "COMPLETED"
+                ? "completed"
+                : status === "FAILED"
+                  ? "failed"
+                  : status === "CANCELLED"
+                    ? "cancelled"
+                    : status === "PROCESSING"
+                      ? "processing"
+                      : "queued",
+            type: "ai-video",
+            resultUrl: job.resultUrl ?? null,
+            error: job.error ?? null,
+            createdAt: job.createdAt,
+          };
+        }),
+      );
+    } catch (error) {
+      console.error("Video jobs fetch failed:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadVideoJobs();
+
+    const interval = window.setInterval(() => {
+      void loadVideoJobs();
+    }, 3000);
+
+    return () => window.clearInterval(interval);
+  }, [loadVideoJobs]);
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chats, isGenerating]);
 
   const activeChat = useMemo(() => chats.find((c) => c.id === activeChatId), [chats, activeChatId]);
@@ -171,7 +231,7 @@ export default function AIChangeConsole() {
     setProgress(5);
 
     const clientJobId = crypto.randomUUID();
-    setRenderQueue(prev => [{ id: clientJobId, prompt: currentPrompt, progress: 5, status: "rendering", type: activeType }, ...prev]);
+    setRenderQueue(prev => [{ id: clientJobId, prompt: currentPrompt, progress: 5, status: "queued", type: activeType }, ...prev]);
 
 
     try {
@@ -237,20 +297,32 @@ export default function AIChangeConsole() {
       }
 
       let data = await response.json();
+
       if (activeType === "ai-video" && data.jobId) {
-        let finished = false;
-        for (let attempt = 0; attempt < 180; attempt++) {
-          const check = await fetch(`/api/generate-video/status?jobId=${encodeURIComponent(data.jobId)}`, { cache: "no-store" });
-          const state = await check.json();
-          if (typeof state.progress === "number") {
-            setProgress(state.progress);
-            setRenderQueue(q => q.map(j => j.id === clientJobId ? { ...j, progress: state.progress } : j));
-          }
-          if (state.status === "done") { data = { ...data, videoUrl: state.videoUrl || state.video }; finished = true; break; }
-          if (state.status === "failed" || state.status === "cancelled") throw new Error(state.error || "Video generation failed");
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        setRenderQueue((prev) =>
+          prev.map((job) =>
+            job.id === clientJobId
+              ? {
+                  ...job,
+                  id: data.jobId,
+                  jobId: data.jobId,
+                  status: String(data.status).toUpperCase() === "PROCESSING" ? "processing" : "queued",
+                  progress: typeof data.progress === "number" ? data.progress : 5,
+                }
+              : job,
+          ),
+        );
+
+        if (typeof data.remainingCredits === "number") {
+          setCredits(Math.max(0, data.remainingCredits));
+        } else {
+          await refreshCredits().catch(() => undefined);
         }
-        if (!finished) throw new Error("Video generation timed out");
+
+        // The server, BullMQ worker and RunPod continue the generation in the background.
+        // The Generate page must not wait for the GPU job to finish.
+        setProgress(typeof data.progress === "number" ? data.progress : 5);
+        return;
       }
 
       // الصورة-إلى-فيديو (خارج وضع الديمو) يرجع فوراً بحالة "processing" مع
@@ -332,13 +404,47 @@ export default function AIChangeConsole() {
                   <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
                     {renderQueue.map(job => (
                       <div key={job.id} className="text-[11px] bg-white/95 p-2 rounded-lg border border-teal-900/10">
-                        <div className="flex justify-between text-slate-500 text-[10px] mb-1">
+                        <div className="flex justify-between text-slate-500 text-[10px] mb-1 gap-2">
                           <span className="truncate max-w-[120px] font-mono">{job.prompt}</span>
-                          <span className="text-teal-600 font-mono">{job.progress}%</span>
+                          <span className="text-teal-600 font-mono shrink-0">
+                            {job.status === "queued"
+                              ? "QUEUED"
+                              : job.status === "processing"
+                                ? `${job.progress}%`
+                                : job.status === "completed"
+                                  ? "DONE"
+                                  : job.status === "failed"
+                                    ? "FAILED"
+                                    : "CANCELLED"}
+                          </span>
                         </div>
                         <div className="w-full bg-slate-200/60 h-1 rounded-full overflow-hidden">
-                          <div className="h-full bg-teal-500 transition-all duration-500" style={{ width: `${job.progress}%` }} />
+                          <div
+                            className={`h-full transition-all duration-500 ${
+                              job.status === "failed"
+                                ? "bg-red-500"
+                                : job.status === "completed"
+                                  ? "bg-emerald-500"
+                                  : "bg-teal-500"
+                            }`}
+                            style={{ width: `${job.progress}%` }}
+                          />
                         </div>
+                        {job.status === "completed" && job.resultUrl && (
+                          <a
+                            href={job.resultUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 block text-center rounded-lg bg-emerald-500/10 px-2 py-1.5 text-[10px] font-bold text-emerald-600 hover:bg-emerald-500/20"
+                          >
+                            ▶ View Video
+                          </a>
+                        )}
+                        {job.status === "failed" && (
+                          <p className="mt-1 text-[9px] text-red-500 truncate">
+                            {job.error || "Generation failed"}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>

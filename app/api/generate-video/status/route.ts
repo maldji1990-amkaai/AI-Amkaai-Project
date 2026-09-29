@@ -1,39 +1,78 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { getOrCreateUser } from "@/lib/getUser";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  try {
-    const { userId: clerkId } = await auth();
-    if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const jobId = new URL(req.url).searchParams.get("jobId");
-    if (!jobId) return NextResponse.json({ error: "jobId is required" }, { status: 400 });
-    const user = await db.user.findUnique({ where: { clerkId }, select: { id: true } });
-    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-    const job = await db.videoJob.findUnique({ where: { id: jobId } });
-    if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
-    if (job.userId !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { userId: clerkId } = await auth();
 
-    const position = job.status === "PENDING"
-      ? await db.videoJob.count({ where: { userId: user.id, status: "PENDING", OR: [{ priority: { gt: job.priority } }, { priority: job.priority, createdAt: { lt: job.createdAt } }] } })
-      : 0;
-    const status = job.status.toLowerCase() === "completed" ? "done" : job.status.toLowerCase();
-    return NextResponse.json({
-      jobId: job.id,
-      status,
-      progress: job.status === "COMPLETED" ? 100 : job.progress,
-      videoUrl: job.resultUrl,
-      video: job.resultUrl,
-      error: job.error,
-      position,
-      estimatedTime: job.status === "PENDING" ? position * 30 : job.status === "PROCESSING" ? 5 : 0,
-      createdAt: job.createdAt,
-      finishedAt: job.finishedAt,
-    });
-  } catch (error) {
-    console.error("VIDEO STATUS ROUTE ERROR", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  if (!clerkId) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 },
+    );
   }
+
+  const user = await getOrCreateUser(clerkId);
+
+  if (!user) {
+    return NextResponse.json(
+      { error: "User not found" },
+      { status: 404 },
+    );
+  }
+
+  const { searchParams } = new URL(req.url);
+  const jobId = searchParams.get("jobId")?.trim();
+
+  if (!jobId) {
+    return NextResponse.json(
+      { error: "jobId is required" },
+      { status: 400 },
+    );
+  }
+
+  const job = await db.videoJob.findFirst({
+    where: {
+      id: jobId,
+      userId: user.id,
+    },
+  });
+
+  if (!job) {
+    return NextResponse.json(
+      { error: "Video job not found" },
+      { status: 404 },
+    );
+  }
+
+  const status = String(job.status).toUpperCase();
+
+  return NextResponse.json(
+    {
+      success: true,
+      jobId: job.id,
+      generationId: job.generationId,
+      status,
+      progress: job.progress ?? 0,
+      videoUrl: job.resultUrl ?? null,
+      resultUrl: job.resultUrl ?? null,
+      error: job.error ?? null,
+      durationSeconds: job.durationSeconds,
+      clipCount: job.clipCount,
+      model: job.model,
+      attempts: job.attempts,
+      externalJobId: job.externalJobId ?? null,
+      createdAt: job.createdAt,
+      startedAt: job.startedAt ?? null,
+      finishedAt: job.finishedAt ?? null,
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+      },
+    },
+  );
 }
