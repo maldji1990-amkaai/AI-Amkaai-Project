@@ -36,11 +36,14 @@ type RenderJob = {
   jobId?: string;
   prompt: string;
   progress: number;
-  status: "queued" | "processing" | "completed" | "failed" | "cancelled";
+  status: "queued" | "processing" | "finalizing" | "completed" | "failed" | "cancelled";
   type: MediaType;
   resultUrl?: string | null;
   error?: string | null;
   createdAt?: string;
+  durationSeconds?: number | null;
+  generationStatus?: string | null;
+  finalVideoUrl?: string | null;
 };
 
 const PRESET_STYLES: PresetStyle[] = [
@@ -137,25 +140,40 @@ export default function AIChangeConsole() {
         data.jobs.map((job: any): RenderJob => {
           const status = String(job.status ?? "PENDING").toUpperCase();
 
+          const generationStatus = String(job.generationStatus ?? "").toUpperCase();
+          const isFinalizing =
+            status === "COMPLETED" &&
+            generationStatus === "PROCESSING" &&
+            !job.finalVideoUrl;
+
           return {
             id: job.id,
             jobId: job.id,
             prompt: job.prompt || "Video generation",
-            progress: typeof job.progress === "number" ? job.progress : 0,
+            progress: isFinalizing
+              ? 99
+              : typeof job.progress === "number"
+                ? job.progress
+                : 0,
             status:
-              status === "COMPLETED"
-                ? "completed"
-                : status === "FAILED"
-                  ? "failed"
-                  : status === "CANCELLED"
-                    ? "cancelled"
-                    : status === "PROCESSING"
-                      ? "processing"
-                      : "queued",
+              generationStatus === "FAILED" || status === "FAILED"
+                ? "failed"
+                : status === "CANCELLED"
+                  ? "cancelled"
+                  : job.finalVideoUrl && generationStatus === "COMPLETED"
+                    ? "completed"
+                    : isFinalizing
+                      ? "finalizing"
+                      : status === "PROCESSING"
+                        ? "processing"
+                        : "queued",
             type: "ai-video",
-            resultUrl: job.resultUrl ?? null,
+            resultUrl: job.finalVideoUrl ?? job.resultUrl ?? null,
             error: job.error ?? null,
             createdAt: job.createdAt,
+            durationSeconds: job.durationSeconds ?? null,
+            generationStatus: job.generationStatus ?? null,
+            finalVideoUrl: job.finalVideoUrl ?? null,
           };
         }),
       );
@@ -178,6 +196,9 @@ export default function AIChangeConsole() {
 
   const activeChat = useMemo(() => chats.find((c) => c.id === activeChatId), [chats, activeChatId]);
   const lastMessage = activeChat?.messages[activeChat.messages.length - 1];
+  const lastVideoJob = renderQueue[0] ?? null;
+  const previewVideoUrl =
+    lastVideoJob?.status === "completed" ? lastVideoJob.resultUrl : null;
 
   const handlePresetApply = (style: PresetStyle) => {
     setPrompt((prev) => `${prev.trim()} ${style.promptSuffix}`.trim());
@@ -231,7 +252,7 @@ export default function AIChangeConsole() {
     setProgress(5);
 
     const clientJobId = crypto.randomUUID();
-    setRenderQueue(prev => [{ id: clientJobId, prompt: currentPrompt, progress: 5, status: "queued", type: activeType }, ...prev]);
+    setRenderQueue(prev => [{ id: clientJobId, prompt: currentPrompt, progress: 5, status: "queued", type: activeType, durationSeconds: selectedDuration }, ...prev]);
 
 
     try {
@@ -308,6 +329,7 @@ export default function AIChangeConsole() {
                   jobId: data.jobId,
                   status: String(data.status).toUpperCase() === "PROCESSING" ? "processing" : "queued",
                   progress: typeof data.progress === "number" ? data.progress : 5,
+                  durationSeconds: typeof data.durationSeconds === "number" ? data.durationSeconds : selectedDuration,
                 }
               : job,
           ),
@@ -411,7 +433,9 @@ export default function AIChangeConsole() {
                               ? "QUEUED"
                               : job.status === "processing"
                                 ? `${job.progress}%`
-                                : job.status === "completed"
+                                : job.status === "finalizing"
+                                  ? "FINALIZING"
+                                  : job.status === "completed"
                                   ? "DONE"
                                   : job.status === "failed"
                                     ? "FAILED"
@@ -425,7 +449,9 @@ export default function AIChangeConsole() {
                                 ? "bg-red-500"
                                 : job.status === "completed"
                                   ? "bg-emerald-500"
-                                  : "bg-teal-500"
+                                  : job.status === "finalizing"
+                                    ? "bg-cyan-500"
+                                    : "bg-teal-500"
                             }`}
                             style={{ width: `${job.progress}%` }}
                           />
@@ -632,37 +658,69 @@ export default function AIChangeConsole() {
                   )}
                 </div>
 
-                {lastMessage && lastMessage.outputUrl && !isGenerating ? (
+                {previewVideoUrl ? (
                   <div className="w-full h-full relative">
-                    {compareMode ? (
-                      <div className="w-full h-full relative select-none">
-                        <div className="absolute inset-0 bg-[#d9eee6]" style={{ clipPath: `polygon(${compareSlider}% 0, 100% 0, 100% 100%, ${compareSlider}% 100%)` }}>
-                          <video src={lastMessage.outputUrl} autoPlay loop muted className="w-full h-full object-contain" />
-                        </div>
-                        <div className="absolute bottom-0 top-0 w-0.5 bg-purple-400 z-20" style={{ left: `${compareSlider}%` }}>
-                          <input type="range" min="0" max="100" value={compareSlider} onChange={e => setCompareSlider(Number(e.target.value))} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 opacity-0 cursor-ew-resize" />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full h-full relative flex items-center justify-center">
-                        {lastMessage.meta?.type === "voice-clone" ? (
-                          <audio src={lastMessage.outputUrl} controls className="w-[80%] accent-purple-400" />
-                        ) : (
-                          <video src={lastMessage.outputUrl} controls autoPlay loop className="w-full h-full object-contain bg-white" />
-                        )}
-                        <a href={lastMessage.outputUrl} download target="_blank" rel="noreferrer" className="absolute bottom-4 right-4 bg-white/95 hover:bg-teal-500 hover:text-black p-2.5 rounded-xl border border-teal-900/10 text-xs font-bold flex items-center gap-1.5 transition-all">
-                          <Download size={13} /> Export Stream
+                    <div className="w-full h-full relative flex items-center justify-center">
+                      <video src={previewVideoUrl} controls autoPlay loop className="w-full h-full object-contain bg-white" />
+                      <div className="absolute bottom-4 right-4 flex gap-2">
+                        <a href={previewVideoUrl} download target="_blank" rel="noreferrer" className="bg-white/95 hover:bg-teal-500 hover:text-black p-2.5 rounded-xl border border-teal-900/10 text-xs font-bold flex items-center gap-1.5 transition-all">
+                          <Download size={13} /> Download
                         </a>
+                        <a href={previewVideoUrl} target="_blank" rel="noreferrer" className="bg-white/95 hover:bg-teal-500 hover:text-black p-2.5 rounded-xl border border-teal-900/10 text-xs font-bold transition-all">
+                          Open
+                        </a>
+                        <button onClick={() => { setPrompt(""); setProgress(0); }} className="bg-white/95 hover:bg-teal-500 hover:text-black px-3 py-2.5 rounded-xl border border-teal-900/10 text-xs font-bold transition-all">
+                          Create another
+                        </button>
                       </div>
-                    )}
-                  </div>
-                ) : isGenerating ? (
-                  <div className="text-center space-y-3 px-4">
-                    <Loader2 size={32} className="text-teal-600 animate-spin mx-auto" />
-                    <p className="text-xs font-bold text-slate-500">الذكاء الاصطناعي يقوم بحياكة الإطارات وتحريك الأفاتار...</p>
-                    <div className="w-48 h-1 bg-slate-100 rounded-full mx-auto overflow-hidden">
-                      <div className="h-full bg-teal-500 transition-all duration-300" style={{ width: `${progress}%` }} />
                     </div>
+                  </div>
+                ) : lastVideoJob && (lastVideoJob.status === "queued" || lastVideoJob.status === "processing" || lastVideoJob.status === "finalizing") ? (
+                  <div className="text-center space-y-4 px-6 w-full max-w-md">
+                    <Loader2 size={34} className="text-teal-600 animate-spin mx-auto" />
+                    <div>
+                      <p className="text-sm font-black text-slate-700">
+                        {lastVideoJob.status === "queued"
+                          ? "Queued — waiting for GPU"
+                          : lastVideoJob.status === "finalizing"
+                            ? "Finalizing your video…"
+                            : "Generating your video…"}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1 truncate">{lastVideoJob.prompt}</p>
+                    </div>
+                    <div className="w-full bg-slate-200/70 h-2 rounded-full overflow-hidden">
+                      <div className="h-full bg-teal-500 transition-all duration-500" style={{ width: `${Math.max(5, lastVideoJob.progress)}%` }} />
+                    </div>
+                    <div className="grid grid-cols-4 gap-1 text-[9px] font-mono uppercase text-slate-400">
+                      <span className={lastVideoJob.progress >= 5 ? "text-teal-600" : ""}>Request</span>
+                      <span className={lastVideoJob.progress >= 10 ? "text-teal-600" : ""}>GPU</span>
+                      <span className={lastVideoJob.status === "finalizing" || lastVideoJob.progress >= 50 ? "text-teal-600" : ""}>Render</span>
+                      <span className={lastVideoJob.status === "finalizing" ? "text-teal-600" : ""}>Finalizing</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-3 pt-1">
+                      <span className="text-[10px] text-slate-500 font-mono">{lastVideoJob.progress}%</span>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch("/api/generate-video/cancel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId: lastVideoJob.jobId ?? lastVideoJob.id }) });
+                            if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || "Unable to cancel job");
+                            await loadVideoJobs();
+                            setIsGenerating(false);
+                          } catch (error) {
+                            console.error("Cancel failed", error);
+                          }
+                        }}
+                        className="text-[10px] font-bold text-red-500 hover:text-red-600"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : lastVideoJob && (lastVideoJob.status === "failed" || lastVideoJob.status === "cancelled") ? (
+                  <div className="text-center space-y-3 px-6 max-w-md">
+                    <div className="text-sm font-black text-red-500">Generation {lastVideoJob.status}</div>
+                    <p className="text-[11px] text-slate-500">{lastVideoJob.error || "The generation job did not complete."}</p>
+                    <button onClick={() => { setPrompt(lastVideoJob.prompt); setSelectedDuration(lastVideoJob.durationSeconds ?? 30); setShowDurationModal(true); }} className="px-4 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold">Try again</button>
                   </div>
                 ) : (
                   <div className="text-center text-slate-500 space-y-2 p-6">

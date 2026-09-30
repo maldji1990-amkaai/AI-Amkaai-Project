@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getOrCreateUser } from "@/lib/getUser";
 import { db } from "@/lib/db";
@@ -32,6 +32,14 @@ export async function GET() {
       createdAt: "desc",
     },
     take: 50,
+    include: {
+      generation: {
+        select: {
+          status: true,
+          metadata: true,
+        },
+      },
+    },
   });
 
   return NextResponse.json(
@@ -53,6 +61,13 @@ export async function GET() {
         createdAt: job.createdAt,
         startedAt: job.startedAt ?? null,
         finishedAt: job.finishedAt ?? null,
+        generationStatus: job.generation?.status ?? null,
+        finalVideoUrl:
+          job.generation?.metadata &&
+          typeof job.generation.metadata === "object" &&
+          typeof (job.generation.metadata as Record<string, unknown>).finalVideoUrl === "string"
+            ? (job.generation.metadata as Record<string, unknown>).finalVideoUrl
+            : null,
       })),
     },
     {
