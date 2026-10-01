@@ -41,6 +41,31 @@ RUN python -m pip install \
     torchaudio==2.4.1 \
     --index-url https://download.pytorch.org/whl/cu124
 
+# FlashAttention-2: required by Wan2.2 attention implementation.
+# Install AFTER PyTorch so it builds/links against the exact Torch version.
+RUN python -m pip install \
+    packaging \
+    psutil \
+    ninja
+
+RUN MAX_JOBS=2 python -m pip install \
+    "flash-attn==2.7.4.post1" \
+    --no-build-isolation
+
+RUN python - <<'PY'
+import torch
+import flash_attn
+
+print("TORCH =", torch.__version__)
+print("TORCH CUDA =", torch.version.cuda)
+print("FLASH_ATTN =", flash_attn.__version__)
+print("CUDA AVAILABLE =", torch.cuda.is_available())
+
+assert hasattr(flash_attn, "flash_attn_func")
+
+print("FlashAttention-2 import check: OK")
+PY
+
 RUN grep -vi "flash.attn" \
     /opt/Wan2.2/requirements.txt \
     > /tmp/wan-reqs.txt \
