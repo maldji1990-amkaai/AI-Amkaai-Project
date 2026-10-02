@@ -36,6 +36,11 @@ type RenderJob = {
   jobId?: string;
   prompt: string;
   progress: number;
+  progressStage?: string | null;
+  progressClip?: number | null;
+  progressClipCount?: number | null;
+  progressStep?: number | null;
+  progressTotalSteps?: number | null;
   status: "queued" | "processing" | "finalizing" | "completed" | "failed" | "cancelled";
   type: MediaType;
   resultUrl?: string | null;
@@ -155,6 +160,11 @@ export default function AIChangeConsole() {
               : typeof job.progress === "number"
                 ? job.progress
                 : 0,
+            progressStage: typeof job.progressStage === "string" ? job.progressStage : null,
+            progressClip: typeof job.progressClip === "number" ? job.progressClip : null,
+            progressClipCount: typeof job.progressClipCount === "number" ? job.progressClipCount : null,
+            progressStep: typeof job.progressStep === "number" ? job.progressStep : null,
+            progressTotalSteps: typeof job.progressTotalSteps === "number" ? job.progressTotalSteps : null,
             status:
               generationStatus === "FAILED" || status === "FAILED"
                 ? "failed"
@@ -679,26 +689,55 @@ export default function AIChangeConsole() {
                   <div className="text-center space-y-4 px-6 w-full max-w-md">
                     <Loader2 size={34} className="text-teal-600 animate-spin mx-auto" />
                     <div>
-                      <p className="text-sm font-black text-slate-700">
-                        {lastVideoJob.status === "queued"
-                          ? "Queued — waiting for GPU"
-                          : lastVideoJob.status === "finalizing"
-                            ? "Finalizing your video…"
-                            : "Generating your video…"}
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-1 truncate">{lastVideoJob.prompt}</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-slate-700">
+                            {lastVideoJob.status === "queued"
+                              ? "Queued — waiting for GPU"
+                              : lastVideoJob.status === "finalizing"
+                                ? "Finalizing your video…"
+                                : "Generating your video…"}
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-1 truncate">{lastVideoJob.prompt}</p>
+                        </div>
+                        <span className="text-lg font-black text-teal-600 tabular-nums">{Math.round(lastVideoJob.progress)}%</span>
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-200/70 h-2 rounded-full overflow-hidden">
-                      <div className="h-full bg-teal-500 transition-all duration-500" style={{ width: `${Math.max(5, lastVideoJob.progress)}%` }} />
-                    </div>
-                    <div className="grid grid-cols-4 gap-1 text-[9px] font-mono uppercase text-slate-400">
-                      <span className={lastVideoJob.progress >= 5 ? "text-teal-600" : ""}>Request</span>
-                      <span className={lastVideoJob.progress >= 10 ? "text-teal-600" : ""}>GPU</span>
-                      <span className={lastVideoJob.status === "finalizing" || lastVideoJob.progress >= 50 ? "text-teal-600" : ""}>Render</span>
-                      <span className={lastVideoJob.status === "finalizing" ? "text-teal-600" : ""}>Finalizing</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-3 pt-1">
-                      <span className="text-[10px] text-slate-500 font-mono">{lastVideoJob.progress}%</span>
+
+                    <div className="w-full bg-slate-200/70 h-3 rounded-full overflow-hidden shadow-inner">
+                        <div
+                          className="h-full bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-400 transition-all duration-700 ease-out relative"
+                          style={{ width: `${Math.max(5, Math.min(100, lastVideoJob.progress))}%` }}
+                        >
+                          <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                        <span>
+                          {lastVideoJob.progressStage === "GENERATING"
+                            ? `Generating${lastVideoJob.progressClip && lastVideoJob.progressClipCount ? ` · Clip ${lastVideoJob.progressClip}/${lastVideoJob.progressClipCount}` : ""}`
+                            : lastVideoJob.status === "finalizing"
+                              ? "Finalizing"
+                              : lastVideoJob.status === "queued"
+                                ? "Queued"
+                                : "Preparing"}
+                        </span>
+                        {lastVideoJob.progressStage === "GENERATING" &&
+                        typeof lastVideoJob.progressStep === "number" &&
+                        typeof lastVideoJob.progressTotalSteps === "number" ? (
+                          <span>Step {lastVideoJob.progressStep}/{lastVideoJob.progressTotalSteps}</span>
+                        ) : null}
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-1 text-[9px] font-mono uppercase text-slate-400">
+                        <span className={lastVideoJob.progress >= 5 ? "text-teal-600" : ""}>Request</span>
+                        <span className={lastVideoJob.progress >= 10 ? "text-teal-600" : ""}>GPU</span>
+                        <span className={lastVideoJob.progress >= 10 && lastVideoJob.progress < 91 ? "text-teal-600" : ""}>Render</span>
+                        <span className={lastVideoJob.progress >= 91 || lastVideoJob.status === "finalizing" ? "text-teal-600" : ""}>Finalizing</span>
+                      </div>
+
+                      <div className="flex items-center justify-center gap-3 pt-1">
                       <button
                         onClick={async () => {
                           try {

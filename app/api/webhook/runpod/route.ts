@@ -309,6 +309,55 @@ export async function POST(req: Request) {
           : null;
 
     /*
+     * LIVE PROGRESS
+     *
+     * RunPod/Wan sends PROCESSING callbacks during the real diffusion loop.
+     * Persist the latest percentage and step metadata so the Generate page
+     * can show the actual inference progress while the GPU is working.
+     */
+    if (status === "PROCESSING" && typeof body?.progress === "number") {
+      const progress = Math.max(0, Math.min(99, Math.round(body.progress)));
+      const output = body?.output && typeof body.output === "object"
+        ? (body.output as Record<string, unknown>)
+        : {};
+
+      await db.videoJob.updateMany({
+        where: {
+          id: jobId,
+          status: { in: ["PENDING", "PROCESSING"] },
+        },
+        data: {
+          status: "PROCESSING",
+          progress,
+          error: null,
+          input: {
+            ...input,
+            progress_stage: typeof output.stage === "string" ? output.stage : "GENERATING",
+            progress_clip: typeof output.clip === "number" ? output.clip : null,
+            progress_clip_count: typeof output.clip_count === "number" ? output.clip_count : null,
+            progress_step: typeof output.step === "number" ? output.step : null,
+            progress_total_steps: typeof output.total_steps === "number" ? output.total_steps : null,
+          },
+        },
+      });
+
+      if (job.generationId) {
+        await db.generationStep.updateMany({
+          where: {
+            generationId: job.generationId,
+            name: "Video Render",
+          },
+          data: {
+            status: "PROCESSING",
+            progress,
+          },
+        });
+      }
+
+      return NextResponse.json({ success: true, progress });
+    }
+
+    /*
      * SUCCESS
      */
     if (

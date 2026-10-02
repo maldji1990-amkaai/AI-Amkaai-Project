@@ -6,6 +6,7 @@ import tempfile
 import traceback
 from pathlib import Path
 from typing import Any, Dict
+from contextlib import contextmanager
 
 import httpx
 import runpod
@@ -13,6 +14,7 @@ import torch
 from PIL import Image
 
 import server as wan_server
+import wan.textimage2video as wan_ti2v_module
 
 
 logging.basicConfig(
@@ -87,6 +89,86 @@ def safe_job_id(value: str) -> str:
         else "_"
         for character in value
     )
+
+
+class ProgressReporter:
+    """
+    Publishes real Wan diffusion-step progress to both RunPod and AmkaAI.
+    Updates are throttled so the webhook/DB is not hammered on every step.
+    """
+
+    def __init__(self, job: Dict[str, Any], webhook_url: str, clip_index: int, clip_count: int, total_steps: int):
+        self.job = job
+        self.webhook_url = webhook_url
+        self.clip_index = clip_index
+        self.clip_count = clip_count
+        self.total_steps = max(1, total_steps)
+        self.last_progress = -1
+        self.last_sent_at = 0.0
+
+    def update(self, step: int) -> None:
+        step = max(0, min(step, self.total_steps))
+        overall_completed_steps = self.clip_index * self.total_steps + step
+        overall_total_steps = max(1, self.clip_count * self.total_steps)
+        progress = 10 + round((overall_completed_steps / overall_total_steps) * 80)
+        progress = max(10, min(90, progress))
+
+        now = time.monotonic()
+        # Send immediately on meaningful changes, otherwise at most every 2.5s.
+        if progress == self.last_progress and (now - self.last_sent_at) < 2.5:
+            return
+        if progress < self.last_progress and (now - self.last_sent_at) < 2.5:
+            return
+
+        self.last_progress = progress
+        self.last_sent_at = now
+
+        payload = {
+            "id": str(self.job.get("input", {}).get("job_id") or self.job.get("id") or ""),
+            "status": "PROCESSING",
+            "progress": progress,
+            "output": {
+                "stage": "GENERATING",
+                "clip": self.clip_index + 1,
+                "clip_count": self.clip_count,
+                "step": step,
+                "total_steps": self.total_steps,
+            },
+        }
+
+        try:
+            runpod.serverless.progress_update(self.job, payload)
+        except Exception:
+            log.debug("RunPod progress update failed", exc_info=True)
+
+        try:
+            post_webhook_sync(self.webhook_url, payload)
+        except Exception:
+            # Progress delivery is best-effort. Never fail a video because a
+            # progress webhook was temporarily unavailable.
+            log.debug("AmkaAI progress webhook failed", exc_info=True)
+
+
+@contextmanager
+def wan_progress_hook(reporter: ProgressReporter):
+    """
+    Wan2.2 uses tqdm directly inside wan.textimage2video for its diffusion
+    loop. Wrap that iterator so we can observe the actual step number without
+    modifying the upstream Wan source code.
+    """
+    original_tqdm = wan_ti2v_module.tqdm
+
+    def tracked_tqdm(iterable, *args, **kwargs):
+        total = len(iterable) if hasattr(iterable, "__len__") else reporter.total_steps
+        for step_index, item in enumerate(iterable, start=1):
+            yield item
+            reporter.update(step_index)
+
+    wan_ti2v_module.tqdm = tracked_tqdm
+    try:
+        yield
+    finally:
+        wan_ti2v_module.tqdm = original_tqdm
 
 
 def handler(job: Dict[str, Any]) -> Dict[str, Any]:
@@ -209,42 +291,34 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
                 wan_server.SAMPLING_STEPS,
             )
 
-            # Inform RunPod about progress.
-            try:
-                runpod.serverless.progress_update(
-                    job,
-                    {
-                        "status": "PROCESSING",
-                        "progress": progress,
-                        "clip": index + 1,
-                        "clip_count": clip_count,
-                    },
-                )
-            except Exception:
-                log.debug(
-                    "Progress update failed",
-                    exc_info=True,
-                )
+            reporter = ProgressReporter(
+                job=job,
+                webhook_url=webhook_url,
+                clip_index=index,
+                clip_count=clip_count,
+                total_steps=wan_server.SAMPLING_STEPS,
+            )
+            reporter.update(0)
 
             with wan_server.job_lock:
-
-                video = wan_server.model.generate(
-                    clip_prompt,
-                    img=(
-                        Image.open(image_path).convert("RGB")
-                        if image_path
-                        else None
-                    ),
-                    size=wan_server.VIDEO_SIZE,
-                    max_area=wan_server.MAX_AREA,
-                    frame_num=wan_server.FRAME_NUM,
-                    shift=wan_server.SHIFT,
-                    sample_solver="unipc",
-                    sampling_steps=wan_server.SAMPLING_STEPS,
-                    guide_scale=wan_server.GUIDE_SCALE,
-                    seed=seed,
-                    offload_model=wan_server.OFFLOAD_MODEL,
-                )
+                with wan_progress_hook(reporter):
+                    video = wan_server.model.generate(
+                        clip_prompt,
+                        img=(
+                            Image.open(image_path).convert("RGB")
+                            if image_path
+                            else None
+                        ),
+                        size=wan_server.VIDEO_SIZE,
+                        max_area=wan_server.MAX_AREA,
+                        frame_num=wan_server.FRAME_NUM,
+                        shift=wan_server.SHIFT,
+                        sample_solver="unipc",
+                        sampling_steps=wan_server.SAMPLING_STEPS,
+                        guide_scale=wan_server.GUIDE_SCALE,
+                        seed=seed,
+                        offload_model=wan_server.OFFLOAD_MODEL,
+                    )
 
             if video is None:
                 raise RuntimeError(
@@ -261,6 +335,7 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
             )
 
             generated.append(clip_path)
+            reporter.update(wan_server.SAMPLING_STEPS)
 
             del video
 

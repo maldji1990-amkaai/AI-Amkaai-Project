@@ -51,6 +51,31 @@ export async function GET() {
         prompt: job.prompt,
         status: job.status,
         progress: job.progress ?? 0,
+        progressStage:
+          job.input && typeof job.input === "object" &&
+          typeof (job.input as Record<string, unknown>).progress_stage === "string"
+            ? (job.input as Record<string, unknown>).progress_stage
+            : null,
+        progressClip:
+          job.input && typeof job.input === "object" &&
+          typeof (job.input as Record<string, unknown>).progress_clip === "number"
+            ? (job.input as Record<string, unknown>).progress_clip
+            : null,
+        progressClipCount:
+          job.input && typeof job.input === "object" &&
+          typeof (job.input as Record<string, unknown>).progress_clip_count === "number"
+            ? (job.input as Record<string, unknown>).progress_clip_count
+            : null,
+        progressStep:
+          job.input && typeof job.input === "object" &&
+          typeof (job.input as Record<string, unknown>).progress_step === "number"
+            ? (job.input as Record<string, unknown>).progress_step
+            : null,
+        progressTotalSteps:
+          job.input && typeof job.input === "object" &&
+          typeof (job.input as Record<string, unknown>).progress_total_steps === "number"
+            ? (job.input as Record<string, unknown>).progress_total_steps
+            : null,
         resultUrl: job.resultUrl ?? null,
         error: job.error ?? null,
         durationSeconds: job.durationSeconds,

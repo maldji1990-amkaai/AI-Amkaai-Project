@@ -24,11 +24,24 @@ export async function GET(req: Request) {
         while (true) {
           const job = await db.videoJob.findFirst({
             where: { id: jobId, userId: user.id },
-            select: { status: true, resultUrl: true, error: true },
+            select: { status: true, progress: true, resultUrl: true, error: true, input: true },
           });
           if (!job) { send({ status: "not_found" }); break; }
-          const progress = job.status === "PENDING" ? 5 : job.status === "PROCESSING" ? 40 : 100;
-          send({ status: job.status.toLowerCase(), progress, video: job.resultUrl ?? null, error: job.error ?? null });
+          const input = job.input && typeof job.input === "object"
+            ? (job.input as Record<string, unknown>)
+            : {};
+          const progress = job.status === "COMPLETED" ? 100 : job.status === "FAILED" || job.status === "CANCELLED" ? (job.progress ?? 0) : Math.max(5, job.progress ?? 5);
+          send({
+            status: job.status.toLowerCase(),
+            progress,
+            stage: typeof input.progress_stage === "string" ? input.progress_stage : null,
+            clip: typeof input.progress_clip === "number" ? input.progress_clip : null,
+            clipCount: typeof input.progress_clip_count === "number" ? input.progress_clip_count : null,
+            step: typeof input.progress_step === "number" ? input.progress_step : null,
+            totalSteps: typeof input.progress_total_steps === "number" ? input.progress_total_steps : null,
+            video: job.resultUrl ?? null,
+            error: job.error ?? null,
+          });
           if (["COMPLETED", "FAILED", "CANCELLED"].includes(job.status)) break;
           await new Promise((r) => setTimeout(r, 2000));
         }

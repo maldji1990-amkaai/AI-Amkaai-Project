@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getOrCreateUser } from "@/lib/getUser";
 import { db } from "@/lib/db";
@@ -57,6 +57,31 @@ export async function GET(req: Request) {
       generationId: job.generationId,
       status,
       progress: job.progress ?? 0,
+      progressStage:
+        job.input && typeof job.input === "object" &&
+        typeof (job.input as Record<string, unknown>).progress_stage === "string"
+          ? (job.input as Record<string, unknown>).progress_stage
+          : null,
+      progressClip:
+        job.input && typeof job.input === "object" &&
+        typeof (job.input as Record<string, unknown>).progress_clip === "number"
+          ? (job.input as Record<string, unknown>).progress_clip
+          : null,
+      progressClipCount:
+        job.input && typeof job.input === "object" &&
+        typeof (job.input as Record<string, unknown>).progress_clip_count === "number"
+          ? (job.input as Record<string, unknown>).progress_clip_count
+          : null,
+      progressStep:
+        job.input && typeof job.input === "object" &&
+        typeof (job.input as Record<string, unknown>).progress_step === "number"
+          ? (job.input as Record<string, unknown>).progress_step
+          : null,
+      progressTotalSteps:
+        job.input && typeof job.input === "object" &&
+        typeof (job.input as Record<string, unknown>).progress_total_steps === "number"
+          ? (job.input as Record<string, unknown>).progress_total_steps
+          : null,
       videoUrl: job.resultUrl ?? null,
       resultUrl: job.resultUrl ?? null,
       error: job.error ?? null,
