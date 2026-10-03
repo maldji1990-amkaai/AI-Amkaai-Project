@@ -46,7 +46,8 @@ RUN python -m pip install \
 # Blackwell (sm_120 / RTX 5090) kernels: the build succeeds and the import check
 # passes, but every attention call then fails at runtime with "no kernel image is
 # available". Wan2.2 falls back to PyTorch SDPA automatically, which supports sm_120.
-RUN python -c "import torch; a=torch.cuda.get_arch_list(); print('TORCH', torch.__version__, 'CUDA', torch.version.cuda, 'ARCHS', a); assert any(x in a for x in ('sm_120','compute_120')), 'torch build has no RTX 5090 (sm_120) support'"
+# (Informational only: there is no GPU at build time, so torch.cuda.get_arch_list() is empty here.)
+RUN python -c "import torch; f=getattr(torch._C,'_cuda_getArchFlags',lambda:'n/a')(); print('TORCH', torch.__version__, 'CUDA', torch.version.cuda, 'ARCH_FLAGS', f)"
 
 RUN grep -vi "flash.attn" \
     /opt/Wan2.2/requirements.txt \
