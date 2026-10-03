@@ -255,7 +255,7 @@ export default function AIChangeConsole() {
   // 🔥 دالة توليد الفيديو الحية وتحديث قائمة الانتظار (Queue) والسجلات
   // 🔥 دالة توليد الفيديو الحية وتحديث قائمة الانتظار (Queue) والسجلات
   const handleGenerateVideo = async () => {
-    if (!prompt.trim() || !activeChat) return alert("الرجاء كتابة الوصف النصي أولاً!");
+    if (!prompt.trim()) return alert("الرجاء كتابة الوصف النصي أولاً!");
 
     if ((activeType === "ai-avatar" || activeType === "image-to-video") && !uploadedImage) {
       alert("الرجاء رفع صورة الأفاتار أو المشهد أولاً من لوحة التحكم الجانبية.");
