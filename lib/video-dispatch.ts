@@ -4,6 +4,7 @@ import {
   clearDispatchLease,
   hasDispatchLease,
   markDispatchLease,
+  submitVideoToPod,
 } from "@/lib/runpod-pod-manager";
 import {
   submitVideoToServerless,
@@ -30,6 +31,10 @@ export async function dispatchVideoJob(videoJobId: string) {
   if (await hasDispatchLease(job.id)) {
     return job;
   }
+
+  // RUNPOD_DIRECT_POD_ENABLED=true  -> on-demand GPU Pod (runpod-pod-manager)
+  // otherwise                        -> RunPod Serverless endpoint (legacy path)
+  const directPod = process.env.RUNPOD_DIRECT_POD_ENABLED === "true";
 
   const webhookSecret = process.env.RUNPOD_WEBHOOK_SECRET;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -81,12 +86,19 @@ export async function dispatchVideoJob(videoJobId: string) {
    * This protects against two Railway workers submitting
    * the same video job at the same time.
    */
-  await markDispatchLease(job.id);
+  // In Pod mode submitVideoToPod() creates the lease itself; marking it here
+  // too would throw VIDEO_DISPATCH_IN_FLIGHT.
+  if (!directPod) await markDispatchLease(job.id);
 
-  let submission;
+  let submission: { id: string; podId?: string; [k: string]: unknown };
 
   try {
-    submission = await submitVideoToServerless({
+    const submit = (payload: Record<string, unknown>) =>
+      directPod
+        ? submitVideoToPod(payload, job.id)
+        : submitVideoToServerless(payload);
+
+    submission = await submit({
       job_id: job.id,
       custom_id: job.id,
       webhook_url: webhookUrl,
@@ -173,7 +185,9 @@ export async function dispatchVideoJob(videoJobId: string) {
 
         input: {
           ...input,
-          runpod_serverless_job_id: submission.id,
+          ...(directPod
+            ? { runpod_pod_id: submission.podId, runpod_pod_job_id: submission.id }
+            : { runpod_serverless_job_id: submission.id }),
         },
       },
     });

@@ -3,6 +3,8 @@ import logging
 import os
 import shutil
 import tempfile
+import threading
+import time
 import traceback
 from pathlib import Path
 from typing import Any, Dict
@@ -93,60 +95,112 @@ def safe_job_id(value: str) -> str:
 
 class ProgressReporter:
     """
-    Publishes real Wan diffusion-step progress to both RunPod and AmkaAI.
-    Updates are throttled so the webhook/DB is not hammered on every step.
+    Publishes real Wan progress to RunPod and to the AmkaAI webhook.
+
+    IMPORTANT: publishing happens on a background thread, with a single short
+    attempt per update. The previous version posted synchronously from inside
+    the diffusion loop with 5 retries / 30s timeouts, so an unreachable webhook
+    URL could stall the GPU for minutes per step and the bar never moved.
+
+    Progress map (always monotonic):
+        0-8    preparing / downloading input
+        8-90   clips: sampling steps (0-90% of a clip), VAE decode (90-96%),
+               mp4 encode (96-100%)
+        91-92  concatenating clips
+        93-99  uploading        (100 is sent by the COMPLETED webhook)
     """
 
-    def __init__(self, job: Dict[str, Any], webhook_url: str, clip_index: int, clip_count: int, total_steps: int):
+    BASE = 8
+    SPAN = 82
+
+    def __init__(self, job: Dict[str, Any], webhook_url: str, clip_count: int, total_steps: int):
         self.job = job
         self.webhook_url = webhook_url
-        self.clip_index = clip_index
-        self.clip_count = clip_count
+        self.clip_count = max(1, clip_count)
         self.total_steps = max(1, total_steps)
-        self.last_progress = -1
+        self.clip_index = 0
+        self.last_progress = 0
         self.last_sent_at = 0.0
+        self.min_interval = float(os.getenv("WAN_PROGRESS_MIN_INTERVAL", "2.0"))
+        self._lock = threading.Lock()
+        self._pending: Dict[str, Any] | None = None
+        self._wake = threading.Event()
+        self._stop = False
+        self._thread = threading.Thread(target=self._run, daemon=True, name="progress-sender")
+        self._thread.start()
+
+    # ---- public API -------------------------------------------------------
+    def begin_clip(self, index: int) -> None:
+        self.clip_index = index
+        self._publish("GENERATING", within=0.0, step=0, total=self.total_steps, force=True)
 
     def update(self, step: int) -> None:
+        """Called after every diffusion step."""
         step = max(0, min(step, self.total_steps))
-        overall_completed_steps = self.clip_index * self.total_steps + step
-        overall_total_steps = max(1, self.clip_count * self.total_steps)
-        progress = 10 + round((overall_completed_steps / overall_total_steps) * 80)
-        progress = max(10, min(90, progress))
+        if step >= self.total_steps:
+            self._publish("DECODING", within=0.90, step=step, total=self.total_steps, force=True)
+        else:
+            self._publish("GENERATING", within=0.90 * step / self.total_steps, step=step, total=self.total_steps)
 
+    def clip_stage(self, stage: str, within: float) -> None:
+        self._publish(stage, within=within, force=True)
+
+    def overall_stage(self, stage: str, overall: int) -> None:
+        self._send(stage, max(self.last_progress, overall), force=True)
+
+    def close(self) -> None:
+        self._stop = True
+        self._wake.set()
+        self._thread.join(timeout=3)
+
+    # ---- internals --------------------------------------------------------
+    def _publish(self, stage, within, step=None, total=None, force=False) -> None:
+        frac = (self.clip_index + max(0.0, min(1.0, within))) / self.clip_count
+        progress = min(90, int(self.BASE + frac * self.SPAN))
+        self._send(stage, max(self.last_progress, progress), step=step, total=total, force=force)
+
+    def _send(self, stage, progress, step=None, total=None, force=False) -> None:
         now = time.monotonic()
-        # Send immediately on meaningful changes, otherwise at most every 2.5s.
-        if progress == self.last_progress and (now - self.last_sent_at) < 2.5:
+        if not force and now - self.last_sent_at < self.min_interval:
             return
-        if progress < self.last_progress and (now - self.last_sent_at) < 2.5:
-            return
-
         self.last_progress = progress
         self.last_sent_at = now
-
         payload = {
             "id": str(self.job.get("input", {}).get("job_id") or self.job.get("id") or ""),
             "status": "PROCESSING",
             "progress": progress,
             "output": {
-                "stage": "GENERATING",
+                "stage": stage,
                 "clip": self.clip_index + 1,
                 "clip_count": self.clip_count,
                 "step": step,
-                "total_steps": self.total_steps,
+                "total_steps": total,
             },
         }
+        with self._lock:
+            self._pending = payload  # keep only the newest
+        self._wake.set()
 
-        try:
-            runpod.serverless.progress_update(self.job, payload)
-        except Exception:
-            log.debug("RunPod progress update failed", exc_info=True)
-
-        try:
-            post_webhook_sync(self.webhook_url, payload)
-        except Exception:
-            # Progress delivery is best-effort. Never fail a video because a
-            # progress webhook was temporarily unavailable.
-            log.debug("AmkaAI progress webhook failed", exc_info=True)
+    def _run(self) -> None:
+        with httpx.Client(timeout=6, follow_redirects=True) as client:
+            while True:
+                self._wake.wait(timeout=1.0)
+                self._wake.clear()
+                with self._lock:
+                    payload, self._pending = self._pending, None
+                if payload is not None:
+                    try:
+                        runpod.serverless.progress_update(self.job, payload)
+                    except Exception:
+                        log.debug("RunPod progress update failed", exc_info=True)
+                    try:
+                        r = client.post(self.webhook_url, json=payload)
+                        if r.status_code >= 400:
+                            log.warning("Progress webhook rejected: HTTP %s %s", r.status_code, r.text[:200])
+                    except Exception as exc:
+                        log.warning("Progress webhook unreachable: %s", exc)
+                if self._stop and self._pending is None:
+                    return
 
 
 @contextmanager
@@ -159,7 +213,6 @@ def wan_progress_hook(reporter: ProgressReporter):
     original_tqdm = wan_ti2v_module.tqdm
 
     def tracked_tqdm(iterable, *args, **kwargs):
-        total = len(iterable) if hasattr(iterable, "__len__") else reporter.total_steps
         for step_index, item in enumerate(iterable, start=1):
             yield item
             reporter.update(step_index)
@@ -224,6 +277,8 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
 
     workdir.mkdir(parents=True, exist_ok=True)
 
+    reporter: ProgressReporter | None = None
+
     try:
         ensure_serverless_model()
 
@@ -246,6 +301,14 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         image_url = job_input.get("image_url")
+
+        reporter = ProgressReporter(
+            job=job,
+            webhook_url=webhook_url,
+            clip_count=clip_count,
+            total_steps=wan_server.SAMPLING_STEPS,
+        )
+        reporter.overall_stage("PREPARING", 5)
 
         image_path = None
 
@@ -291,14 +354,7 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
                 wan_server.SAMPLING_STEPS,
             )
 
-            reporter = ProgressReporter(
-                job=job,
-                webhook_url=webhook_url,
-                clip_index=index,
-                clip_count=clip_count,
-                total_steps=wan_server.SAMPLING_STEPS,
-            )
-            reporter.update(0)
+            reporter.begin_clip(index)
 
             with wan_server.job_lock:
                 with wan_progress_hook(reporter):
@@ -329,25 +385,29 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
                 workdir / f"clip_{index:03d}.mp4"
             )
 
+            reporter.clip_stage("ENCODING", 0.96)
             wan_server.save_tensor_to_mp4(
                 video,
                 clip_path,
             )
 
             generated.append(clip_path)
-            reporter.update(wan_server.SAMPLING_STEPS)
+            reporter.clip_stage("ENCODING", 1.0)
 
             del video
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
+        reporter.overall_stage("ENCODING", 91)
         final_path = workdir / "final.mp4"
 
         wan_server.concat_mp4(
             generated,
             final_path,
         )
+
+        reporter.overall_stage("UPLOADING", 93)
 
         log.info(
             "Uploading final video job=%s",
@@ -361,6 +421,8 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
                 or external_id
             ),
         )
+
+        reporter.close()  # flush progress before the final webhook
 
         payload = {
             "id": external_id,
@@ -434,6 +496,9 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
         raise
 
     finally:
+        if reporter is not None:
+            reporter.close()
+
         # Keep the generated result available until the handler has
         # returned to RunPod. Then clean the temporary job directory.
         try:

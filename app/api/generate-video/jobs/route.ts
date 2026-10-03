@@ -87,6 +87,10 @@ export async function GET() {
         startedAt: job.startedAt ?? null,
         finishedAt: job.finishedAt ?? null,
         generationStatus: job.generation?.status ?? null,
+        composing:
+          job.generation?.metadata &&
+          typeof job.generation.metadata === "object" &&
+          typeof (job.generation.metadata as Record<string, unknown>).composerJobId === "string",
         finalVideoUrl:
           job.generation?.metadata &&
           typeof job.generation.metadata === "object" &&

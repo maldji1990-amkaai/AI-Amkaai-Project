@@ -1,0 +1,74 @@
+# AmkaAI Wan 2.2 TI2V-5B — image for NVIDIA GeForce RTX 5090 (Blackwell, sm_120)
+#
+# The original Dockerfile (CUDA 12.4 + torch 2.4.1) cannot run on RTX 5090:
+# Blackwell kernels only ship in CUDA 12.8+ builds of PyTorch (>= 2.7).
+#
+# Build (from this folder):
+#   docker build -f Dockerfile.rtx5090 -t <you>/amkaai-wan22:5090 .
+#   docker push <you>/amkaai-wan22:5090
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/opt/Wan2.2 \
+    WAN_REPO_DIR=/opt/Wan2.2 \
+    WAN_MODEL_DIR=/workspace/models/Wan2.2-TI2V-5B \
+    OUTPUT_DIR=/workspace/outputs \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+    # 5090 has 32 GB: keep the DiT resident on the GPU (faster, and it also makes
+    # mid-generation cancel safe). T5 stays on CPU to leave headroom for 1280x704.
+    # If you hit CUDA OOM, set WAN_OFFLOAD_MODEL=true (cancel then only works
+    # between clips). If you have spare VRAM, try WAN_T5_CPU=false.
+    WAN_OFFLOAD_MODEL=false \
+    WAN_T5_CPU=true \
+    WAN_CONVERT_MODEL_DTYPE=true
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3.10-dev python3-pip git ffmpeg curl ca-certificates \
+    build-essential libgl1 libglib2.0-0 && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -sf /usr/bin/python3.10 /usr/bin/python && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip
+
+WORKDIR /opt
+RUN git clone --depth 1 https://github.com/Wan-Video/Wan2.2.git /opt/Wan2.2
+
+# PyTorch with Blackwell (sm_120) kernels.
+RUN python -m pip install --upgrade pip setuptools wheel && \
+    python -m pip install \
+    torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 \
+    --index-url https://download.pytorch.org/whl/cu128
+
+# Wan2.2's own requirements, minus flash-attn (SDPA fallback is used) and minus
+# torch/torchvision/torchaudio so pip doesn't replace the cu128 build above.
+RUN grep -viE "flash.attn|^torch(vision|audio)?([=<>~! ]|$)" /opt/Wan2.2/requirements.txt > /tmp/wan-reqs.txt && \
+    python -m pip install -r /tmp/wan-reqs.txt
+
+RUN python -m pip install \
+    "opencv-python>=4.9.0.80" \
+    "diffusers>=0.31.0" \
+    "transformers>=4.49.0,<=4.51.3" \
+    "tokenizers>=0.20.3" \
+    "accelerate>=1.1.1" \
+    tqdm "imageio[ffmpeg]" easydict ftfy dashscope imageio-ffmpeg \
+    "numpy==1.26.4" \
+    "scipy==1.11.4" \
+    einops decord librosa soundfile av peft \
+    fastapi "uvicorn[standard]" httpx pillow huggingface_hub cloudinary
+
+RUN python -m pip install --no-deps -e /opt/Wan2.2
+
+# Fail the build early if this torch cannot target Blackwell.
+RUN python -c "import torch; a=torch.cuda._get_arch_list() if hasattr(torch.cuda,'_get_arch_list') else []; print('torch',torch.__version__,'cuda',torch.version.cuda,'archs',a); assert 'sm_120' in a, 'torch build has no sm_120 (RTX 5090) kernels'"
+
+COPY server.py /opt/amkaai-server/server.py
+COPY requirements.txt /opt/amkaai-server/requirements.txt
+
+RUN mkdir -p /workspace/models /workspace/outputs /workspace/jobs
+
+WORKDIR /opt/amkaai-server
+
+EXPOSE 8000
+
+CMD ["python", "server.py"]

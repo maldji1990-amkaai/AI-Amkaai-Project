@@ -1,0 +1,101 @@
+# RTX 5090 (Blackwell sm_120) serverless image: CUDA 12.8 + PyTorch 2.7.1 (cu128)
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/opt/Wan2.2:/opt/amkaai-server \
+    WAN_REPO_DIR=/opt/Wan2.2 \
+    WAN_MODEL_DIR=/runpod-volume/models/Wan2.2-TI2V-5B \
+    OUTPUT_DIR=/tmp/outputs \
+    JOBS_DIR=/tmp/jobs \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+    WAN_QUANTIZE_8BIT=false
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 \
+    python3.10-dev \
+    python3-pip \
+    git \
+    ffmpeg \
+    curl \
+    ca-certificates \
+    build-essential \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    && ln -sf /usr/bin/pip3 /usr/bin/pip
+
+WORKDIR /opt
+
+RUN git clone --depth 1 \
+    https://github.com/Wan-Video/Wan2.2.git \
+    /opt/Wan2.2
+
+RUN python -m pip install --upgrade \
+    pip setuptools wheel
+
+RUN python -m pip install \
+    torch==2.7.1 \
+    torchvision==0.22.1 \
+    torchaudio==2.7.1 \
+    --index-url https://download.pytorch.org/whl/cu128
+
+# NOTE: flash-attn is intentionally NOT installed. flash-attn 2.7.x ships no
+# Blackwell (sm_120 / RTX 5090) kernels: the build succeeds and the import check
+# passes, but every attention call then fails at runtime with "no kernel image is
+# available". Wan2.2 falls back to PyTorch SDPA automatically, which supports sm_120.
+RUN python - <<'PY'
+import torch
+archs = torch.cuda._get_arch_list() if hasattr(torch.cuda, "_get_arch_list") else []
+print("TORCH =", torch.__version__, "| CUDA =", torch.version.cuda, "| ARCHS =", archs)
+assert "sm_120" in archs, "this torch build has no RTX 5090 (sm_120) kernels"
+PY
+
+RUN grep -vi "flash.attn" \
+    /opt/Wan2.2/requirements.txt \
+    > /tmp/wan-reqs.txt \
+    && python -m pip install -r /tmp/wan-reqs.txt
+
+RUN python -m pip install \
+    "opencv-python>=4.9.0.80" \
+    "diffusers>=0.31.0" \
+    "transformers>=4.49.0,<=4.51.3" \
+    "tokenizers>=0.20.3" \
+    "accelerate>=1.1.1" \
+    tqdm \
+    "imageio[ffmpeg]" \
+    easydict \
+    ftfy \
+    dashscope \
+    imageio-ffmpeg \
+    "numpy==1.26.4" \
+    "scipy==1.14.1" \
+    einops \
+    decord \
+    librosa \
+    soundfile \
+    av \
+    peft \
+    fastapi \
+    "uvicorn[standard]" \
+    httpx \
+    pillow \
+    huggingface_hub \
+    cloudinary \
+    bitsandbytes>=0.43.1 \
+    runpod==1.9.1
+
+RUN python -m pip install \
+    --no-deps \
+    -e /opt/Wan2.2
+
+COPY runpod-wan22/server.py /opt/amkaai-server/server.py
+COPY runpod-wan22/handler.py /opt/amkaai-server/handler.py
+
+RUN mkdir -p /tmp/outputs /tmp/jobs
+
+WORKDIR /opt/amkaai-server
+
+CMD ["python", "handler.py"]

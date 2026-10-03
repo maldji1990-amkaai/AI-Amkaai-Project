@@ -7,10 +7,8 @@ const LOCK_KEY = "amkaai:runpod:video-gpu:lock:v2";
 const ACTIVE_SET_KEY = "amkaai:runpod:video-gpu:active-jobs:v2";
 const DISPATCH_SET_KEY = "amkaai:runpod:video-gpu:dispatch-leases:v2";
    const DEFAULT_GPUS = [
-     "NVIDIA RTX PRO 4500",
-     "NVIDIA GeForce RTX 4090",
-     "NVIDIA RTX PRO 4000",
-   ];
+  "NVIDIA GeForce RTX 5090",
+];
 const DEFAULT_PORT = 8000;
 const DEFAULT_GENERATE_PATH = "/generate";
 const DEFAULT_HEALTH_PATH = "/health";
@@ -99,7 +97,7 @@ async function createPod() {
   const port = podPort();
 
   const body: Record<string, unknown> = {
-    name: process.env.RUNPOD_POD_NAME || "amkaai-video-4090",
+    name: process.env.RUNPOD_POD_NAME || "amkaai-video-5090",
     gpuCount: 1,
     containerDiskInGb: Math.trunc(
       envNumber("RUNPOD_POD_CONTAINER_DISK_GB", 50)
@@ -129,6 +127,16 @@ async function createPod() {
 
     body.gpuTypeIds = gpuTypes;
     body.gpuTypePriority = "availability";
+
+    // RTX 5090 (Blackwell) needs a host driver with CUDA 12.8+. Optional filter,
+    // e.g. RUNPOD_ALLOWED_CUDA_VERSIONS=12.8,12.9
+    const allowedCuda = (process.env.RUNPOD_ALLOWED_CUDA_VERSIONS || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (allowedCuda.length) {
+      body.allowedCudaVersions = allowedCuda;
+    }
 
     if (imageName) {
       body.imageName = imageName;

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { VIDEO_CREDITS_PER_SECOND } from "@/lib/config";
+import VideoProgress from "@/components/VideoProgress";
 import { 
   Video, ImageIcon, Wand2, Sparkles, ArrowLeft, Loader2, Play, Film,
   Plus, LifeBuoy, X, PanelLeft, Mic, SlidersHorizontal, Tv, Flame, Upload, 
@@ -46,6 +47,7 @@ type RenderJob = {
   resultUrl?: string | null;
   error?: string | null;
   createdAt?: string;
+  startedAt?: string | null;
   durationSeconds?: number | null;
   generationStatus?: string | null;
   finalVideoUrl?: string | null;
@@ -141,15 +143,19 @@ export default function AIChangeConsole() {
       const data = await response.json();
       if (!Array.isArray(data?.jobs)) return;
 
-      setRenderQueue(
-        data.jobs.map((job: any): RenderJob => {
+      const serverJobs: RenderJob[] = data.jobs.map((job: any): RenderJob => {
           const status = String(job.status ?? "PENDING").toUpperCase();
 
           const generationStatus = String(job.generationStatus ?? "").toUpperCase();
+          // "Finalizing" only while a post-production composer job is really running
+          // (and not for more than 15 min). Otherwise the finished clip is shown.
+          const finishedMs = Date.parse(job.finishedAt || "") || 0;
           const isFinalizing =
             status === "COMPLETED" &&
             generationStatus === "PROCESSING" &&
-            !job.finalVideoUrl;
+            !job.finalVideoUrl &&
+            job.composing === true &&
+            Date.now() - finishedMs < 15 * 60_000;
 
           return {
             id: job.id,
@@ -170,7 +176,7 @@ export default function AIChangeConsole() {
                 ? "failed"
                 : status === "CANCELLED"
                   ? "cancelled"
-                  : job.finalVideoUrl && generationStatus === "COMPLETED"
+                  : status === "COMPLETED" && !isFinalizing && (job.finalVideoUrl || job.resultUrl)
                     ? "completed"
                     : isFinalizing
                       ? "finalizing"
@@ -181,12 +187,26 @@ export default function AIChangeConsole() {
             resultUrl: job.finalVideoUrl ?? job.resultUrl ?? null,
             error: job.error ?? null,
             createdAt: job.createdAt,
+            startedAt: job.startedAt ?? null,
             durationSeconds: job.durationSeconds ?? null,
             generationStatus: job.generationStatus ?? null,
             finalVideoUrl: job.finalVideoUrl ?? null,
           };
-        }),
-      );
+        });
+
+      // Keep the optimistic "just clicked Generate" entry visible until the server
+      // job shows up; otherwise a poll that lands mid-request wipes the progress bar.
+      setRenderQueue((prev) => {
+        const known = new Set(serverJobs.map((j) => j.id));
+        const pending = prev.filter(
+          (j) =>
+            !j.jobId &&
+            !known.has(j.id) &&
+            j.status === "queued" &&
+            Date.now() - Date.parse(j.createdAt || "") < 60_000,
+        );
+        return [...pending, ...serverJobs];
+      });
     } catch (error) {
       console.error("Video jobs fetch failed:", error);
     }
@@ -262,7 +282,7 @@ export default function AIChangeConsole() {
     setProgress(5);
 
     const clientJobId = crypto.randomUUID();
-    setRenderQueue(prev => [{ id: clientJobId, prompt: currentPrompt, progress: 5, status: "queued", type: activeType, durationSeconds: selectedDuration }, ...prev]);
+    setRenderQueue(prev => [{ id: clientJobId, prompt: currentPrompt, progress: 5, status: "queued", type: activeType, durationSeconds: selectedDuration, createdAt: new Date().toISOString() }, ...prev]);
 
 
     try {
@@ -399,6 +419,7 @@ export default function AIChangeConsole() {
 
     } catch (e: any) {
       console.error(e);
+      setRenderQueue((prev) => prev.filter((j) => j.id !== clientJobId));
       alert(e.message || "حدث خطأ أثناء التوليد");
     } finally {
       setIsGenerating(false);
@@ -436,36 +457,20 @@ export default function AIChangeConsole() {
                   <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
                     {renderQueue.map(job => (
                       <div key={job.id} className="text-[11px] bg-white/95 p-2 rounded-lg border border-teal-900/10">
-                        <div className="flex justify-between text-slate-500 text-[10px] mb-1 gap-2">
-                          <span className="truncate max-w-[120px] font-mono">{job.prompt}</span>
-                          <span className="text-teal-600 font-mono shrink-0">
-                            {job.status === "queued"
-                              ? "QUEUED"
-                              : job.status === "processing"
-                                ? `${job.progress}%`
-                                : job.status === "finalizing"
-                                  ? "FINALIZING"
-                                  : job.status === "completed"
-                                  ? "DONE"
-                                  : job.status === "failed"
-                                    ? "FAILED"
-                                    : "CANCELLED"}
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-200/60 h-1 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full transition-all duration-500 ${
-                              job.status === "failed"
-                                ? "bg-red-500"
-                                : job.status === "completed"
-                                  ? "bg-emerald-500"
-                                  : job.status === "finalizing"
-                                    ? "bg-cyan-500"
-                                    : "bg-teal-500"
-                            }`}
-                            style={{ width: `${job.progress}%` }}
-                          />
-                        </div>
+                        <p className="truncate font-mono text-[10px] text-slate-500 mb-1.5">{job.prompt}</p>
+                        <VideoProgress
+                          variant="compact"
+                          jobKey={job.jobId ?? job.id}
+                          status={job.status}
+                          progress={job.progress}
+                          stage={job.progressStage}
+                          clip={job.progressClip}
+                          clipCount={job.progressClipCount}
+                          step={job.progressStep}
+                          totalSteps={job.progressTotalSteps}
+                          startedAt={job.startedAt}
+                          createdAt={job.createdAt}
+                        />
                         {job.status === "completed" && job.resultUrl && (
                           <a
                             href={job.resultUrl}
@@ -687,55 +692,19 @@ export default function AIChangeConsole() {
                   </div>
                 ) : lastVideoJob && (lastVideoJob.status === "queued" || lastVideoJob.status === "processing" || lastVideoJob.status === "finalizing") ? (
                   <div className="text-center space-y-4 px-6 w-full max-w-md">
-                    <Loader2 size={34} className="text-teal-600 animate-spin mx-auto" />
-                    <div>
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-black text-slate-700">
-                            {lastVideoJob.status === "queued"
-                              ? "Queued — waiting for GPU"
-                              : lastVideoJob.status === "finalizing"
-                                ? "Finalizing your video…"
-                                : "Generating your video…"}
-                          </p>
-                          <p className="text-[11px] text-slate-500 mt-1 truncate">{lastVideoJob.prompt}</p>
-                        </div>
-                        <span className="text-lg font-black text-teal-600 tabular-nums">{Math.round(lastVideoJob.progress)}%</span>
-                      </div>
-                    </div>
-
-                    <div className="w-full bg-slate-200/70 h-3 rounded-full overflow-hidden shadow-inner">
-                        <div
-                          className="h-full bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-400 transition-all duration-700 ease-out relative"
-                          style={{ width: `${Math.max(5, Math.min(100, lastVideoJob.progress))}%` }}
-                        >
-                          <div className="absolute inset-0 bg-white/20 animate-pulse" />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
-                        <span>
-                          {lastVideoJob.progressStage === "GENERATING"
-                            ? `Generating${lastVideoJob.progressClip && lastVideoJob.progressClipCount ? ` · Clip ${lastVideoJob.progressClip}/${lastVideoJob.progressClipCount}` : ""}`
-                            : lastVideoJob.status === "finalizing"
-                              ? "Finalizing"
-                              : lastVideoJob.status === "queued"
-                                ? "Queued"
-                                : "Preparing"}
-                        </span>
-                        {lastVideoJob.progressStage === "GENERATING" &&
-                        typeof lastVideoJob.progressStep === "number" &&
-                        typeof lastVideoJob.progressTotalSteps === "number" ? (
-                          <span>Step {lastVideoJob.progressStep}/{lastVideoJob.progressTotalSteps}</span>
-                        ) : null}
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-1 text-[9px] font-mono uppercase text-slate-400">
-                        <span className={lastVideoJob.progress >= 5 ? "text-teal-600" : ""}>Request</span>
-                        <span className={lastVideoJob.progress >= 10 ? "text-teal-600" : ""}>GPU</span>
-                        <span className={lastVideoJob.progress >= 10 && lastVideoJob.progress < 91 ? "text-teal-600" : ""}>Render</span>
-                        <span className={lastVideoJob.progress >= 91 || lastVideoJob.status === "finalizing" ? "text-teal-600" : ""}>Finalizing</span>
-                      </div>
+                    <VideoProgress
+                      jobKey={lastVideoJob.jobId ?? lastVideoJob.id}
+                      status={lastVideoJob.status}
+                      progress={lastVideoJob.progress}
+                      stage={lastVideoJob.progressStage}
+                      clip={lastVideoJob.progressClip}
+                      clipCount={lastVideoJob.progressClipCount}
+                      step={lastVideoJob.progressStep}
+                      totalSteps={lastVideoJob.progressTotalSteps}
+                      startedAt={lastVideoJob.startedAt}
+                      createdAt={lastVideoJob.createdAt}
+                    />
+                    <p className="text-[11px] text-slate-500 truncate">{lastVideoJob.prompt}</p>
 
                       <div className="flex items-center justify-center gap-3 pt-1">
                       <button
@@ -823,7 +792,7 @@ export default function AIChangeConsole() {
               </div>
 
               <div className="text-[10px] text-slate-500 text-center font-mono">
-                Wan 2.2 TI2V-5B • RTX 4090 on demand • 5 credits/second • 5s clips
+                Wan 2.2 TI2V-5B • RTX 5090 on demand • 5 credits/second • 5s clips
               </div>
             </div>
 

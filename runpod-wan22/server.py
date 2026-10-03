@@ -85,6 +85,167 @@ cancel_events: Dict[str, threading.Event] = {}
 generation_thread: Optional[threading.Thread] = None
 
 
+# --- Live progress reporting ------------------------------------------------
+# The app's webhook (app/api/webhook/runpod/route.ts) already accepts
+# status=PROCESSING callbacks carrying {progress, output:{stage,clip,clip_count,
+# step,total_steps}}. Previously nothing sent them, so the UI sat at 5% for the
+# whole diffusion run. These helpers send real per-step progress.
+PROGRESS_MIN_INTERVAL = float(os.getenv("WAN_PROGRESS_MIN_INTERVAL", "1.5"))
+# Interrupting a diffusion pass is only safe when the DiT stays resident on the
+# GPU (no CPU<->GPU weight shuffling), so default to "on" only without offload.
+CANCEL_MID_STEP = os.getenv(
+    "WAN_CANCEL_MID_STEP", "false" if OFFLOAD_MODEL else "true"
+).lower() == "true"
+
+_step_hook: Dict[str, Any] = {"cb": None}
+_step_hook_installed = False
+
+
+def install_step_hook() -> bool:
+    """Wrap the tqdm used by Wan's sampling loop so we get a callback per step."""
+    global _step_hook_installed
+    if _step_hook_installed:
+        return True
+    try:
+        import importlib
+        mod = importlib.import_module("wan.textimage2video")
+    except Exception:
+        log.warning("Progress hook: cannot import wan.textimage2video", exc_info=True)
+        return False
+
+    orig = getattr(mod, "tqdm", None)
+    if orig is None:
+        log.warning("Progress hook: wan.textimage2video has no tqdm; per-step progress disabled")
+        return False
+
+    def tracked_tqdm(iterable=None, *args, **kwargs):
+        inner = orig(iterable, *args, **kwargs)
+        cb = _step_hook.get("cb")
+        if cb is None or iterable is None:
+            return inner
+        try:
+            total = len(iterable)
+        except TypeError:
+            return inner
+        if total < 2:
+            return inner
+
+        def _gen():
+            cb(0, total)
+            for i, item in enumerate(inner):
+                yield item
+                cb(i + 1, total)
+
+        return _gen()
+
+    mod.tqdm = tracked_tqdm
+    _step_hook_installed = True
+    log.info("Progress hook installed (per-step progress enabled)")
+    return True
+
+
+class ProgressReporter:
+    """Throttled, ordered, best-effort PROCESSING webhooks sent from a side thread."""
+
+    def __init__(self, url: str, external_id: str, clip_count: int, job: Dict[str, Any]):
+        self.url = url
+        self.external_id = external_id
+        self.clip_count = max(1, clip_count)
+        self.job = job
+        self._lock = threading.Lock()
+        self._pending: Optional[Dict[str, Any]] = None
+        self._wake = threading.Event()
+        self._stop = False
+        self._last_emit = 0.0
+        self._last_progress = 0
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name=f"progress-{external_id}"
+        )
+        self._thread.start()
+
+    def _overall(self, clip: int, within: float) -> int:
+        # 0-5 prepare, 5-90 clips, 90-93 encode/concat, 93-99 upload
+        value = 5 + ((clip - 1) + max(0.0, min(1.0, within))) / self.clip_count * 85
+        return int(min(90, value))
+
+    def emit(
+        self,
+        stage: str,
+        clip: int = 1,
+        within: float = 0.0,
+        step: Optional[int] = None,
+        total: Optional[int] = None,
+        overall: Optional[int] = None,
+        force: bool = False,
+    ) -> None:
+        progress = overall if overall is not None else self._overall(clip, within)
+        progress = max(progress, self._last_progress)  # never go backwards
+        self._last_progress = progress
+
+        self.job["progress"] = progress
+        self.job["stage"] = stage
+        self.job["clip"] = clip
+        self.job["clip_count"] = self.clip_count
+        self.job["step"] = step
+        self.job["total_steps"] = total
+
+        now = time.time()
+        if not force and now - self._last_emit < PROGRESS_MIN_INTERVAL:
+            return
+        self._last_emit = now
+
+        payload = {
+            "id": self.external_id,
+            "status": "PROCESSING",
+            "progress": progress,
+            "output": {
+                "stage": stage,
+                "clip": clip,
+                "clip_count": self.clip_count,
+                "step": step,
+                "total_steps": total,
+            },
+        }
+        with self._lock:
+            self._pending = payload
+        self._wake.set()
+
+    def emit_step(self, clip: int, step: int, total: int) -> None:
+        done = step >= total
+        self.emit(
+            "DECODING" if done else "GENERATING",
+            clip=clip,
+            within=0.88 * (step / total),
+            step=step,
+            total=total,
+            force=(step == 0 or done),
+        )
+
+    def _run(self) -> None:
+        try:
+            with httpx.Client(timeout=5, follow_redirects=True) as client:
+                while True:
+                    self._wake.wait(timeout=1.0)
+                    self._wake.clear()
+                    with self._lock:
+                        payload, self._pending = self._pending, None
+                    if payload is not None:
+                        try:
+                            client.post(self.url, json=payload).raise_for_status()
+                        except Exception as exc:  # progress is best-effort
+                            log.debug("progress webhook failed: %s", exc)
+                    if self._stop:
+                        return
+        except Exception:
+            log.debug("progress reporter crashed", exc_info=True)
+
+    def close(self) -> None:
+        self._stop = True
+        self._wake.set()
+        self._thread.join(timeout=3)
+
+
+
 class GenerateRequest(BaseModel):
     job_id: str = Field(min_length=1)
     custom_id: Optional[str] = None
@@ -247,6 +408,8 @@ def ensure_model() -> None:
             convert_model_dtype=CONVERT_DTYPE,
         )
 
+        install_step_hook()
+
         if QUANTIZE_8BIT:
             log.info("WAN_QUANTIZE_8BIT=true, converting DiT weights to 8-bit before marking model ready")
             quantize_model_8bit()
@@ -354,11 +517,15 @@ def generate_job(request: GenerateRequest, external_id: str) -> None:
     workdir = JOBS_DIR / safe_job_id(external_id)
     workdir.mkdir(parents=True, exist_ok=True)
 
+    reporter: Optional[ProgressReporter] = None
+
     try:
         if not model_ready or model is None:
             raise RuntimeError(model_error or "WAN_MODEL_NOT_READY")
 
         clip_count = max(1, min(int(request.clip_count or 1), 60))
+        reporter = ProgressReporter(request.webhook_url, external_id, clip_count, job)
+        reporter.emit("PREPARING", overall=2, force=True)
         prompt_base = request.prompt.strip()
         image_path = None
 
@@ -367,6 +534,8 @@ def generate_job(request: GenerateRequest, external_id: str) -> None:
                 request.image_url,
                 workdir / "input.png",
             )
+
+        reporter.emit("PREPARING", overall=5, force=True)
 
         generated = []
         for index in range(clip_count):
@@ -390,28 +559,42 @@ def generate_job(request: GenerateRequest, external_id: str) -> None:
                 external_id, index + 1, clip_count, SAMPLING_STEPS,
             )
 
+            def on_step(step: int, total: int, _clip: int = index + 1) -> None:
+                if CANCEL_MID_STEP and event.is_set():
+                    raise InterruptedError("CANCELLED")
+                reporter.emit_step(_clip, step, total)
+
+            if not _step_hook_installed:
+                # No per-step hook available: at least announce the clip start.
+                reporter.emit("GENERATING", clip=index + 1, within=0.0, force=True)
+
             with job_lock:
-                video = model.generate(
-                    clip_prompt,
-                    img=Image.open(image_path).convert("RGB") if image_path else None,
-                    size=VIDEO_SIZE,
-                    max_area=MAX_AREA,
-                    frame_num=FRAME_NUM,
-                    shift=SHIFT,
-                    sample_solver="unipc",
-                    sampling_steps=SAMPLING_STEPS,
-                    guide_scale=GUIDE_SCALE,
-                    seed=seed,
-                    offload_model=OFFLOAD_MODEL,
-                )
+                _step_hook["cb"] = on_step
+                try:
+                    video = model.generate(
+                        clip_prompt,
+                        img=Image.open(image_path).convert("RGB") if image_path else None,
+                        size=VIDEO_SIZE,
+                        max_area=MAX_AREA,
+                        frame_num=FRAME_NUM,
+                        shift=SHIFT,
+                        sample_solver="unipc",
+                        sampling_steps=SAMPLING_STEPS,
+                        guide_scale=GUIDE_SCALE,
+                        seed=seed,
+                        offload_model=OFFLOAD_MODEL,
+                    )
+                finally:
+                    _step_hook["cb"] = None
 
             if video is None:
                 raise RuntimeError("WAN_GENERATION_RETURNED_NO_VIDEO")
 
             clip_path = workdir / f"clip_{index:03d}.mp4"
+            reporter.emit("ENCODING", clip=index + 1, within=0.94, force=True)
             save_tensor_to_mp4(video, clip_path)
             generated.append(clip_path)
-            job["progress"] = int(((index + 1) / clip_count) * 90)
+            reporter.emit("ENCODING", clip=index + 1, within=1.0, force=True)
 
             del video
             if torch.cuda.is_available():
@@ -423,9 +606,11 @@ def generate_job(request: GenerateRequest, external_id: str) -> None:
         final_path = workdir / "final.mp4"
         concat_mp4(generated, final_path)
 
-        job["progress"] = 92
+        reporter.emit("UPLOADING", clip=clip_count, overall=93, force=True)
         video_url = upload_video(final_path, request.job_id)
+        reporter.close()
         job["progress"] = 100
+        job["stage"] = "COMPLETED"
         job["status"] = "COMPLETED"
         job["video_url"] = video_url
 
@@ -463,7 +648,12 @@ def generate_job(request: GenerateRequest, external_id: str) -> None:
         except Exception:
             log.exception("Failed to send failure webhook")
     finally:
+        if reporter is not None:
+            reporter.close()
+        _step_hook["cb"] = None
         cancel_events.pop(external_id, None)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 @APP.on_event("startup")
