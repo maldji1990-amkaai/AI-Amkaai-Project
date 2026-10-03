@@ -774,7 +774,7 @@ export default function AIChangeConsole() {
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerateVideo(); } }}
                 />
                 <button 
-  onClick={() => setShowDurationModal(true)} // هذا التغيير سيفتح النافذة بدلاً من التوليد المباشر
+  onClick={handleGenerateVideo}
   disabled={isGenerating || !prompt.trim()} 
   className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-600 text-slate-800 disabled:opacity-20 transition shadow-md hover:bg-teal-500 shrink-0"
 >
