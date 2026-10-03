@@ -261,70 +261,119 @@ export default function HomePage() {
   const executeDash = async () => {
     if (!dashInput.trim()) return;
     if (!isSignedIn) { router.push("/sign-in?redirect_url=/#studio"); return; }
-    
-    // 🔒 فحص الرصيد — إذا انتهى يفتح modal الاشتراك
-    if (credits <= 0) {
-      setPricingModalOpen(true);
-      return;
-    }
 
-    const jobId = crypto.randomUUID();
-    setRenderQueue(prev => [{ id: jobId, prompt: dashInput.slice(0, 28) + "...", progress: 10 }, ...prev]);
-    setDashLoading(true); setDashResult("");
+    // The server is the authority for credits. The API will return the exact
+    // remaining/required balance instead of relying on stale client state.
+    const clientJobId = crypto.randomUUID();
+    setRenderQueue(prev => [{ id: clientJobId, prompt: dashInput.slice(0, 28) + "...", progress: 5 }, ...prev]);
+    setDashLoading(true);
+    setDashResult("");
 
-    // ETA countdown
     const etaSeconds = dashType === "ai-video" ? 45 : dashType === "ai-avatar" ? 30 : dashType === "voice-clone" ? 20 : 35;
     setRenderETA(etaSeconds);
-    const etaInterval = setInterval(() => {
+    const etaInterval = window.setInterval(() => {
       setRenderETA(prev => {
-        if (prev === null || prev <= 1) { clearInterval(etaInterval); return null; }
+        if (prev === null || prev <= 1) {
+          window.clearInterval(etaInterval);
+          return null;
+        }
         return prev - 1;
       });
     }, 1000);
+
+    const updateProgress = (value: number) => {
+      const safe = Math.max(5, Math.min(99, Math.round(value)));
+      setRenderQueue(prev => prev.map(j => j.id === clientJobId ? { ...j, progress: safe } : j));
+    };
+
     try {
       let endpoint = "/api/generate-video";
       if (dashType === "ai-avatar") endpoint = "/api/generate-avatar";
       if (dashType === "image-to-video") endpoint = "/api/generate-image";
       if (dashType === "voice-clone") endpoint = "/api/generate-voice";
+
       const res = await fetch(endpoint, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": clientJobId },
         body: JSON.stringify({ prompt: dashInput, aspectRatio: dashAspect, cameraMotion: dashCamera, duration }),
       });
 
-      // 402 = رصيد منتهي من السيرفر
       if (res.status === 402) {
-        setCredits(0);
+        const data = await res.json().catch(() => ({}));
+        setCredits(typeof data?.remainingCredits === "number" ? data.remainingCredits : 0);
         setPricingModalOpen(true);
-        setRenderQueue(prev => prev.filter(j => j.id !== jobId));
+        setRenderQueue(prev => prev.filter(j => j.id !== clientJobId));
         return;
+      }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || data?.message || "Failed to start generation");
       }
 
       let data = await res.json();
 
-      // رصيد منتهي من الـ response body
-      if (data?.error?.toLowerCase().includes("credit") || data?.remainingCredits === 0) {
-        setCredits(0);
-        setPricingModalOpen(true);
-        setRenderQueue(prev => prev.filter(j => j.id !== jobId));
-        return;
+      // AI Video is asynchronous: the API returns a jobId immediately.
+      // Keep the generation panel in its live state and poll the real server
+      // job instead of incorrectly marking the queue 100% and returning to Standby.
+      if (dashType === "ai-video" && data.jobId) {
+        updateProgress(typeof data.progress === "number" ? data.progress : 5);
+
+        for (let attempt = 0; attempt < 240; attempt++) {
+          const check = await fetch(`/api/generate-video/status?jobId=${encodeURIComponent(data.jobId)}`, { cache: "no-store" });
+          const state = await check.json().catch(() => ({}));
+
+          if (!check.ok) {
+            throw new Error(state?.error || "Unable to read generation status");
+          }
+
+          const status = String(state.status || "QUEUED").toUpperCase();
+          const serverProgress = typeof state.progress === "number" ? state.progress : 5;
+          updateProgress(serverProgress);
+
+          if (status === "COMPLETED" && (state.videoUrl || state.resultUrl)) {
+            setDashResult(state.videoUrl || state.resultUrl);
+            setRenderQueue(prev => prev.map(j => j.id === clientJobId ? { ...j, progress: 100 } : j));
+            return;
+          }
+
+          if (status === "FAILED" || status === "CANCELLED") {
+            throw new Error(state.error || `Generation ${status.toLowerCase()}`);
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+
+        throw new Error("Generation timed out while waiting for the GPU job");
       }
 
-      // الصورة-إلى-فيديو (خارج وضع الديمو) يرجع فوراً بحالة "processing" مع
-      // generationId، والتوليد الفعلي يعمل بشكل غير متزامن على خوادم Replicate.
+      // Other generation modes may still return their final output directly.
       if (dashType === "image-to-video" && data.status === "processing" && data.generationId) {
         for (let attempt = 0; attempt < 150; attempt++) {
+          updateProgress(Math.min(95, 10 + attempt));
           const check = await fetch(`/api/generate-image/status?generationId=${encodeURIComponent(data.generationId)}`, { cache: "no-store" });
           const state = await check.json();
           if (state.status === "done") { data = { ...data, videoUrl: state.videoUrl }; break; }
-          if (state.status === "failed") { setDashResult(""); break; }
+          if (state.status === "failed") throw new Error(state.error || "Video generation failed");
           await new Promise(resolve => setTimeout(resolve, 4000));
         }
       }
 
-      setDashResult(data.videoUrl || data.outputUrl || "");
-      if (data.remainingCredits !== undefined) setCredits(data.remainingCredits);
-      setRenderQueue(prev => prev.map(j => j.id === jobId ? { ...j, progress: 100 } : j));
-    } catch(e) { console.error(e); } finally { setDashLoading(false); }
+      const output = data.videoUrl || data.outputUrl || data.avatar || "";
+      if (!output) throw new Error("No output was returned by the generation pipeline");
+      setDashResult(output);
+      if (typeof data.remainingCredits === "number") setCredits(data.remainingCredits);
+      setRenderQueue(prev => prev.map(j => j.id === clientJobId ? { ...j, progress: 100 } : j));
+    } catch (e: any) {
+      console.error(e);
+      setRenderQueue(prev => prev.filter(j => j.id !== clientJobId));
+      setDashResult("");
+      alert(e?.message || "حدث خطأ أثناء التوليد");
+    } finally {
+      window.clearInterval(etaInterval);
+      setRenderETA(null);
+      setDashLoading(false);
+    }
   };
 
   const studioTabs = [
@@ -1088,11 +1137,20 @@ export default function HomePage() {
                     </div>
                   </div>
                 ) : dashLoading ? (
-                  <div className="text-center space-y-3 pt-8">
-                    <div className="w-10 h-10 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-[11px] text-teal-600 font-mono tracking-wider animate-pulse">Rendering sequence pipeline via live GPU nodes...</p>
+                  <div className="w-full max-w-md px-6 space-y-4 pt-8">
+                    <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-500">
+                      <span className="text-teal-600 animate-pulse">Generating video...</span>
+                      <span>{renderQueue[0]?.progress ?? 5}%</span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-teal-500 via-cyan-500 to-emerald-500 transition-all duration-700"
+                        style={{ width: `${renderQueue[0]?.progress ?? 5}%` }}
+                      />
+                    </div>
+                    <p className="text-center text-[11px] text-slate-500 font-mono tracking-wider">Live GPU generation in progress...</p>
                     {renderETA !== null && (
-                      <p className="text-[10px] text-slate-500 font-mono">Estimated completion in {renderETA}s</p>
+                      <p className="text-center text-[10px] text-slate-500 font-mono">Estimated completion in {renderETA}s</p>
                     )}
                   </div>
                 ) : (
