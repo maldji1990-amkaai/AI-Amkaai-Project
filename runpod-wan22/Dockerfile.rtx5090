@@ -60,7 +60,7 @@ RUN python -m pip install \
 RUN python -m pip install --no-deps -e /opt/Wan2.2
 
 # Fail the build early if this torch cannot target Blackwell.
-RUN python -c "import torch; a=torch.cuda._get_arch_list() if hasattr(torch.cuda,'_get_arch_list') else []; print('torch',torch.__version__,'cuda',torch.version.cuda,'archs',a); assert 'sm_120' in a, 'torch build has no sm_120 (RTX 5090) kernels'"
+RUN python -c "import torch; a=torch.cuda.get_arch_list(); print('TORCH', torch.__version__, 'CUDA', torch.version.cuda, 'ARCHS', a); assert any(x in a for x in ('sm_120','compute_120')), 'torch build has no RTX 5090 (sm_120) support'"
 
 COPY server.py /opt/amkaai-server/server.py
 COPY requirements.txt /opt/amkaai-server/requirements.txt

@@ -1,0 +1,8 @@
+  node_modules
+  .next
+  .git
+  public
+  prisma_backup_before_repair
+  *.mp4
+  *.db
+  .env*
