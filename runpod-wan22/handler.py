@@ -27,6 +27,92 @@ logging.basicConfig(
 log = logging.getLogger("amkaai-serverless")
 
 
+# ---------------------------------------------------------------------------
+# Attention fallback (no flash-attn required)
+#
+# Wan's model calls wan.modules.attention.flash_attention() directly, and that
+# function does `assert FLASH_ATTN_2_AVAILABLE`. Without the flash-attn package
+# the job dies with AssertionError. PyTorch's scaled_dot_product_attention has
+# its own fused FlashAttention kernels (Ampere/Ada/Blackwell), so we route to
+# it instead. If flash-attn *is* installed, we leave Wan untouched.
+# ---------------------------------------------------------------------------
+def install_sdpa_attention_fallback() -> bool:
+    import importlib.util
+
+    if importlib.util.find_spec("flash_attn") is not None:
+        log.info("flash-attn found: using Wan's native attention")
+        return False
+
+    import torch.nn.functional as F
+    import wan.modules.attention as wan_attention
+    import wan.modules.model as wan_model
+
+    def sdpa_flash_attention(
+        q,
+        k,
+        v,
+        q_lens=None,
+        k_lens=None,
+        dropout_p=0.0,
+        softmax_scale=None,
+        q_scale=None,
+        causal=False,
+        window_size=(-1, -1),
+        deterministic=False,
+        dtype=torch.bfloat16,
+        version=None,
+    ):
+        # q: [B, Lq, N, C]   k, v: [B, Lk, N, C]   (same layout as Wan's flash_attention)
+        out_dtype = q.dtype
+        compute_dtype = dtype if dtype in (torch.float16, torch.bfloat16) else torch.bfloat16
+
+        if q_scale is not None:
+            q = q * q_scale
+
+        attn_mask = None
+        if k_lens is not None:
+            if k.size(0) == 1:
+                # Single sample (what this server runs): drop padded keys instead of masking.
+                valid = int(k_lens[0])
+                k = k[:, :valid]
+                v = v[:, :valid]
+            else:
+                positions = torch.arange(k.size(1), device=k.device)[None, :]
+                attn_mask = (positions < k_lens.to(k.device)[:, None])[:, None, None, :]
+
+        q_ = q.transpose(1, 2).to(compute_dtype)
+        k_ = k.transpose(1, 2).to(compute_dtype)
+        v_ = v.transpose(1, 2).to(compute_dtype)
+
+        out = F.scaled_dot_product_attention(
+            q_,
+            k_,
+            v_,
+            attn_mask=attn_mask,
+            is_causal=causal,
+            dropout_p=dropout_p,
+            scale=softmax_scale,
+        )
+        return out.transpose(1, 2).contiguous().to(out_dtype)
+
+    wan_attention.flash_attention = sdpa_flash_attention
+    wan_model.flash_attention = sdpa_flash_attention
+
+    import wan.modules as wan_modules
+
+    if hasattr(wan_modules, "flash_attention"):
+        wan_modules.flash_attention = sdpa_flash_attention
+
+    log.info("flash-attn not installed: patched Wan attention to use PyTorch SDPA")
+    return True
+
+
+try:
+    install_sdpa_attention_fallback()
+except Exception:  # never prevent the worker from booting
+    log.exception("Could not install the SDPA attention fallback")
+
+
 def post_webhook_sync(url: str, payload: Dict[str, Any]) -> None:
     """
     Send the result to the existing AMKAAI webhook.
