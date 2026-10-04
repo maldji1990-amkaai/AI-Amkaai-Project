@@ -317,35 +317,93 @@ export default function HomePage() {
       // Keep the generation panel in its live state and poll the real server
       // job instead of incorrectly marking the queue 100% and returning to Standby.
       if (dashType === "ai-video" && data.jobId) {
-        updateProgress(typeof data.progress === "number" ? data.progress : 5);
+  updateProgress(typeof data.progress === "number" ? data.progress : 5);
 
-        for (let attempt = 0; attempt < 240; attempt++) {
-          const check = await fetch(`/api/generate-video/status?jobId=${encodeURIComponent(data.jobId)}`, { cache: "no-store" });
-          const state = await check.json().catch(() => ({}));
+  // RunPod generation can legitimately take longer than the UI polling window.
+  // Keep polling for a long time instead of declaring the generation failed.
+  for (let attempt = 0; attempt < 1200; attempt++) {
+    const check = await fetch(
+      `/api/generate-video/status?jobId=${encodeURIComponent(data.jobId)}`,
+      { cache: "no-store" }
+    );
 
-          if (!check.ok) {
-            throw new Error(state?.error || "Unable to read generation status");
+    const state = await check.json().catch(() => ({}));
+
+    if (!check.ok) {
+      throw new Error(
+        state?.error || "Unable to read generation status"
+      );
+    }
+
+    const status = String(
+      state.status || "QUEUED"
+    ).toUpperCase();
+
+    const serverProgress =
+      typeof state.progress === "number"
+        ? state.progress
+        : 5;
+
+    updateProgress(serverProgress);
+
+    if (
+      status === "COMPLETED" &&
+      (state.videoUrl || state.resultUrl)
+    ) {
+      const outputUrl =
+        state.videoUrl || state.resultUrl;
+
+      setDashResult(outputUrl);
+
+      setRenderQueue(prev =>
+        prev.map(j =>
+          j.id === clientJobId
+            ? {
+                ...j,
+                progress: 100,
+                status: "completed",
+                resultUrl: outputUrl,
+              }
+            : j
+        )
+      );
+
+      return;
+    }
+
+    if (
+      status === "FAILED" ||
+      status === "CANCELLED"
+    ) {
+      throw new Error(
+        state.error ||
+          `Generation ${status.toLowerCase()}`
+      );
+    }
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 3000)
+    );
+  }
+
+  // Do NOT mark the generation as failed.
+  // The server/RunPod may still be processing the job.
+  setRenderQueue(prev =>
+    prev.map(j =>
+      j.id === clientJobId
+        ? {
+            ...j,
+            status: "processing",
+            progress: Math.max(j.progress || 5, 80),
           }
+        : j
+    )
+  );
 
-          const status = String(state.status || "QUEUED").toUpperCase();
-          const serverProgress = typeof state.progress === "number" ? state.progress : 5;
-          updateProgress(serverProgress);
+  setDashResult("");
 
-          if (status === "COMPLETED" && (state.videoUrl || state.resultUrl)) {
-            setDashResult(state.videoUrl || state.resultUrl);
-            setRenderQueue(prev => prev.map(j => j.id === clientJobId ? { ...j, progress: 100 } : j));
-            return;
-          }
-
-          if (status === "FAILED" || status === "CANCELLED") {
-            throw new Error(state.error || `Generation ${status.toLowerCase()}`);
-          }
-
-          await new Promise(resolve => setTimeout(resolve, 3000));
-        }
-
-        throw new Error("Generation timed out while waiting for the GPU job");
-      }
+  return;
+}
 
       // Other generation modes may still return their final output directly.
       if (dashType === "image-to-video" && data.status === "processing" && data.generationId) {
