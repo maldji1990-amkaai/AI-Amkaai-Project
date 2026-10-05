@@ -83,6 +83,17 @@ function fmt(seconds: number) {
   return m > 0 ? `${m}m ${String(r).padStart(2, "0")}s` : `${r}s`;
 }
 
+const HUD_ANIMATION_STYLE = (
+  <style jsx global>{`
+    @keyframes progress-shine {
+      0% { transform: translateX(0) skewX(-18deg); opacity: 0; }
+      15% { opacity: 0.7; }
+      60% { opacity: 0.25; }
+      100% { transform: translateX(420%) skewX(-18deg); opacity: 0; }
+    }
+  `}</style>
+);
+
 export default function VideoProgress(props: VideoProgressProps) {
   const { status, progress, stage, startedAt, createdAt, jobKey, variant = "full" } = props;
   const done = status === "completed";
@@ -213,66 +224,152 @@ export default function VideoProgress(props: VideoProgressProps) {
   }
 
   return (
-    <div className="w-full space-y-3 text-left">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-black text-slate-700 flex items-center gap-2">
-            {active && <Loader2 size={14} className="animate-spin text-teal-600 shrink-0" />}
-            <span className="truncate">{title}</span>
-          </p>
-          <p className="text-[11px] text-slate-500 mt-0.5">{detail}</p>
+    <>
+      {HUD_ANIMATION_STYLE}
+      <div className="w-full text-center">
+      <div className="relative overflow-hidden rounded-3xl border border-cyan-400/20 bg-[#050b14] px-5 py-7 shadow-[0_0_55px_rgba(6,182,212,0.16)]">
+        {/* Futuristic background glow — visual only */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-500/10 blur-3xl animate-pulse" />
+          <div className="absolute -left-16 -top-16 h-40 w-40 rounded-full bg-blue-600/10 blur-3xl" />
+          <div className="absolute -bottom-20 -right-10 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(34,211,238,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.08)_1px,transparent_1px)] [background-size:28px_28px] animate-[pulse_3s_ease-in-out_infinite]" />
         </div>
-        <span className="text-2xl font-black text-teal-600 tabular-nums leading-none">{pct}%</span>
-      </div>
 
-      {bar("h-3")}
+        <div className="relative z-10">
+          {/* Brand */}
+          <div className="mb-5 flex items-center justify-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-300/40 bg-cyan-400/10 text-[11px] font-black text-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.25)]">
+              A
+            </div>
+            <div className="text-left leading-none">
+              <div className="text-[15px] font-black tracking-[0.22em] text-white">AMKAAI</div>
+              <div className="mt-1 text-[7px] font-bold tracking-[0.3em] text-cyan-300/70">POWERED BY AI</div>
+            </div>
+          </div>
 
-      <ol className="grid grid-cols-5 gap-1">
-        {PHASES.map((ph, i) => {
-          const complete = done || i < phase;
-          const current = !done && i === phase && active;
-          const Icon = ph.icon;
-          return (
-            <li key={ph.key} className="flex flex-col items-center gap-1 min-w-0">
-              <span
-                className={`w-6 h-6 rounded-full flex items-center justify-center border text-[10px] transition-colors ${
-                  complete
-                    ? "bg-teal-500 border-teal-500 text-white"
-                    : current
-                      ? "border-teal-500 text-teal-600 bg-teal-50 animate-pulse"
-                      : "border-slate-300 text-slate-400 bg-white"
+          {/* Percentage HUD */}
+          <div className="relative mx-auto mb-6 flex h-48 w-48 items-center justify-center">
+            <div className="absolute inset-5 rounded-full border border-cyan-400/15" />
+            <div className="absolute inset-8 rounded-full border border-dashed border-cyan-300/20 animate-[spin_18s_linear_infinite]" />
+            <div className="absolute inset-11 rounded-full border border-cyan-400/20" />
+            <div className="absolute inset-[4.25rem] rounded-full bg-cyan-400/5 shadow-[0_0_55px_rgba(34,211,238,0.22)]" />
+            <div className="absolute inset-0 rounded-full border border-transparent border-t-cyan-300/90 border-r-cyan-500/30 animate-[spin_3.5s_linear_infinite]" />
+            <div className="absolute inset-3 rounded-full border border-transparent border-b-blue-400/30 border-l-cyan-300/30 animate-[spin_7s_linear_infinite_reverse]" />
+
+            <div className="relative z-10 animate-[pulse_2.2s_ease-in-out_infinite]">
+              <div
+                className={`text-5xl font-black tracking-tight tabular-nums ${
+                  failed
+                    ? "text-red-400"
+                    : done
+                      ? "text-emerald-400"
+                      : "text-cyan-300"
                 }`}
+                aria-live="polite"
               >
-                {complete ? <Check size={12} strokeWidth={3} /> : <Icon size={12} />}
-              </span>
-              <span
-                className={`text-[9px] font-mono uppercase tracking-wide truncate ${
-                  complete || current ? "text-teal-600" : "text-slate-400"
+                {pct}%
+              </div>
+              <div className="mt-1 text-[8px] font-bold uppercase tracking-[0.3em] text-slate-400">
+                {done ? "Completed" : failed ? "Generation stopped" : "Generating"}
+              </div>
+            </div>
+          </div>
+
+          {/* Real progress bar — width still uses the existing RunPod-backed value */}
+          <div className="mb-6 relative">
+            <div
+              className="h-1.5 w-full overflow-hidden rounded-full bg-white/10"
+              role="progressbar"
+              aria-label={title}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={pct}
+            >
+              <div
+                className={`relative h-full rounded-full transition-[width] duration-500 ease-out ${
+                  failed
+                    ? "bg-gradient-to-r from-red-500 to-red-300"
+                    : done
+                      ? "bg-gradient-to-r from-emerald-500 to-emerald-300"
+                      : "bg-gradient-to-r from-blue-500 via-cyan-300 to-cyan-400 shadow-[0_0_16px_rgba(34,211,238,0.7)]"
                 }`}
+                style={{ width: `${Math.max(active ? 3 : 0, Math.min(100, shown))}%` }}
               >
-                {ph.label}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+                {active && <div className="absolute inset-0 bg-white/20 animate-pulse" />}
+                {active && <div className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/25 blur-sm animate-[progress-shine_1.8s_linear_infinite]" />}
+              </div>
+            </div>
+          </div>
 
-      <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
-        <span className="flex items-center gap-1">
-          <Clock size={10} />
-          {elapsed !== null ? `Elapsed ${fmt(elapsed)}` : "—"}
-        </span>
-        <span className="flex items-center gap-1">
-          <Hourglass size={10} />
-          {eta !== null ? `~${fmt(eta)} left` : active ? "Estimating…" : ""}
-        </span>
+          {/* Generation phases */}
+          <ol className="mb-5 grid grid-cols-5 gap-1">
+            {PHASES.map((ph, i) => {
+              const complete = done || i < phase;
+              const current = !done && i === phase && active;
+              const Icon = ph.icon;
+
+              return (
+                <li key={ph.key} className="flex min-w-0 flex-col items-center gap-1.5">
+                  <span
+                    className={`flex h-8 w-8 items-center justify-center rounded-full border text-[10px] transition-all duration-300 ${
+                      complete
+                        ? "border-cyan-300 bg-cyan-300 text-[#061018] shadow-[0_0_16px_rgba(34,211,238,0.45)]"
+                        : current
+                          ? "border-cyan-300/80 bg-cyan-400/10 text-cyan-300 shadow-[0_0_22px_rgba(34,211,238,0.38)] animate-pulse"
+                          : "border-white/10 bg-white/[0.03] text-slate-500"
+                    }`}
+                  >
+                    {complete ? <Check size={13} strokeWidth={3} /> : <Icon size={13} />}
+                  </span>
+                  <span
+                    className={`truncate text-[8px] font-bold uppercase tracking-wider ${
+                      complete || current ? "text-cyan-300" : "text-slate-500"
+                    }`}
+                  >
+                    {ph.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+
+          {/* Status */}
+          <div className="border-t border-white/10 pt-4">
+            <div className="flex items-center justify-center gap-2">
+              {active && <Loader2 size={13} className="animate-spin text-cyan-300" />}
+              <p className="text-xs font-bold text-white/90">{title}</p>
+            </div>
+            <p className="mt-1 text-[10px] text-slate-400">{detail}</p>
+            <p className="mt-3 text-[9px] font-medium tracking-wide text-cyan-300/60">
+              {done
+                ? "Your video is ready."
+                : failed
+                  ? "The generation did not complete."
+                  : "Veuillez patienter, votre vidéo est en cours de génération..."}
+            </p>
+          </div>
+
+          {/* Timing information */}
+          <div className="mt-4 flex items-center justify-between text-[9px] font-mono text-slate-500">
+            <span className="flex items-center gap-1">
+              <Clock size={10} />
+              {elapsed !== null ? `Elapsed ${fmt(elapsed)}` : "—"}
+            </span>
+            <span className="flex items-center gap-1">
+              <Hourglass size={10} />
+              {eta !== null ? `~${fmt(eta)} left` : active ? "Estimating…" : ""}
+            </span>
+          </div>
+
+          {stalled && (
+            <p className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/5 px-2.5 py-1.5 text-[10px] text-amber-300">
+              No update for {fmt(stalledFor)}. This is normal while a GPU worker cold-starts or loads the model — the job is still running.
+            </p>
+          )}
+        </div>
       </div>
-
-      {stalled && (
-        <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
-          No update for {fmt(stalledFor)}. This is normal while a GPU worker cold-starts or loads the model — the job is still running.
-        </p>
-      )}
-    </div>
+      </div>
+    </>
   );
 }
