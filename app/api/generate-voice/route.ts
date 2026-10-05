@@ -10,6 +10,83 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
+const MAX_ENHANCED_VOICE_TEXT_LENGTH = 12000;
+
+async function autoEnhanceVoiceText(text: string) {
+  // AUTO_ENHANCE_PROMPT=false keeps the original voice text untouched.
+  if (process.env.AUTO_ENHANCE_PROMPT === "false") {
+    return { enhancedText: text, provider: "disabled" };
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  // Auto Enhance must never block voice generation.
+  if (!apiKey) {
+    return { enhancedText: text, provider: "fallback" };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-5-mini",
+        input: [
+          {
+            role: "system",
+            content: [
+              {
+                type: "input_text",
+                text: [
+                  "You are AmkaAI's automatic voice-script enhancer.",
+                  "Improve the text only for natural text-to-speech delivery.",
+                  "PRESERVE EVERY ORIGINAL WORD EXACTLY.",
+                  "Do not add words, remove words, translate, summarize, rewrite, or change the meaning.",
+                  "Do not invent dialogue, facts, names, emotions, or events.",
+                  "You may only improve punctuation, capitalization, paragraph breaks, and harmless spacing so the voice model can speak the same text naturally.",
+                  "Return ONLY the improved text. No heading, explanation, quotation marks, or markdown.",
+                ].join("\n"),
+              },
+            ],
+          },
+          {
+            role: "user",
+            content: [{ type: "input_text", text }],
+          },
+        ],
+        max_output_tokens: 1200,
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return { enhancedText: text, provider: "fallback" };
+    }
+
+    const outputText =
+      typeof data?.output_text === "string" ? data.output_text.trim() : "";
+
+    if (!outputText || outputText.length > MAX_ENHANCED_VOICE_TEXT_LENGTH) {
+      return { enhancedText: text, provider: "fallback" };
+    }
+
+    return { enhancedText: outputText, provider: "openai" };
+  } catch (error) {
+    console.error("AUTO_ENHANCE_VOICE_TEXT_FAILED", error);
+    return { enhancedText: text, provider: "fallback" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function POST(request: Request) {
   // 🎯 إنشاء معرف فريد للعملية لمتابعة حجز النقاط وإرجاعها تلقائياً في حال الفشل
   const referenceId = `voc_${crypto.randomUUID()}`;
@@ -25,7 +102,7 @@ export async function POST(request: Request) {
 
     // 📦 استقبال المعطيات من واجهة المستخدم الفخمة (Synthesis Hub)
     const body = await request.json();
-    const { text, voiceSampleUrl, language, targetAvatarVideo } = body;
+    let { text, voiceSampleUrl, language, targetAvatarVideo } = body;
 
     if (!text) {
       return NextResponse.json({ error: "الرجاء كتابة النص المراد تحويله لنطق بشري حقيقي" }, { status: 400 });
@@ -34,6 +111,18 @@ export async function POST(request: Request) {
     // 👤 جلب بيانات المستخدم التحقق من وجوده في قاعدة البيانات
     const user = await getOrCreateUser(userId);
     if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+
+    /*
+     * AUTO ENHANCE
+     *
+     * For voice generation we must NOT invent or rewrite spoken content.
+     * The enhancer only improves punctuation/formatting while preserving
+     * every original word. Replicate, credits, cloning and lip-sync stay intact.
+     */
+    const { enhancedText, provider: enhanceProvider } =
+      await autoEnhanceVoiceText(text);
+
+    text = enhancedText;
 
     //////////////////////////////////////////////////
     // 💸 USE CREDITS & SUBSCRIPTION CHECK (آمن وصارم)
@@ -150,6 +239,10 @@ export async function POST(request: Request) {
         outputUrl: finalOutputUrl, // سيعود برابط فيديو متكامل أو ملف صوتي فخم حسب الخيارات المفعلة
         demo: false,
         remainingCredits: creditResult.remainingCredits,
+        autoEnhanced: enhancedText !== body.text,
+        enhanceProvider,
+        originalText: body.text,
+        enhancedText,
       });
 
     } catch (aiError) {

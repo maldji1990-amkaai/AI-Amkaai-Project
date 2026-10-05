@@ -11,6 +11,64 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
+// Auto Enhance: expands a short user prompt into a clearer cinematic avatar direction.
+// No OPENAI_PROMPT_MODEL variable is required. If OpenAI is unavailable, the original
+// prompt is preserved so the existing AI generation pipeline is not broken.
+async function enhanceAvatarPrompt(prompt: string): Promise<string> {
+  const cleanPrompt = String(prompt || "").trim();
+  if (!cleanPrompt) return "expression driving pattern";
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return cleanPrompt;
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-6-luna",
+        input: [
+          {
+            role: "system",
+            content: [
+              {
+                type: "input_text",
+                text:
+                  "You are an AI video prompt enhancer. Expand the user's short avatar direction into one concise, production-ready prompt for an AI avatar/video model. Preserve the user's exact intent. Add only useful details such as natural facial expression, subtle head movement, eye direction, lip sync, posture, lighting, camera framing and cinematic realism when appropriate. Do not invent a different subject, action, story, language, identity, or style. Return only the enhanced prompt, with no explanation, labels, or quotation marks.",
+              },
+            ],
+          },
+          {
+            role: "user",
+            content: [
+              { type: "input_text", text: cleanPrompt },
+            ],
+          },
+        ],
+        max_output_tokens: 220,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("⚠️ Auto Enhance unavailable:", response.status);
+      return cleanPrompt;
+    }
+
+    const data = await response.json();
+    const enhanced = typeof data?.output_text === "string"
+      ? data.output_text.trim()
+      : "";
+
+    return enhanced || cleanPrompt;
+  } catch (error) {
+    console.warn("⚠️ Auto Enhance failed; using original prompt:", error);
+    return cleanPrompt;
+  }
+}
+
 export async function POST(request: Request) {
   // 🎯 إنشاء معرّف فريد للعملية لربط حجز النقاط وإرجاعها في حال الفشل
   const referenceId = `avt_${crypto.randomUUID()}`;
@@ -83,7 +141,7 @@ export async function POST(request: Request) {
         version: "fofr/live-portrait:16ef6823", // معرف الموديل المستقر على Replicate
         input: {
           source_image: uploadedImage, // يقبل رابط مباشر أو صورة مشفرة Base64 قادمة من الفرونت إند
-          prompt: prompt || "expression driving pattern",
+          prompt: await enhanceAvatarPrompt(prompt || "expression driving pattern"),
         },
       });
 

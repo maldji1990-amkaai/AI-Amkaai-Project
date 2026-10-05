@@ -98,8 +98,12 @@ export default function HomePage() {
   const [dashType, setDashType] = useState<DashMediaType>("ai-video");
   const [dashAspect, setDashAspect] = useState<AspectRatioType>("16:9");
   const [dashCamera, setDashCamera] = useState("static");
+  const [dashImage, setDashImage] = useState<string | null>(null);
+  const [dashImageName, setDashImageName] = useState("");
+  const [dashAvatarImage, setDashAvatarImage] = useState<string | null>(null);
+  const [dashAvatarImageName, setDashAvatarImageName] = useState(""); const [dashVoiceSample, setDashVoiceSample] = useState<string | null>(null); const [dashVoiceSampleName, setDashVoiceSampleName] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [renderQueue, setRenderQueue] = useState<{id:string;prompt:string;progress:number}[]>([]);
+  const [renderQueue, setRenderQueue] = useState<{ id: string; prompt: string; progress: number; status?: string; resultUrl?: string }[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [credits, setCredits] = useState(0);
 
@@ -113,6 +117,18 @@ export default function HomePage() {
     setStudioVisible(true);
     setDashInput("");
     setDashResult("");
+    if (tool !== "image-to-video") {
+      setDashImage(null);
+      setDashImageName("");
+    }
+    if (tool !== "ai-avatar") {
+      setDashAvatarImage(null);
+      setDashAvatarImageName("");
+    }
+    if (tool !== "voice-clone") {
+      setDashVoiceSample(null);
+      setDashVoiceSampleName("");
+    }
     setTimeout(() => {
       document.getElementById("studio")?.scrollIntoView({ behavior: "smooth" });
     }, 50);
@@ -260,6 +276,18 @@ export default function HomePage() {
 
   const executeDash = async () => {
     if (!dashInput.trim()) return;
+    if (dashType === "image-to-video" && !dashImage) {
+      alert("Please upload an image first for Image-to-Video.");
+      return;
+    }
+    if (dashType === "ai-avatar" && !dashAvatarImage) {
+      alert("Please upload an image first for Create an Avatar.");
+      return;
+    }
+    if (dashType === "voice-clone" && !dashVoiceSample) {
+      alert("Please upload a voice sample first for AI Voice.");
+      return;
+    }
     if (!isSignedIn) { router.push("/sign-in?redirect_url=/#studio"); return; }
 
     // The server is the authority for credits. The API will return the exact
@@ -289,13 +317,21 @@ export default function HomePage() {
     try {
       let endpoint = "/api/generate-video";
       if (dashType === "ai-avatar") endpoint = "/api/generate-avatar";
-      if (dashType === "image-to-video") endpoint = "/api/generate-image";
+      if (dashType === "image-to-video") endpoint = "/api/generate-image-to-video";
       if (dashType === "voice-clone") endpoint = "/api/generate-voice";
 
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": clientJobId },
-        body: JSON.stringify({ prompt: dashInput, aspectRatio: dashAspect, cameraMotion: dashCamera, duration }),
+        body: JSON.stringify({
+          prompt: dashInput,
+          aspectRatio: dashAspect,
+          cameraMotion: dashCamera,
+          duration,
+          ...(dashType === "image-to-video" ? { uploadedImage: dashImage } : {}),
+  ...(dashType === "ai-avatar" ? { uploadedImage: dashAvatarImage } : {}),
+  ...(dashType === "voice-clone" ? { voiceSampleUrl: dashVoiceSample } : {}),
+        }),
       });
 
       if (res.status === 402) {
@@ -409,7 +445,7 @@ export default function HomePage() {
       if (dashType === "image-to-video" && data.status === "processing" && data.generationId) {
         for (let attempt = 0; attempt < 150; attempt++) {
           updateProgress(Math.min(95, 10 + attempt));
-          const check = await fetch(`/api/generate-image/status?generationId=${encodeURIComponent(data.generationId)}`, { cache: "no-store" });
+          const check = await fetch(`/api/generate-image-to-video/status?generationId=${encodeURIComponent(data.generationId)}`, { cache: "no-store" });
           const state = await check.json();
           if (state.status === "done") { data = { ...data, videoUrl: state.videoUrl }; break; }
           if (state.status === "failed") throw new Error(state.error || "Video generation failed");
@@ -1222,6 +1258,214 @@ export default function HomePage() {
 
               {/* Input Desk */}
               <div className="p-4 border-t border-teal-900/10 bg-[#d9eee6]/90 backdrop-blur-md space-y-3">
+                {dashType === "voice-clone" && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">
+                    AI Voice sample
+                  </label>
+                  <p className="text-[10px] text-slate-500">
+                    Upload the voice sample you want to use for AI Voice and Lip-Sync.
+                  </p>
+
+                  {dashVoiceSample ? (
+                    <div className="rounded-xl border border-amber-500/20 bg-white/70 p-3 flex items-center gap-3">
+                      <div className="h-11 w-11 rounded-lg bg-amber-50 border border-amber-500/20 flex items-center justify-center text-amber-600">
+                        <Mic size={17} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-slate-700 truncate">
+                          {dashVoiceSampleName || "Voice sample selected"}
+                        </p>
+                        <p className="text-[9px] text-amber-600 font-semibold">
+                          ✓ Ready for AI Voice
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDashVoiceSample(null);
+                          setDashVoiceSampleName("");
+                        }}
+                        className="px-2 py-1 rounded-lg text-[9px] font-bold text-red-600 border border-red-200 hover:bg-red-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-amber-500/30 bg-amber-50/40 px-3 py-5 cursor-pointer hover:bg-amber-50/70 transition">
+                      <Plus size={14} className="text-amber-600" />
+                      <span className="text-[10px] font-bold text-slate-600">
+                        Upload voice sample
+                      </span>
+                      <input
+                        type="file"
+                        accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/webm"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 20 * 1024 * 1024) {
+                            alert("Audio sample must be 20 MB or smaller.");
+                            e.currentTarget.value = "";
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === "string") {
+                              setDashVoiceSample(reader.result);
+                              setDashVoiceSampleName(file.name);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+                  )}
+
+                  <p className="text-[9px] text-slate-400">
+                    MP3, WAV, M4A or WEBM • maximum 20 MB
+                  </p>
+                </div>
+              )}
+
+              {dashType === "ai-avatar" && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">
+                    <span className="inline-flex items-center gap-1">
+                      <UserSquare2 size={13} className="text-cyan-600" /> Avatar image
+                    </span>
+                  </label>
+                  <p className="text-[10px] text-slate-500">
+                    Upload the person&apos;s photo you want to use for the Avatar.
+                  </p>
+
+                  {dashAvatarImage ? (
+                    <div className="rounded-xl border border-cyan-500/20 bg-white/70 p-2 flex items-center gap-3">
+                      <img
+                        src={dashAvatarImage}
+                        alt="Selected avatar"
+                        className="h-16 w-16 rounded-lg object-cover border border-cyan-500/20"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-slate-700 truncate">
+                          {dashAvatarImageName || "Image selected"}
+                        </p>
+                        <p className="text-[9px] text-cyan-600 font-semibold">
+                          ✓ Ready for Create an Avatar
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDashAvatarImage(null);
+                          setDashAvatarImageName("");
+                        }}
+                        className="px-2 py-1 rounded-lg text-[9px] font-bold text-red-600 border border-red-200 hover:bg-red-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-cyan-500/30 bg-cyan-50/40 px-3 py-5 cursor-pointer hover:bg-cyan-50/70 transition">
+                      <Plus size={14} className="text-cyan-600" />
+                      <span className="text-[10px] font-bold text-slate-600">
+                        Upload Avatar image
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 10 * 1024 * 1024) {
+                            alert("Image must be 10 MB or smaller.");
+                            e.currentTarget.value = "";
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === "string") {
+                              setDashAvatarImage(reader.result);
+                              setDashAvatarImageName(file.name);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+                  )}
+
+                  <p className="text-[9px] text-slate-400">
+                    PNG, JPG or WEBP • maximum 10 MB
+                  </p>
+                </div>
+              )}
+
+              {dashType === "image-to-video" && (
+                  <div className="rounded-2xl border border-emerald-500/20 bg-white/70 p-3 shadow-sm">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-[11px] font-black text-slate-700 flex items-center gap-1.5">
+                          <ImageIcon size={13} className="text-emerald-600" /> Reference image
+                        </p>
+                        <p className="text-[9px] text-slate-500 font-mono mt-0.5">Upload the image you want to animate</p>
+                      </div>
+                      {dashImage && (
+                        <button
+                          type="button"
+                          onClick={() => { setDashImage(null); setDashImageName(""); }}
+                          className="text-[9px] font-bold text-red-500 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <label className="relative flex min-h-[92px] cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-emerald-400/50 bg-emerald-50/70 hover:bg-emerald-50 transition">
+                      {dashImage ? (
+                        <div className="flex w-full items-center gap-3 p-2.5">
+                          <img src={dashImage} alt="Selected reference" className="h-16 w-16 rounded-lg object-cover border border-emerald-500/20" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold text-slate-700 truncate">{dashImageName || "Image selected"}</p>
+                            <p className="text-[9px] text-emerald-600 font-mono mt-1">✓ Ready for Image-to-Video</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center px-4">
+                          <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                            <Plus size={16} />
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-600">Click to upload an image</p>
+                          <p className="text-[9px] text-slate-400 font-mono mt-0.5">PNG, JPG, WEBP</p>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 10 * 1024 * 1024) {
+                            alert("Image must be smaller than 10 MB.");
+                            e.currentTarget.value = "";
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setDashImage(reader.result as string);
+                            setDashImageName(file.name);
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+
                 {/* Preset Styles */}
                 <div className="grid grid-cols-4 gap-2">
                   {PRESET_STYLES.map(s => (

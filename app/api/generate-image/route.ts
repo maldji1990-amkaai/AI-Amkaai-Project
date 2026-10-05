@@ -10,6 +10,78 @@ const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
+async function autoEnhancePrompt(prompt: string): Promise<string> {
+  const original = (prompt || "").trim();
+
+  if (!original) {
+    return "Bring this image to life with natural, realistic cinematic movement, subtle subject motion, smooth camera movement, coherent physics, and high visual quality.";
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.warn("OPENAI_API_KEY is not configured. Using original Image-to-Video prompt.");
+    return original;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-5-mini",
+        input: [
+          {
+            role: "system",
+            content:
+              "You are a professional AI image-to-video prompt enhancer. " +
+              "Rewrite the user's short prompt into one concise, production-ready video prompt. " +
+              "Preserve the user's exact intent, subject, setting, and requested action. " +
+              "Do not invent new characters, objects, locations, dialogue, or story events. " +
+              "Improve motion direction, natural movement, camera behavior, temporal consistency, " +
+              "lighting continuity, realism, and cinematic quality only when useful. " +
+              "Return ONLY the final prompt, with no explanation, labels, quotes, or bullet points.",
+          },
+          {
+            role: "user",
+            content: original,
+          },
+        ],
+        max_output_tokens: 300,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      console.warn("OpenAI prompt enhancement failed:", response.status, errorText);
+      return original;
+    }
+
+    const data = await response.json();
+    const enhanced =
+      typeof data?.output_text === "string"
+        ? data.output_text.trim()
+        : "";
+
+    if (!enhanced) {
+      return original;
+    }
+
+    return enhanced;
+  } catch (error) {
+    console.warn("OpenAI prompt enhancement unavailable. Using original prompt:", error);
+    return original;
+  }
+}
+
 // ⚠️ هذا المسار لا ينتظر انتهاء التوليد داخل نفس الطلب (كان سابقاً while-loop
 // يستهلك وقت التنفيذ الأقصى المسموح على منصات serverless مثل Vercel ويؤدي
 // لـ Timeout على الفيديوهات الأطول). الآن: ننشئ الـ prediction فقط ونرجّع
@@ -68,13 +140,18 @@ export async function POST(request: Request) {
       });
     }
 
-    // 5️⃣ إنشاء طلب التوليد الحقيقي لدى Replicate فقط (بدون انتظار داخل نفس الطلب)
+    // 5️⃣ Auto Enhance للـprompt قبل إرساله إلى Replicate.
+    // إذا تعذر الاتصال بـOpenAI لأي سبب، نستخدم prompt الأصلي تلقائياً
+    // حتى لا تتعطل عملية التوليد أو RunPod/Replicate.
+    const enhancedPrompt = await autoEnhancePrompt(prompt);
+
+    // 6️⃣ إنشاء طلب التوليد الحقيقي لدى Replicate فقط (بدون انتظار داخل نفس الطلب)
     try {
       const prediction = await replicate.predictions.create({
         version: "maxwell-in-the-cloud/luma-dream-machine",
         input: {
           image: uploadedImage, // الصورة المرفوعة من الواجهة (رابط أو Base64)
-          prompt: prompt || "Bring this image to life, natural cinematic movement, high quality",
+          prompt: enhancedPrompt,
           aspect_ratio: aspectRatio || "16:9",
         },
       });
@@ -83,7 +160,7 @@ export async function POST(request: Request) {
         data: {
           userId: user.id,
           type: "IMAGE_TO_VIDEO",
-          prompt: prompt || null,
+          prompt: enhancedPrompt,
           status: "PROCESSING",
           metadata: {
             referenceId,
