@@ -678,81 +678,56 @@ export default function HomePage() {
         {/* ── 4 TOOL BUTTONS ── */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="mt-12 w-full max-w-4xl">
           <p className="text-[11px] font-mono text-slate-500 uppercase tracking-[0.2em] mb-5 text-center">Choose your creation tool</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 
-            {/* 1 — AI Video Generator */}
-            <motion.button
-              whileHover={{ y: -4, scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => openStudio("ai-video")}
-              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-purple-200 bg-white px-4 py-6 transition-all hover:border-purple-400 hover:shadow-[0_10px_30px_rgba(168,85,247,0.15)] text-center shadow-sm"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-purple-100 border border-purple-200 flex items-center justify-center group-hover:bg-purple-200 transition">
-                <Video size={22} className="text-purple-600" />
-              </div>
-              <div>
-                <p className="text-[13px] font-black text-slate-800 leading-tight">AI Video</p>
-                <p className="text-[13px] font-black text-slate-800 leading-tight">Generator</p>
-                <p className="text-[10px] text-slate-500 mt-1 font-mono">Text → Cinematic Video</p>
-              </div>
-              <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-purple-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
-            </motion.button>
+<div className="grid grid-cols-2 md:grid-cols-3 gap-4">
 
-            {/* 2 — Create an Avatar */}
-            <motion.button
-              whileHover={{ y: -4, scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => openStudio("ai-avatar")}
-              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-sky-200 bg-white px-4 py-6 transition-all hover:border-sky-400 hover:shadow-[0_10px_30px_rgba(14,165,233,0.15)] text-center shadow-sm"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-sky-100 border border-sky-200 flex items-center justify-center group-hover:bg-sky-200 transition">
-                <UserSquare2 size={22} className="text-sky-600" />
-              </div>
-              <div>
-                <p className="text-[13px] font-black text-slate-800 leading-tight">Create an</p>
-                <p className="text-[13px] font-black text-slate-800 leading-tight">Avatar</p>
-                <p className="text-[10px] text-slate-500 mt-1 font-mono">AI Digital Presenter</p>
-              </div>
-              <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-sky-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
-            </motion.button>
+  {/* AI Video Generator */}
+  <motion.button
+    whileHover={{ y: -4, scale: 1.02 }}
+    whileTap={{ scale: 0.97 }}
+    onClick={() => openStudio("ai-video")}
+    className="group relative flex flex-col items-center gap-3 rounded-2xl border border-purple-200 bg-white px-4 py-6 transition-all hover:border-purple-400 hover:shadow-[0_10px_30px_rgba(168,85,247,0.15)] text-center shadow-sm"
+  >
+    <div className="w-12 h-12 rounded-2xl bg-purple-100 border border-purple-200 flex items-center justify-center">
+      <Video size={22} className="text-purple-600" />
+    </div>
+    <div>
+      <p className="text-[13px] font-black text-slate-800">AI Video Generator</p>
+      <p className="text-[10px] text-slate-500 mt-1 font-mono">Text → Cinematic Video</p>
+    </div>
+  </motion.button>
 
-            {/* 3 — Image to Video */}
-            <motion.button
-              whileHover={{ y: -4, scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => openStudio("image-to-video")}
-              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-6 transition-all hover:border-emerald-400 hover:shadow-[0_10px_30px_rgba(16,185,129,0.15)] text-center shadow-sm"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center group-hover:bg-emerald-200 transition">
-                <ImageIcon size={22} className="text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-[13px] font-black text-slate-800 leading-tight">Image to</p>
-                <p className="text-[13px] font-black text-slate-800 leading-tight">Video</p>
-                <p className="text-[10px] text-slate-500 mt-1 font-mono">HeyGen Engine Mode</p>
-              </div>
-              <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-emerald-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
-            </motion.button>
+  {/* Image To Video — keep enabled */}
+  <motion.button
+    whileHover={{ y: -4, scale: 1.02 }}
+    whileTap={{ scale: 0.97 }}
+    onClick={() => openStudio("image-to-video")}
+    className="group relative flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-6 transition-all hover:border-emerald-400 hover:shadow-[0_10px_30px_rgba(16,185,129,0.15)] text-center shadow-sm"
+  >
+    <div className="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center">
+      <ImageIcon size={22} className="text-emerald-600" />
+    </div>
+    <div>
+      <p className="text-[13px] font-black text-slate-800">Image To Video</p>
+      <p className="text-[10px] text-slate-500 mt-1 font-mono">HeyGen Engine Mode</p>
+    </div>
+  </motion.button>
 
-            {/* 4 — AI AI Voice Generator & Lip-Sync */}
-            <motion.button
-              whileHover={{ y: -4, scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => openStudio("voice-clone")}
-              className="group relative flex flex-col items-center gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-6 transition-all hover:border-amber-400 hover:shadow-[0_10px_30px_rgba(245,158,11,0.15)] text-center shadow-sm"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center group-hover:bg-amber-200 transition">
-                <Mic size={22} className="text-amber-600" />
-              </div>
-              <div>
-                <p className="text-[13px] font-black text-slate-800 leading-tight">AI Voice</p>
-                <p className="text-[13px] font-black text-slate-800 leading-tight">Generator & Lip-Sync</p>
-                <p className="text-[10px] text-slate-500 mt-1 font-mono">Voice Matrix</p>
-              </div>
-              <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-amber-400 opacity-0 group-hover:opacity-100 transition animate-pulse" />
-            </motion.button>
+  {/* AI Avatar & Voice — disabled temporarily */}
+  <div className="relative flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-center opacity-80 cursor-not-allowed">
+    <span className="absolute right-3 top-3 rounded-full bg-slate-200 px-2 py-1 text-[9px] font-bold text-slate-600">
+      Coming Soon
+    </span>
+    <div className="w-12 h-12 rounded-2xl bg-slate-200 border border-slate-300 flex items-center justify-center">
+      <UserSquare2 size={22} className="text-slate-600" />
+    </div>
+    <div>
+      <p className="text-[13px] font-black text-slate-700">AI Avatar & Voice</p>
+      <p className="text-[10px] text-slate-500 mt-1 font-mono">Avatar + Voice + Lip-Sync</p>
+    </div>
+  </div>
 
-          </div>
+</div>
 
           {!isSignedIn && (
             <div className="mt-6 flex justify-center">
@@ -1013,40 +988,60 @@ export default function HomePage() {
               {/* AI Generation Engine */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">AI Generation Engine</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setDashType("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-video" ? "bg-teal-600/10 border-teal-500 text-slate-800" : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"}`}>
-                    <Video size={14} className={dashType === "ai-video" ? "text-teal-600" : "text-slate-500"} />
-                    <div>
-                      <p className="text-[11px] font-black tracking-tight">AI Video Generator</p>
-                      <span className="text-[9px] text-slate-500 font-mono">Text to Video</span>
-                    </div>
-                  </button>
+               
+<div className="grid grid-cols-2 gap-2">
 
-                  <button onClick={() => setDashType("ai-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "ai-avatar" ? "bg-cyan-600/10 border-cyan-500 text-slate-800" : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"}`}>
-                    <UserSquare2 size={14} className={dashType === "ai-avatar" ? "text-teal-600" : "text-slate-500"} />
-                    <div>
-                      <p className="text-[11px] font-black tracking-tight">Create an Avatar</p>
-                      <span className="text-[9px] text-slate-500 font-mono">Photo Presenter</span>
-                    </div>
-                  </button>
+  <button
+    onClick={() => setDashType("ai-video")}
+    className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${
+      dashType === "ai-video"
+        ? "bg-teal-600/10 border-teal-500 text-slate-800"
+        : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"
+    }`}
+  >
+    <Video size={14} className="text-teal-600" />
+    <div>
+      <p className="text-[11px] font-black tracking-tight">AI Video Generator</p>
+      <span className="text-[9px] text-slate-500 font-mono">Text to Video</span>
+    </div>
+  </button>
 
-                  <button onClick={() => setDashType("image-to-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "image-to-video" ? "bg-emerald-500/10 border-emerald-500 text-slate-800" : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"}`}>
-                    <ImageIcon size={14} className={dashType === "image-to-video" ? "text-emerald-400" : "text-slate-500"} />
-                    <div>
-                      <p className="text-[11px] font-black tracking-tight">Image To Video</p>
-                      <span className="text-[9px] text-slate-500 font-mono">HeyGen Engine Mode</span>
-                    </div>
-                  </button>
+  <button
+    onClick={() => setDashType("image-to-video")}
+    className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${
+      dashType === "image-to-video"
+        ? "bg-emerald-500/10 border-emerald-500 text-slate-800"
+        : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"
+    }`}
+  >
+    <ImageIcon size={14} className="text-emerald-600" />
+    <div>
+      <p className="text-[11px] font-black tracking-tight">Image To Video</p>
+      <span className="text-[9px] text-slate-500 font-mono">HeyGen Engine Mode</span>
+    </div>
+  </button>
 
-                  <button onClick={() => setDashType("voice-clone")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${dashType === "voice-clone" ? "bg-amber-500/10 border-amber-500 text-slate-800" : "bg-white/65 border-teal-900/10 text-slate-500 hover:bg-white/80"}`}>
-                    <Mic size={14} className={dashType === "voice-clone" ? "text-amber-400" : "text-slate-500"} />
-                    <div>
-                      <p className="text-[10px] font-black tracking-tight leading-none">AI Voice Generator & Lip-Sync</p>
-                      <span className="text-[9px] text-slate-500 font-mono">Voice Matrix</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
+  <div className="relative col-span-2 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-100/80 p-3 opacity-80 cursor-not-allowed">
+    <div className="flex items-center gap-3">
+      <UserSquare2 size={16} className="text-slate-500" />
+      <div>
+        <p className="text-[11px] font-black tracking-tight text-slate-700">
+          AI Avatar & Voice
+        </p>
+        <span className="text-[9px] text-slate-500 font-mono">
+          Avatar + Voice + Lip-Sync
+        </span>
+      </div>
+    </div>
+    <span className="shrink-0 rounded-full bg-slate-200 px-2 py-1 text-[9px] font-bold text-slate-600">
+      Coming Soon
+    </span>
+  </div>
+
+</div>
+</div>
+
+{/* Aspect Dimensions */}
 
               {/* Aspect Dimensions */}
               {dashType !== "voice-clone" && (
