@@ -535,43 +535,68 @@ export default function AIChangeConsole() {
               <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Synthesis Control Hub</h2>
             </div>
 
-            {/* Pipeline Buttons Selector */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">AI Generation Engine</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setActiveType("ai-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "ai-video" ? "bg-teal-600/10 border-teal-500 text-slate-800" : "bg-white/95 border-teal-900/10 text-slate-500 hover:bg-slate-200/60"}`}>
-                  <Video size={14} className={activeType === "ai-video" ? "text-teal-600" : "text-slate-500"} />
-                  <div>
-                    <p className="text-[11px] font-black tracking-tight">AI Video Generator</p>
-                    <span className="text-[9px] text-slate-500 font-mono">Text to Video</span>
-                  </div>
-                </button>
+{/* Pipeline Buttons Selector */}
+<div className="space-y-2">
+  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+    AI Generation Engine
+  </label>
 
-                <button onClick={() => setActiveType("ai-avatar")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "ai-avatar" ? "bg-cyan-600/10 border-cyan-500 text-slate-800" : "bg-white/95 border-teal-900/10 text-slate-500 hover:bg-slate-200/60"}`}>
-                  <UserSquare2 size={14} className={activeType === "ai-avatar" ? "text-cyan-400" : "text-slate-500"} />
-                  <div>
-                    <p className="text-[11px] font-black tracking-tight">Create an Avatar</p>
-                    <span className="text-[9px] text-slate-500 font-mono">Photo Presenter</span>
-                  </div>
-                </button>
+  <div className="grid grid-cols-2 gap-2">
+    <button
+      onClick={() => setActiveType("ai-video")}
+      className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${
+        activeType === "ai-video"
+          ? "bg-teal-600/10 border-teal-500 text-slate-800"
+          : "bg-white/95 border-teal-900/10 text-slate-500 hover:bg-slate-200/60"
+      }`}
+    >
+      <Video size={14} className={activeType === "ai-video" ? "text-teal-600" : "text-slate-500"} />
+      <div>
+        <p className="text-[11px] font-black tracking-tight">AI Video Generator</p>
+        <span className="text-[9px] text-slate-500 font-mono">Text to Video</span>
+      </div>
+    </button>
 
-                <button onClick={() => setActiveType("image-to-video")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "image-to-video" ? "bg-emerald-600/10 border-emerald-500 text-slate-800" : "bg-white/95 border-teal-900/10 text-slate-500 hover:bg-slate-200/60"}`}>
-                  <ImageIcon size={14} className={activeType === "image-to-video" ? "text-emerald-400" : "text-slate-500"} />
-                  <div>
-                    <p className="text-[11px] font-black tracking-tight">Image To Video</p>
-                    <span className="text-[9px] text-slate-500 font-mono">HeyGen Engine Mode</span>
-                  </div>
-                </button>
+    <button
+      onClick={() => setActiveType("image-to-video")}
+      className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 ${
+        activeType === "image-to-video"
+          ? "bg-emerald-600/10 border-emerald-500 text-slate-800"
+          : "bg-white/95 border-teal-900/10 text-slate-500 hover:bg-slate-200/60"
+      }`}
+    >
+      <ImageIcon size={14} className={activeType === "image-to-video" ? "text-emerald-600" : "text-slate-500"} />
+      <div>
+        <p className="text-[11px] font-black tracking-tight">Image To Video</p>
+        <span className="text-[9px] text-slate-500 font-mono">Image Animation</span>
+      </div>
+    </button>
 
-                <button onClick={() => setActiveType("voice-clone")} className={`p-3 text-left rounded-xl border transition flex flex-col justify-between h-20 group ${activeType === "voice-clone" ? "bg-amber-600/10 border-amber-500 text-slate-800" : "bg-white/95 border-teal-900/10 text-slate-500 hover:bg-slate-200/60"}`}>
-                  <Mic size={14} className={activeType === "voice-clone" ? "text-amber-400" : "text-slate-500"} />
-                  <div>
-                    <p className="text-[10px] font-black tracking-tight leading-none">AI Voice Cloning & Lip-Sync</p>
-                    <span className="text-[9px] text-slate-500 font-mono">Cloning Matrix</span>
-                  </div>
-                </button>
-              </div>
-            </div>
+    <div
+      aria-disabled="true"
+      className="relative flex h-20 cursor-not-allowed flex-col justify-between rounded-xl border border-slate-300 bg-slate-100/80 p-3 opacity-75"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <UserSquare2 size={14} className="text-slate-500" />
+          <Mic size={14} className="text-slate-500" />
+        </div>
+        <span className="rounded-full border border-slate-300 bg-white px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-500">
+          Coming Soon
+        </span>
+      </div>
+      <div>
+        <p className="text-[10px] font-black leading-tight text-slate-600">
+          AI Avatar &amp; Voice
+        </p>
+        <span className="text-[9px] font-mono text-slate-500">
+          Avatar + Voice + Lip-Sync
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
 
             {/* Asset Seed Uploader for Images */}
             {(activeType === "ai-avatar" || activeType === "image-to-video") && (

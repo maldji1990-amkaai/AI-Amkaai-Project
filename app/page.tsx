@@ -317,7 +317,7 @@ export default function HomePage() {
     try {
       let endpoint = "/api/generate-video";
       if (dashType === "ai-avatar") endpoint = "/api/generate-avatar";
-      if (dashType === "image-to-video") endpoint = "/api/generate-image-to-video";
+      if (dashType === "image-to-video") endpoint = "/api/generate-image";
       if (dashType === "voice-clone") endpoint = "/api/generate-voice";
 
       const res = await fetch(endpoint, {
@@ -445,7 +445,7 @@ export default function HomePage() {
       if (dashType === "image-to-video" && data.status === "processing" && data.generationId) {
         for (let attempt = 0; attempt < 150; attempt++) {
           updateProgress(Math.min(95, 10 + attempt));
-          const check = await fetch(`/api/generate-image-to-video/status?generationId=${encodeURIComponent(data.generationId)}`, { cache: "no-store" });
+          const check = await fetch(`/api/generate-image/status?generationId=${encodeURIComponent(data.generationId)}`, { cache: "no-store" });
           const state = await check.json();
           if (state.status === "done") { data = { ...data, videoUrl: state.videoUrl }; break; }
           if (state.status === "failed") throw new Error(state.error || "Video generation failed");
