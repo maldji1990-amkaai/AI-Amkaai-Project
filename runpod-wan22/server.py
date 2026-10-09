@@ -36,6 +36,38 @@ logging.basicConfig(
 )
 log = logging.getLogger("amkaai-wan22")
 
+
+def _perf_gpu_snapshot(label: str) -> None:
+    if not torch.cuda.is_available():
+        log.info("PERF_GPU label=%s cuda=false", label)
+        return
+    try:
+        allocated = torch.cuda.memory_allocated() / (1024 ** 3)
+        reserved = torch.cuda.memory_reserved() / (1024 ** 3)
+        peak = torch.cuda.max_memory_allocated() / (1024 ** 3)
+        total = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        log.info(
+            "PERF_GPU label=%s device=%s total_gb=%.2f allocated_gb=%.2f reserved_gb=%.2f peak_allocated_gb=%.2f",
+            label, torch.cuda.get_device_name(0), total, allocated, reserved, peak,
+        )
+    except Exception:
+        log.debug("PERF_GPU snapshot failed label=%s", label, exc_info=True)
+
+
+def _perf_timer(label: str):
+    start = time.perf_counter()
+    log.info("PERF_START label=%s", label)
+    _perf_gpu_snapshot(f"{label}:start")
+    try:
+        yield
+    finally:
+        _perf_gpu_snapshot(f"{label}:end")
+        log.info("PERF_END label=%s elapsed_sec=%.3f", label, time.perf_counter() - start)
+
+from contextlib import contextmanager
+_perf_timer = contextmanager(_perf_timer)
+
+
 APP = FastAPI(title="AmkaAI Wan 2.2 TI2V-5B", version="1.0.0")
 
 MODEL_ID = os.getenv("WAN_MODEL_ID", "Wan-AI/Wan2.2-TI2V-5B")
@@ -373,6 +405,7 @@ def quantize_model_8bit() -> None:
 
 def ensure_model() -> None:
     global model_ready, model_error, model
+    total_started = time.perf_counter()
     try:
         MODEL_DIR.parent.mkdir(parents=True, exist_ok=True)
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -385,37 +418,46 @@ def ensure_model() -> None:
         ]
         if not all(p.exists() for p in required):
             log.info("Downloading %s into %s", MODEL_ID, MODEL_DIR)
-            snapshot_download(
-                repo_id=MODEL_ID,
-                local_dir=str(MODEL_DIR),
-                local_dir_use_symlinks=False,
-            )
+            with _perf_timer("model.snapshot_download"):
+                snapshot_download(
+                    repo_id=MODEL_ID,
+                    local_dir=str(MODEL_DIR),
+                    local_dir_use_symlinks=False,
+                )
 
         if not all(p.exists() for p in required):
             raise RuntimeError("Wan model download completed but required files are missing")
 
         cfg = WAN_CONFIGS["ti2v-5B"]
         log.info("Loading WanTI2V model into GPU/CPU memory")
-        model = wan.WanTI2V(
-            config=cfg,
-            checkpoint_dir=str(MODEL_DIR),
-            device_id=0,
-            rank=0,
-            t5_fsdp=False,
-            dit_fsdp=False,
-            use_sp=False,
-            t5_cpu=T5_CPU,
-            convert_model_dtype=CONVERT_DTYPE,
-        )
+        with _perf_timer("model.WanTI2V_init"):
+            model = wan.WanTI2V(
+                config=cfg,
+                checkpoint_dir=str(MODEL_DIR),
+                device_id=0,
+                rank=0,
+                t5_fsdp=False,
+                dit_fsdp=False,
+                use_sp=False,
+                t5_cpu=T5_CPU,
+                convert_model_dtype=CONVERT_DTYPE,
+            )
 
         install_step_hook()
 
         if QUANTIZE_8BIT:
             log.info("WAN_QUANTIZE_8BIT=true, converting DiT weights to 8-bit before marking model ready")
-            quantize_model_8bit()
+            with _perf_timer("model.quantize_8bit"):
+                quantize_model_8bit()
 
         model_ready = True
         model_error = None
+        _perf_gpu_snapshot("model.ready")
+        log.info(
+            "PERF_MODEL_TOTAL elapsed_sec=%.3f offload_model=%s t5_cpu=%s convert_dtype=%s quantize_8bit=%s",
+            time.perf_counter() - total_started,
+            OFFLOAD_MODEL, T5_CPU, CONVERT_DTYPE, QUANTIZE_8BIT,
+        )
         log.info("Wan2.2 TI2V-5B is READY")
     except Exception as exc:
         model_ready = False

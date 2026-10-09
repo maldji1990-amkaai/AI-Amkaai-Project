@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { auth } from "@clerk/nextjs/server";
 import { getOrCreateUser } from "@/lib/getUser";
-import { useCredits, refundCredits, markUsageSuccess } from "@/lib/credits";
-import { demoVideos } from "@/lib/demo"; // يفضل استخدام روابط فيديو ديمو هنا للمشترك المجاني
+import {
+  useCredits,
+  refundCredits,
+  markUsageSuccess,
+} from "@/lib/credits";
+import { demoVideos } from "@/lib/demo";
 import { db } from "@/lib/db";
-import Replicate from "replicate";
+import { submitVideoToServerless } from "@/lib/runpod-serverless";
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-});
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 async function autoEnhancePrompt(prompt: string): Promise<string> {
   const original = (prompt || "").trim();
@@ -18,15 +22,12 @@ async function autoEnhancePrompt(prompt: string): Promise<string> {
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    console.warn("OPENAI_API_KEY is not configured. Using original Image-to-Video prompt.");
-    return original;
-  }
+  if (!apiKey) return original;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12_000);
-
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -40,93 +41,188 @@ async function autoEnhancePrompt(prompt: string): Promise<string> {
             role: "system",
             content:
               "You are a professional AI image-to-video prompt enhancer. " +
-              "Rewrite the user's short prompt into one concise, production-ready video prompt. " +
-              "Preserve the user's exact intent, subject, setting, and requested action. " +
-              "Do not invent new characters, objects, locations, dialogue, or story events. " +
-              "Improve motion direction, natural movement, camera behavior, temporal consistency, " +
-              "lighting continuity, realism, and cinematic quality only when useful. " +
-              "Return ONLY the final prompt, with no explanation, labels, quotes, or bullet points.",
+              "Rewrite the user's prompt into one concise, production-ready video prompt. " +
+              "Preserve the exact intent, subject, setting, and requested action. " +
+              "Do not invent characters, objects, locations, dialogue, or story events. " +
+              "Improve motion, camera movement, temporal consistency, lighting, and realism. " +
+              "Return only the final prompt, without explanation or labels.",
           },
-          {
-            role: "user",
-            content: original,
-          },
+          { role: "user", content: original },
         ],
         max_output_tokens: 300,
       }),
       signal: controller.signal,
+      cache: "no-store",
     });
 
-    clearTimeout(timeout);
-
     if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      console.warn("OpenAI prompt enhancement failed:", response.status, errorText);
+      console.warn("OpenAI prompt enhancement failed:", response.status);
       return original;
     }
 
     const data = await response.json();
-    const enhanced =
-      typeof data?.output_text === "string"
-        ? data.output_text.trim()
-        : "";
-
-    if (!enhanced) {
-      return original;
-    }
-
-    return enhanced;
+    return typeof data?.output_text === "string" && data.output_text.trim()
+      ? data.output_text.trim()
+      : original;
   } catch (error) {
-    console.warn("OpenAI prompt enhancement unavailable. Using original prompt:", error);
+    console.warn("Prompt enhancement unavailable; using original prompt.", error);
     return original;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
-// ⚠️ هذا المسار لا ينتظر انتهاء التوليد داخل نفس الطلب (كان سابقاً while-loop
-// يستهلك وقت التنفيذ الأقصى المسموح على منصات serverless مثل Vercel ويؤدي
-// لـ Timeout على الفيديوهات الأطول). الآن: ننشئ الـ prediction فقط ونرجّع
-// Generation ID فوراً، والعميل يستطلع النتيجة عبر /api/generate-image/status.
+/**
+ * RunPod's worker accepts a public HTTP(S) image URL.
+ * If the frontend sends a Base64 data URI, upload it to Cloudinary first.
+ */
+async function getPublicImageUrl(uploadedImage: unknown): Promise<string> {
+  if (typeof uploadedImage !== "string" || !uploadedImage.trim()) {
+    throw new Error("INVALID_UPLOADED_IMAGE");
+  }
+
+  const value = uploadedImage.trim();
+
+  if (value.startsWith("https://") || value.startsWith("http://")) {
+    const parsed = new URL(value);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("INVALID_IMAGE_URL");
+    }
+    return value;
+  }
+
+  const match = value.match(
+    /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\r\n]+)$/,
+  );
+
+  if (!match) {
+    throw new Error(
+      "IMAGE_MUST_BE_PUBLIC_URL_OR_BASE64_DATA_URI",
+    );
+  }
+
+  const [, mimeType, base64Data] = match;
+  const buffer = Buffer.from(base64Data.replace(/\s/g, ""), "base64");
+
+  if (!buffer.length || buffer.length > 15 * 1024 * 1024) {
+    throw new Error("IMAGE_SIZE_INVALID_OR_OVER_15MB");
+  }
+
+  const cloudName = process.env.CLOUDINARY_CLOUD;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error("CLOUDINARY_CONFIGURATION_MISSING_FOR_BASE64_IMAGE");
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = "amkaai/image-to-video";
+
+  // Cloudinary signed upload: sorted parameters + API secret, SHA-1.
+  const signatureBase = `folder=${folder}&timestamp=${timestamp}`;
+  const signature = createHash("sha1")
+    .update(`${signatureBase}${apiSecret}`)
+    .digest("hex");
+
+  const form = new FormData();
+  form.append(
+    "file",
+    new Blob([buffer], { type: mimeType }),
+    `input-image.${mimeType.split("/")[1].replace("jpeg", "jpg")}`,
+  );
+  form.append("api_key", apiKey);
+  form.append("timestamp", String(timestamp));
+  form.append("folder", folder);
+  form.append("signature", signature);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`,
+    {
+      method: "POST",
+      body: form,
+      cache: "no-store",
+    },
+  );
+
+  const result = await response.json().catch(() => null);
+
+  if (!response.ok || typeof result?.secure_url !== "string") {
+    console.error("Cloudinary image upload failed:", response.status);
+    throw new Error("CLOUDINARY_IMAGE_UPLOAD_FAILED");
+  }
+
+  return result.secure_url;
+}
+
 export async function POST(request: Request) {
   const referenceId = `img2vid_${crypto.randomUUID()}`;
+  let generationId: string | null = null;
+  let creditsDeducted = false;
 
   try {
-    // 1️⃣ التحقق من الهوية عبر Clerk
     const { userId } = await auth();
+
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // استقبال البيانات (الوصف النصي للحركة + الصورة المراد تحريكها)
-    const { prompt, uploadedImage, aspectRatio } = await request.json();
+    const body = await request.json();
+    const { prompt, uploadedImage, aspectRatio } = body ?? {};
 
     if (!uploadedImage) {
-      return NextResponse.json({ error: "الرجاء رفع صورة أولاً لتحويلها إلى فيديو (Image to Video)" }, { status: 400 });
+      return NextResponse.json(
+        { error: "الرجاء رفع صورة أولاً لتحويلها إلى فيديو" },
+        { status: 400 },
+      );
     }
 
-    // 2️⃣ جلب بيانات المستخدم من قاعدة البيانات
     const user = await getOrCreateUser(userId);
-    if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
 
-    // 3️⃣ سحب وخصم النقاط بشكل آمن وصارم
-    let creditResult;
-    try {
-      creditResult = await useCredits(user.id, "video", { reference: referenceId }); // استخدام كلفة الفيديو
-    } catch (err: any) {
-      if (err.message === "SUBSCRIPTION_EXPIRED_OR_INACTIVE") {
-        return NextResponse.json({ error: "Your subscription has expired. Please check your billing dashboard." }, { status: 403 });
-      }
-      return NextResponse.json({ error: err.message || "Not enough credits" }, { status: 402 });
+    if (!user) {
+      return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
     }
 
-    // 4️⃣ وضع المحاكاة للمستخدمين المجانيين (FREE DEMO MODE) — هذا المسار لا
-    // يستدعي أي مزود خارجي لذلك يبقى متزامناً وآمناً بدون خطر Timeout.
+    let creditResult;
+
+    try {
+      creditResult = await useCredits(user.id, "video", {
+        reference: referenceId,
+      });
+      creditsDeducted = true;
+    } catch (error: any) {
+      if (error?.message === "SUBSCRIPTION_EXPIRED_OR_INACTIVE") {
+        return NextResponse.json(
+          {
+            error:
+              "Your subscription has expired. Please check your billing dashboard.",
+          },
+          { status: 403 },
+        );
+      }
+
+      return NextResponse.json(
+        { error: error?.message || "Not enough credits" },
+        { status: 402 },
+      );
+    }
+
+    // Keep the existing free-trial demo behavior.
     if (user.plan === "TRIAL") {
-      const fallbackVideo = Array.isArray(demoVideos) && demoVideos.length > 0
-        ? demoVideos[Math.floor(Math.random() * demoVideos.length)]
-        : null;
+      const fallbackVideo =
+        Array.isArray(demoVideos) && demoVideos.length > 0
+          ? demoVideos[Math.floor(Math.random() * demoVideos.length)]
+          : null;
+
       if (!fallbackVideo) {
         await refundCredits(referenceId);
-        return NextResponse.json({ error: "Demo video is temporarily unavailable. Your credits were refunded." }, { status: 503 });
+        return NextResponse.json(
+          {
+            error:
+              "Demo video is temporarily unavailable. Your credits were refunded.",
+          },
+          { status: 503 },
+        );
       }
 
       await markUsageSuccess(referenceId);
@@ -140,56 +236,96 @@ export async function POST(request: Request) {
       });
     }
 
-    // 5️⃣ Auto Enhance للـprompt قبل إرساله إلى Replicate.
-    // إذا تعذر الاتصال بـOpenAI لأي سبب، نستخدم prompt الأصلي تلقائياً
-    // حتى لا تتعطل عملية التوليد أو RunPod/Replicate.
-    const enhancedPrompt = await autoEnhancePrompt(prompt);
+    const webhookSecret = process.env.RUNPOD_WEBHOOK_SECRET;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-    // 6️⃣ إنشاء طلب التوليد الحقيقي لدى Replicate فقط (بدون انتظار داخل نفس الطلب)
-    try {
-      const prediction = await replicate.predictions.create({
-        version: "maxwell-in-the-cloud/luma-dream-machine",
-        input: {
-          image: uploadedImage, // الصورة المرفوعة من الواجهة (رابط أو Base64)
-          prompt: enhancedPrompt,
-          aspect_ratio: aspectRatio || "16:9",
+    if (!webhookSecret || !appUrl) {
+      throw new Error("RUNPOD_WEBHOOK_CONFIGURATION_MISSING");
+    }
+
+    const enhancedPrompt = await autoEnhancePrompt(
+      typeof prompt === "string" ? prompt : "",
+    );
+
+    // Create the database record before submission so the callback can find it.
+    const generation = await db.generation.create({
+      data: {
+        userId: user.id,
+        type: "IMAGE_TO_VIDEO",
+        prompt: enhancedPrompt,
+        status: "PROCESSING",
+        metadata: {
+          provider: "RUNPOD_WAN22",
+          referenceId,
+          aspectRatio:
+            typeof aspectRatio === "string" ? aspectRatio : "16:9",
         },
-      });
+      },
+    });
 
-      const generation = await db.generation.create({
-        data: {
-          userId: user.id,
-          type: "IMAGE_TO_VIDEO",
-          prompt: enhancedPrompt,
-          status: "PROCESSING",
-          metadata: {
-            referenceId,
-            predictionId: prediction.id,
-            aspectRatio: aspectRatio || "16:9",
+    generationId = generation.id;
+
+    const imageUrl = await getPublicImageUrl(uploadedImage);
+
+    const webhookUrl =
+      `${appUrl.replace(/\/$/, "")}` +
+      `/api/webhook/image-to-video?generationId=${encodeURIComponent(generation.id)}` +
+      `&secret=${encodeURIComponent(webhookSecret)}`;
+
+    await submitVideoToServerless({
+      job_id: generation.id,
+      custom_id: generation.id,
+      webhook_url: webhookUrl,
+      prompt: enhancedPrompt,
+      image_url: imageUrl,
+      duration_seconds: 5,
+      clip_length_seconds: 5,
+      clip_count: 1,
+      model: "Wan2.2-TI2V-5B",
+    });
+
+    return NextResponse.json({
+      success: true,
+      status: "processing",
+      generationId: generation.id,
+      demo: false,
+      remainingCredits: creditResult.remainingCredits,
+    });
+  } catch (error: any) {
+    console.error("IMAGE-TO-VIDEO RUNPOD ERROR:", error);
+
+    const errorMessage =
+      typeof error?.message === "string"
+        ? error.message
+        : "IMAGE_TO_VIDEO_REQUEST_FAILED";
+
+    if (generationId) {
+      await db.generation
+        .updateMany({
+          where: { id: generationId, status: "PROCESSING" },
+          data: {
+            status: "FAILED",
+            error: errorMessage,
           },
-        },
-      });
+        })
+        .catch((dbError) =>
+          console.error("Could not mark generation failed:", dbError),
+        );
+    }
 
-      return NextResponse.json({
-        success: true,
-        status: "processing",
-        generationId: generation.id,
-        demo: false,
-        remainingCredits: creditResult.remainingCredits,
-      });
-    } catch (aiError: any) {
-      // صمام الأمان: رد النقاط فوراً للعميل في حال فشل إنشاء الطلب لدى المزود
-      console.error("🔥 Image-to-Video request creation failed, rolling back credits:", aiError);
-      await refundCredits(referenceId);
-
-      return NextResponse.json(
-        { error: "فشل إنشاء طلب تحويل الصورة إلى فيديو. تم إعادة نقاطك إلى حسابك بأمان." },
-        { status: 500 }
+    if (creditsDeducted) {
+      await refundCredits(referenceId).catch((refundError) =>
+        console.error("Image-to-video credit refund failed:", refundError),
       );
     }
 
-  } catch (error) {
-    console.error("🔥 FATAL ERROR IN IMAGE-TO-VIDEO API:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error:
+          "فشل إرسال طلب تحويل الصورة إلى RunPod. تم إرجاع النقاط إذا تم خصمها.",
+        code: errorMessage,
+      },
+      { status: 500 },
+    );
   }
 }

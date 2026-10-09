@@ -70,6 +70,17 @@ async function enhanceAvatarPrompt(prompt: string): Promise<string> {
 }
 
 export async function POST(request: Request) {
+  // TEMPORARILY DISABLED:
+  // Avatar generation is kept in the codebase for future reactivation,
+  // but this API must not consume credits or call Replicate while disabled.
+  return NextResponse.json(
+    {
+      error: "Avatar generation is temporarily unavailable.",
+      code: "SERVICE_TEMPORARILY_DISABLED",
+    },
+    { status: 503 }
+  );
+
   // 🎯 إنشاء معرّف فريد للعملية لربط حجز النقاط وإرجاعها في حال الفشل
   const referenceId = `avt_${crypto.randomUUID()}`;
 
@@ -80,14 +91,17 @@ export async function POST(request: Request) {
     const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
     // القراءة الديناميكية للبيانات المرفوعة من واجهة المستخدم
     const { prompt, uploadedImage } = await request.json();
 
     // 👤 Single canonical user provisioning path
-    const user = await getOrCreateUser(userId);
+    const user = await getOrCreateUser(userId as string);
     if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
 
     //////////////////////////////////////////////////
@@ -95,7 +109,7 @@ export async function POST(request: Request) {
     //////////////////////////////////////////////////
     let creditResult;
     try {
-      creditResult = await useCredits(user.id, "image", { reference: referenceId });
+      creditResult = await useCredits(user!.id, "image", { reference: referenceId });
     } catch (err: any) {
       if (err.message === "SUBSCRIPTION_EXPIRED_OR_INACTIVE") {
         return NextResponse.json({ error: "Your subscription has expired. Please check your billing dashboard." }, { status: 403 });
@@ -106,7 +120,7 @@ export async function POST(request: Request) {
     //////////////////////////////////////////////////
     // 🧠 DEMO MODE (FREE USERS)
     //////////////////////////////////////////////////
-    if (user.plan === "TRIAL") {
+    if (user!.plan === "TRIAL") {
       const avatar = Array.isArray(demoAvatars) && demoAvatars.length > 0
         ? demoAvatars[Math.floor(Math.random() * demoAvatars.length)]
         : null;

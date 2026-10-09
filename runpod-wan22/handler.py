@@ -27,6 +27,39 @@ logging.basicConfig(
 log = logging.getLogger("amkaai-serverless")
 
 
+def _perf_gpu_snapshot(label: str) -> None:
+    """Log CUDA memory/device state without affecting generation behavior."""
+    if not torch.cuda.is_available():
+        log.info("PERF_GPU label=%s cuda=false", label)
+        return
+    try:
+        allocated = torch.cuda.memory_allocated() / (1024 ** 3)
+        reserved = torch.cuda.memory_reserved() / (1024 ** 3)
+        peak = torch.cuda.max_memory_allocated() / (1024 ** 3)
+        total = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        name = torch.cuda.get_device_name(0)
+        log.info(
+            "PERF_GPU label=%s device=%s total_gb=%.2f allocated_gb=%.2f reserved_gb=%.2f peak_allocated_gb=%.2f",
+            label, name, total, allocated, reserved, peak,
+        )
+    except Exception:
+        log.debug("PERF_GPU snapshot failed label=%s", label, exc_info=True)
+
+
+@contextmanager
+def _perf_timer(label: str):
+    start = time.perf_counter()
+    log.info("PERF_START label=%s", label)
+    _perf_gpu_snapshot(f"{label}:start")
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - start
+        _perf_gpu_snapshot(f"{label}:end")
+        log.info("PERF_END label=%s elapsed_sec=%.3f", label, elapsed)
+
+
+
 # ---------------------------------------------------------------------------
 # Attention fallback (no flash-attn required)
 #
@@ -160,8 +193,9 @@ def ensure_serverless_model() -> None:
 
     log.info("Loading Wan2.2 model...")
 
-    wan_server.configure_cloudinary()
-    wan_server.ensure_model()
+    with _perf_timer("model.ensure_serverless_model"):
+        wan_server.configure_cloudinary()
+        wan_server.ensure_model()
 
     if not wan_server.model_ready or wan_server.model is None:
         raise RuntimeError(
@@ -364,6 +398,8 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
     workdir.mkdir(parents=True, exist_ok=True)
 
     reporter: ProgressReporter | None = None
+    handler_started_at = time.perf_counter()
+    _perf_gpu_snapshot("handler:start")
 
     try:
         ensure_serverless_model()
@@ -399,10 +435,11 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
         image_path = None
 
         if image_url:
-            image_path = wan_server.download_image(
-                str(image_url),
-                workdir / "input.png",
-            )
+            with _perf_timer("input.download_image"):
+                image_path = wan_server.download_image(
+                    str(image_url),
+                    workdir / "input.png",
+                )
 
         generated = []
 
@@ -442,6 +479,8 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
 
             reporter.begin_clip(index)
 
+            _perf_gpu_snapshot(f"clip_{index + 1}:before_generate")
+            generate_started_at = time.perf_counter()
             with wan_server.job_lock:
                 with wan_progress_hook(reporter):
                     video = wan_server.model.generate(
@@ -461,6 +500,16 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
                         seed=seed,
                         offload_model=wan_server.OFFLOAD_MODEL,
                     )
+            log.info(
+                "PERF_GENERATE clip=%s/%s elapsed_sec=%.3f steps=%s offload_model=%s t5_cpu=%s",
+                index + 1,
+                clip_count,
+                time.perf_counter() - generate_started_at,
+                wan_server.SAMPLING_STEPS,
+                wan_server.OFFLOAD_MODEL,
+                wan_server.T5_CPU,
+            )
+            _perf_gpu_snapshot(f"clip_{index + 1}:after_generate")
 
             if video is None:
                 raise RuntimeError(
@@ -472,10 +521,11 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
             )
 
             reporter.clip_stage("ENCODING", 0.96)
-            wan_server.save_tensor_to_mp4(
-                video,
-                clip_path,
-            )
+            with _perf_timer(f"clip_{index + 1}:save_tensor_to_mp4"):
+                wan_server.save_tensor_to_mp4(
+                    video,
+                    clip_path,
+                )
 
             generated.append(clip_path)
             reporter.clip_stage("ENCODING", 1.0)
@@ -488,10 +538,11 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
         reporter.overall_stage("ENCODING", 91)
         final_path = workdir / "final.mp4"
 
-        wan_server.concat_mp4(
-            generated,
-            final_path,
-        )
+        with _perf_timer("final.concat_mp4"):
+            wan_server.concat_mp4(
+                generated,
+                final_path,
+            )
 
         reporter.overall_stage("UPLOADING", 93)
 
@@ -500,13 +551,14 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
             external_id,
         )
 
-        video_url = wan_server.upload_video(
-            final_path,
-            str(
-                job_input.get("job_id")
-                or external_id
-            ),
-        )
+        with _perf_timer("final.upload_cloudinary"):
+            video_url = wan_server.upload_video(
+                final_path,
+                str(
+                    job_input.get("job_id")
+                    or external_id
+                ),
+            )
 
         reporter.close()  # flush progress before the final webhook
 
@@ -521,10 +573,11 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
             },
         }
 
-        post_webhook_sync(
-            webhook_url,
-            payload,
-        )
+        with _perf_timer("final.completed_webhook"):
+            post_webhook_sync(
+                webhook_url,
+                payload,
+            )
 
         log.info(
             "Completed Serverless job=%s url=%s",
@@ -582,6 +635,9 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
         raise
 
     finally:
+        total_elapsed = time.perf_counter() - handler_started_at
+        _perf_gpu_snapshot("handler:finally")
+        log.info("PERF_TOTAL handler_elapsed_sec=%.3f job=%s", total_elapsed, external_id)
         if reporter is not None:
             reporter.close()
 

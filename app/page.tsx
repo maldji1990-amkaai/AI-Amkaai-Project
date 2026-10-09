@@ -107,14 +107,6 @@ export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [credits, setCredits] = useState(0);
 
-  // Optional workflow linkage returned by the existing generation APIs.
-  // These values are only sent when the server provides them; otherwise the
-  // existing standalone generation flow remains unchanged.
-  const [lastGenerationId, setLastGenerationId] = useState<string | null>(null);
-  const [lastSceneId, setLastSceneId] = useState<string | null>(null);
-  const [lastVoiceProfileId, setLastVoiceProfileId] = useState<string | null>(null);
-  const [lastAvatarVideoUrl, setLastAvatarVideoUrl] = useState<string | null>(null);
-
   // STUDIO VISIBILITY — لا يظهر إلا بعد الضغط على أحد الأزرار الأربعة
   const [studioVisible, setStudioVisible] = useState(false);
   const [activeStudioTool, setActiveStudioTool] = useState<DashMediaType | null>(null);
@@ -305,7 +297,7 @@ export default function HomePage() {
     setDashLoading(true);
     setDashResult("");
 
-    const etaSeconds = dashType === "ai-video" ? 45 : dashType === "ai-avatar" ? 30 : dashType === "voice-clone" ? 20 : 35;
+    const etaSeconds = dashType === "ai-video" ? 45 : 35;
     setRenderETA(etaSeconds);
     const etaInterval = window.setInterval(() => {
       setRenderETA(prev => {
@@ -338,15 +330,7 @@ export default function HomePage() {
           duration,
           ...(dashType === "image-to-video" ? { uploadedImage: dashImage } : {}),
   ...(dashType === "ai-avatar" ? { uploadedImage: dashAvatarImage } : {}),
-  ...(dashType === "voice-clone"
-    ? {
-        voiceSampleUrl: dashVoiceSample,
-        generationId: lastGenerationId || undefined,
-        sceneId: lastSceneId || undefined,
-        voiceProfileId: lastVoiceProfileId || undefined,
-        targetAvatarVideo: lastAvatarVideoUrl || undefined,
-      }
-    : {}),
+  ...(dashType === "voice-clone" ? { voiceSampleUrl: dashVoiceSample } : {}),
         }),
       });
 
@@ -364,16 +348,6 @@ export default function HomePage() {
       }
 
       let data = await res.json();
-
-      if (typeof data?.generationId === "string") {
-        setLastGenerationId(data.generationId);
-      }
-      if (typeof data?.sceneId === "string") {
-        setLastSceneId(data.sceneId);
-      }
-      if (typeof data?.voiceProfileId === "string") {
-        setLastVoiceProfileId(data.voiceProfileId);
-      }
 
       // AI Video is asynchronous: the API returns a jobId immediately.
       // Keep the generation panel in its live state and poll the real server
@@ -416,8 +390,6 @@ export default function HomePage() {
         state.videoUrl || state.resultUrl;
 
       setDashResult(outputUrl);
-      if (typeof state.generationId === "string") setLastGenerationId(state.generationId);
-      if (typeof state.sceneId === "string") setLastSceneId(state.sceneId);
 
       setRenderQueue(prev =>
         prev.map(j =>

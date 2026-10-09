@@ -4,7 +4,6 @@ import { getOrCreateUser } from "@/lib/getUser";
 import { useCredits, refundCredits, markUsageSuccess } from "@/lib/credits";
 import Replicate from "replicate";
 import { requireOutputUrl } from "@/lib/ai-output";
-import { db } from "@/lib/db";
 
 // تهيئة محرك اتصال Replicate للذكاء الاصطناعي
 const replicate = new Replicate({
@@ -88,65 +87,18 @@ async function autoEnhanceVoiceText(text: string) {
   }
 }
 
-async function persistVoiceResult(args: {
-  userId: string;
-  generationId: string | null;
-  sceneId: string | null;
-  voiceProfileId: string | null;
-  audioUrl: string;
-  outputUrl: string;
-  lipSyncVideoUrl: string | null;
-  enhancedText: string;
-  enhanceProvider: string;
-}) {
-  const { userId, generationId, sceneId, voiceProfileId, audioUrl, outputUrl, lipSyncVideoUrl, enhancedText, enhanceProvider } = args;
-  const now = new Date().toISOString();
-
-  if (sceneId) {
-    await db.scene.update({
-      where: { id: sceneId },
-      data: { audioUrl },
-    });
-  }
-
-  if (voiceProfileId) {
-    await db.voiceProfile.update({
-      where: { id: voiceProfileId },
-      data: { audioUrl },
-    });
-  }
-
-  if (generationId) {
-    const generation = await db.generation.findFirst({
-      where: { id: generationId, userId },
-      select: { metadata: true },
-    });
-    if (!generation) throw new Error("GENERATION_NOT_FOUND");
-
-    const meta = generation.metadata && typeof generation.metadata === "object"
-      ? { ...(generation.metadata as Record<string, unknown>) }
-      : {};
-
-    await db.generation.update({
-      where: { id: generationId },
-      data: {
-        metadata: {
-          ...meta,
-          voiceAudioUrl: audioUrl,
-          voiceOutputUrl: outputUrl,
-          lipSyncVideoUrl: lipSyncVideoUrl || null,
-          voiceProfileId: voiceProfileId || meta.voiceProfileId || null,
-          sceneId: sceneId || meta.sceneId || null,
-          voiceGeneratedAt: now,
-          voiceEnhanceProvider: enhanceProvider,
-          voiceEnhancedText: enhancedText,
-        },
-      },
-    });
-  }
-}
-
 export async function POST(request: Request) {
+  // TEMPORARILY DISABLED:
+  // Avatar & Voice AI is kept in the codebase for future reactivation,
+  // but this API must not consume credits or call Replicate while disabled.
+  return NextResponse.json(
+    {
+      error: "Avatar & Voice AI is temporarily unavailable.",
+      code: "SERVICE_TEMPORARILY_DISABLED",
+    },
+    { status: 503 }
+  );
+
   // 🎯 إنشاء معرف فريد للعملية لمتابعة حجز النقاط وإرجاعها تلقائياً في حال الفشل
   const referenceId = `voc_${crypto.randomUUID()}`;
 
@@ -161,62 +113,15 @@ export async function POST(request: Request) {
 
     // 📦 استقبال المعطيات من واجهة المستخدم الفخمة (Synthesis Hub)
     const body = await request.json();
-    let {
-      text,
-      voiceSampleUrl,
-      language,
-      targetAvatarVideo,
-      generationId: requestedGenerationId,
-      sceneId: requestedSceneId,
-      voiceProfileId: requestedVoiceProfileId,
-    } = body;
+    let { text, voiceSampleUrl, language, targetAvatarVideo } = body;
 
     if (!text) {
       return NextResponse.json({ error: "الرجاء كتابة النص المراد تحويله لنطق بشري حقيقي" }, { status: 400 });
     }
 
     // 👤 جلب بيانات المستخدم التحقق من وجوده في قاعدة البيانات
-    const user = await getOrCreateUser(userId);
+    const user = await getOrCreateUser(userId as string);
     if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
-
-    const generationId = typeof requestedGenerationId === "string" && requestedGenerationId.trim()
-      ? requestedGenerationId.trim()
-      : null;
-    const sceneId = typeof requestedSceneId === "string" && requestedSceneId.trim()
-      ? requestedSceneId.trim()
-      : null;
-    const voiceProfileId = typeof requestedVoiceProfileId === "string" && requestedVoiceProfileId.trim()
-      ? requestedVoiceProfileId.trim()
-      : null;
-
-    // Optional persistence context. When these IDs are not supplied, the existing
-    // standalone voice-generation behaviour remains unchanged.
-    let linkedGeneration: { id: string; userId: string; projectId: string | null; metadata: unknown } | null = null;
-    if (generationId) {
-      linkedGeneration = await db.generation.findFirst({
-        where: { id: generationId, userId: user.id },
-        select: { id: true, userId: true, projectId: true, metadata: true },
-      });
-      if (!linkedGeneration) {
-        return NextResponse.json({ error: "GENERATION_NOT_FOUND" }, { status: 404 });
-      }
-    }
-
-    if (sceneId) {
-      const scene = await db.scene.findFirst({
-        where: { id: sceneId, project: { userId: user.id } },
-        select: { id: true, projectId: true },
-      });
-      if (!scene) return NextResponse.json({ error: "SCENE_NOT_FOUND" }, { status: 404 });
-    }
-
-    if (voiceProfileId) {
-      const voiceProfile = await db.voiceProfile.findFirst({
-        where: { id: voiceProfileId, userId: user.id },
-        select: { id: true },
-      });
-      if (!voiceProfile) return NextResponse.json({ error: "VOICE_PROFILE_NOT_FOUND" }, { status: 404 });
-    }
 
     /*
      * AUTO ENHANCE
@@ -235,7 +140,7 @@ export async function POST(request: Request) {
     //////////////////////////////////////////////////
     let creditResult;
     try {
-      creditResult = await useCredits(user.id, "voice", { reference: referenceId });
+      creditResult = await useCredits(user!.id, "voice", { reference: referenceId });
     } catch (err: any) {
       if (err.message === "SUBSCRIPTION_EXPIRED_OR_INACTIVE") {
         return NextResponse.json({ error: "Your subscription has expired. Please check your billing dashboard." }, { status: 403 });
@@ -246,7 +151,7 @@ export async function POST(request: Request) {
     //////////////////////////////////////////////////
     // 🧠 DEMO MODE (FREE USERS)
     //////////////////////////////////////////////////
-    if (user.plan === "TRIAL") {
+    if (user!.plan === "TRIAL") {
       // إرسال ملف صوتي تجريبي سريع لتوفير موارد السيرفر الحقيقية
       const demoAudio = "https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg";
       
@@ -265,8 +170,6 @@ export async function POST(request: Request) {
     //////////////////////////////////////////////////
     try {
       let finalOutputUrl = "";
-      let generatedAudioUrl = "";
-      let lipSyncVideoUrl: string | null = null;
 
       // 🎤 المسار الأول: إذا رفع المشترك عينة صوت حقيقية (Instant Voice Cloning)
       if (voiceSampleUrl) {
@@ -288,8 +191,7 @@ export async function POST(request: Request) {
         }
 
         if (result.status === "failed") throw new Error("VOICE_CLONING_PIPELINE_FAILED");
-        finalOutputUrl = requireOutputUrl(result.output, "Generated voice");
-        generatedAudioUrl = finalOutputUrl
+        finalOutputUrl = requireOutputUrl(result.output, "Generated voice"); // رابط ملف الصوت
       } 
       // 🗣️ المسار الثاني: توليد نطق بشري احترافي قياسي من نصوص (Text-to-Speech) في حال عدم رفع عينة
       else {
@@ -309,7 +211,6 @@ export async function POST(request: Request) {
 
         if (result.status === "failed") throw new Error("TTS_ENGINE_FAILED");
         finalOutputUrl = requireOutputUrl(result.output, "Generated voice");
-        generatedAudioUrl = finalOutputUrl;
       }
 
       //////////////////////////////////////////////////////////////////
@@ -337,23 +238,8 @@ export async function POST(request: Request) {
 
         // إذا نجحت عملية المزامنة الحركية، يتحول المخرج النهائي ليكون فيديو ناطق فخم بدلاً من مجرد صوت
         if (syncResult.status === "succeeded") {
-          lipSyncVideoUrl = requireOutputUrl(syncResult.output, "Lip-sync output");
-          finalOutputUrl = lipSyncVideoUrl;
+          finalOutputUrl = requireOutputUrl(syncResult.output, "Lip-sync output");
         }
-      }
-
-      if (generatedAudioUrl && (generationId || sceneId || voiceProfileId)) {
-        await persistVoiceResult({
-          userId: user.id,
-          generationId,
-          sceneId,
-          voiceProfileId,
-          audioUrl: generatedAudioUrl,
-          outputUrl: finalOutputUrl,
-          lipSyncVideoUrl,
-          enhancedText,
-          enhanceProvider,
-        });
       }
 
       // 🎯 تأكيد نجاح العملية بالكامل وترسيخ خصم النقاط في قاعدة البيانات
@@ -361,13 +247,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        outputUrl: finalOutputUrl,
-        audioUrl: generatedAudioUrl || null,
-        voiceAudioUrl: generatedAudioUrl || null,
-        lipSyncVideoUrl,
-        generationId,
-        sceneId,
-        voiceProfileId,
+        outputUrl: finalOutputUrl, // سيعود برابط فيديو متكامل أو ملف صوتي فخم حسب الخيارات المفعلة
         demo: false,
         remainingCredits: creditResult.remainingCredits,
         autoEnhanced: enhancedText !== body.text,
