@@ -71,7 +71,7 @@ export default function HomePage() {
   const watermarkOff = isPaidSubscriber; // watermark is automatically shown during trial, removed once paid
   const [loadingPlan, setLoadingPlan] = useState<PlanType | null>(null);
   const [hoveredGalleryId, setHoveredGalleryId] = useState<number | null>(null);
-  
+
   // STUDIO ENGINE STATES
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState("");
@@ -480,7 +480,7 @@ export default function HomePage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden text-slate-800 font-sans selection:bg-teal-500/20 bg-[#eaf6f1]">
-      
+
       {/* 🎬 BACKGROUND VIDEO */}
       <video
         autoPlay
@@ -971,7 +971,7 @@ export default function HomePage() {
             {/* SYNTHESIS CONTROL HUB */}
             {advancedOpen && (
             <div className="w-72 border-r border-teal-900/10 bg-[#e0f1eb] p-5 space-y-5 overflow-y-auto shrink-0">
-              
+
               {/* Toggle sidebar if closed */}
               {!sidebarOpen && (
                 <button onClick={() => setSidebarOpen(true)} className="mb-2 text-slate-500 hover:text-slate-800 transition"><PanelLeft size={14} /></button>
@@ -988,7 +988,7 @@ export default function HomePage() {
               {/* AI Generation Engine */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">AI Generation Engine</label>
-               
+
 <div className="grid grid-cols-2 gap-2">
 
   <button
@@ -1225,23 +1225,61 @@ export default function HomePage() {
                       </button>
                     </div>
                   </div>
-                ) : dashLoading ? (
-                  <div className="w-full max-w-md px-6 space-y-4 pt-8">
-                    <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-500">
-                      <span className="text-teal-600 animate-pulse">Generating video...</span>
-                      <span>{renderQueue[0]?.progress ?? 5}%</span>
-                    </div>
-                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-teal-500 via-cyan-500 to-emerald-500 transition-all duration-700"
-                        style={{ width: `${renderQueue[0]?.progress ?? 5}%` }}
-                      />
-                    </div>
-                    <p className="text-center text-[11px] text-slate-500 font-mono tracking-wider">Live GPU generation in progress...</p>
-                    {renderETA !== null && (
-                      <p className="text-center text-[10px] text-slate-500 font-mono">Estimated completion in {renderETA}s</p>
-                    )}
-                  </div>
+
+) : dashLoading ? (
+  <div className="w-full h-full min-h-[360px] flex flex-col items-center justify-center px-6 py-8">
+    {/* AmkaAI progress image */}
+    <div className="relative w-48 h-48 sm:w-56 sm:h-56 mb-6 shrink-0">
+      <div className="absolute inset-0 rounded-full bg-teal-400/15 blur-2xl animate-pulse" />
+
+      <img
+        src="/amkaai-progress-logo.jpg"
+        alt="AmkaAI video generation"
+        className="relative z-10 w-full h-full object-contain rounded-2xl"
+      />
+    </div>
+
+    {/* RunPod progress percentage */}
+    <div className="w-full max-w-sm space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm font-semibold text-teal-700 animate-pulse">
+          Generating video...
+        </span>
+
+        <span className="text-xl font-bold font-mono tabular-nums text-teal-700">
+          {renderQueue[0]?.progress ?? 5}%
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div
+        className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/90 shadow-inner"
+        role="progressbar"
+        aria-label="Video generation progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={renderQueue[0]?.progress ?? 5}
+      >
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-teal-500 via-cyan-500 to-emerald-500 transition-all duration-700 ease-out"
+          style={{
+            width: `${renderQueue[0]?.progress ?? 5}%`,
+          }}
+        />
+      </div>
+
+      <p className="text-center text-xs text-slate-500 font-mono">
+        Live GPU generation in progress...
+      </p>
+
+      {renderETA !== null && (
+        <p className="text-center text-[11px] text-slate-500 font-mono">
+          Estimated completion in {renderETA}s
+        </p>
+      )}
+    </div>
+  </div>
+
                 ) : (
                   <div className="text-center pt-8">
                     <Wand2 size={36} className="mx-auto text-zinc-800 mb-3" />
